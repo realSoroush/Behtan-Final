@@ -1,11 +1,14 @@
 /**
  * nutritionHelpers.ts
- * ----------------------------------------------------------------------------
- * PURE, DETERMINISTIC MATH ONLY. No AI, no network calls, no randomness.
- * Every function here must be a pure function: same input -> same output,
- * always. This file is the single source of truth for all calorie/macro
- * math in the app so that nutrition numbers can NEVER hallucinate.
- * ----------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
+ * Pure, deterministic nutrition math. No AI, network calls, or randomness.
+ *
+ * Design rules:
+ * 1) Core calorie math must not depend on an unverified visual body-fat estimate.
+ * 2) Protein must remain feasible inside the calorie budget.
+ * 3) Returned gram values and returned macro calories must agree with each other.
+ * 4) Invalid numeric inputs fail early instead of producing plausible-looking junk.
+ * -----------------------------------------------------------------------------
  */
 
 import type {
@@ -17,20 +20,55 @@ import type {
 } from '@/types';
 
 // ============================================================================
+// CONSTANTS
+// ============================================================================
+
+const KCAL_PER_GRAM_PROTEIN = 4;
+const KCAL_PER_GRAM_FAT = 9;
+const KCAL_PER_GRAM_CARB = 4;
+
+/**
+ * Upper product guardrail for protein. The 35% calorie cap below is the primary
+ * constraint; this absolute cap prevents very-high-calorie / very-high-weight
+ * profiles from producing impractical consumer meal plans.
+ */
+const MAX_PROTEIN_GRAMS_PER_DAY = 220;
+const MAX_PROTEIN_CALORIE_FRACTION = 0.35;
+const FAT_CALORIE_FRACTION = 0.25;
+const WORKOUT_DAY_CALORIE_BONUS = 150;
+
+function assertFinitePositive(value: number, name: string): void {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`[nutritionHelpers] ${name} must be a finite positive number.`);
+  }
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+// ============================================================================
 // AGE
 // ============================================================================
 
 /** Calculates whole-number age in years from an ISO birth date string. */
 export function calculateAge(birthDateISO: string): number {
   const birthDate = new Date(birthDateISO);
-  const today = new Date();
+  if (Number.isNaN(birthDate.getTime())) {
+    throw new Error('[nutritionHelpers] Invalid birth date.');
+  }
 
+  const today = new Date();
   let age = today.getFullYear() - birthDate.getFullYear();
   const monthDiff = today.getMonth() - birthDate.getMonth();
   const dayDiff = today.getDate() - birthDate.getDate();
 
   if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
     age -= 1;
+  }
+
+  if (age < 0 || age > 120) {
+    throw new Error('[nutritionHelpers] Calculated age is outside the supported range.');
   }
 
   return age;
@@ -46,13 +84,18 @@ export interface BmrInput {
   age: number;
   gender: Gender;
   bodyFatPercentage?: number | null;
+  /**
+   * Opt-in only. A visual/AI body-fat estimate should not silently change the
+   * calorie prescription. Set this to true only when the caller has a body-fat
+   * value it intentionally considers suitable for Katch-McArdle.
+   */
+  useBodyFatFormula?: boolean;
 }
 
 /**
  * Calculates BMR (kcal/day).
- * - If bodyFatPercentage is known: Katch-McArdle formula (most accurate,
- *   based on Lean Body Mass).
- * - Otherwise: Mifflin-St Jeor formula (population-average fallback).
+ * - Default: Mifflin-St Jeor.
+ * - Optional: Katch-McArdle only when useBodyFatFormula=true and body fat is valid.
  */
 export function calculateBMR({
   weightKg,
@@ -60,18 +103,25 @@ export function calculateBMR({
   age,
   gender,
   bodyFatPercentage,
+  useBodyFatFormula = false,
 }: BmrInput): number {
-  if (bodyFatPercentage != null && bodyFatPercentage > 0 && bodyFatPercentage < 70) {
-    // Katch-McArdle
+  assertFinitePositive(weightKg, 'weightKg');
+  assertFinitePositive(heightCm, 'heightCm');
+  assertFinitePositive(age, 'age');
+
+  if (
+    useBodyFatFormula &&
+    bodyFatPercentage != null &&
+    Number.isFinite(bodyFatPercentage) &&
+    bodyFatPercentage > 2 &&
+    bodyFatPercentage < 70
+  ) {
     const leanBodyMass = weightKg * (1 - bodyFatPercentage / 100);
-    const bmr = 370 + 21.6 * leanBodyMass;
-    return Math.round(bmr);
+    return Math.round(370 + 21.6 * leanBodyMass);
   }
 
-  // Mifflin-St Jeor
   const base = 10 * weightKg + 6.25 * heightCm - 5 * age;
-  const bmr = gender === 'male' ? base + 5 : base - 161;
-  return Math.round(bmr);
+  return Math.round(gender === 'male' ? base + 5 : base - 161);
 }
 
 // ============================================================================
@@ -87,30 +137,22 @@ const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
 
 /** Applies the activity multiplier to BMR to get maintenance calories. */
 export function calculateTDEE(bmr: number, activityLevel: ActivityLevel): number {
+  assertFinitePositive(bmr, 'bmr');
   const multiplier = ACTIVITY_MULTIPLIERS[activityLevel];
+  if (!multiplier) {
+    throw new Error(`[nutritionHelpers] Unsupported activity level: ${String(activityLevel)}`);
+  }
   return Math.round(bmr * multiplier);
 }
 
 // ============================================================================
 // TARGET CALORIES — TDEE + goal-based adjustment
 // ============================================================================
-//
-// Adjustment is PERCENTAGE-based (relative to the user's own TDEE) rather
-// than a flat kcal number. A flat -500 kcal deficit is too aggressive for
-// a small person close to their TDEE floor, and too mild for someone with
-// a very high TDEE — percentage scales correctly with body size.
-//
-// BUT a pure percentage with no ceiling is dangerous at the high end: a
-// 140kg active man can have a TDEE above 4000 kcal, where a 20% deficit
-// alone is >800 kcal/day — well past the ~500-750 kcal/day range considered
-// safe regardless of body size. So every deficit/surplus percentage is
-// ALSO capped by an absolute kcal/day limit, whichever is reached first.
-// ============================================================================
 
 interface CalorieAdjustmentRule {
-  /** Fraction of TDEE to deduct/add, e.g. 0.20 = 20% deficit. */
+  /** Fraction of TDEE to deduct/add. */
   percentage: number;
-  /** Hard ceiling on the adjustment in kcal/day, regardless of percentage. */
+  /** Hard ceiling for that adjustment in kcal/day. */
   maxAbsoluteKcal: number;
 }
 
@@ -118,18 +160,13 @@ const CALORIE_ADJUSTMENT_RULES: Record<
   'weight_gain' | 'maintenance' | WeightLossSpeed,
   CalorieAdjustmentRule
 > = {
-  weight_gain:  { percentage: 0.15, maxAbsoluteKcal: 500 },
-  maintenance:  { percentage: 0,    maxAbsoluteKcal: 0 },
-  mild:         { percentage: 0.10, maxAbsoluteKcal: 350 },
-  standard:     { percentage: 0.20, maxAbsoluteKcal: 600 },
-  fast:         { percentage: 0.25, maxAbsoluteKcal: 750 },
+  weight_gain: { percentage: 0.15, maxAbsoluteKcal: 500 },
+  maintenance: { percentage: 0, maxAbsoluteKcal: 0 },
+  mild: { percentage: 0.10, maxAbsoluteKcal: 350 },
+  standard: { percentage: 0.20, maxAbsoluteKcal: 600 },
+  fast: { percentage: 0.25, maxAbsoluteKcal: 750 },
 };
 
-/**
- * Resolves the goal (+ weight-loss speed) into a signed kcal/day
- * adjustment, computed as a percentage of THIS user's TDEE and then
- * clamped to a safe absolute ceiling — whichever is smaller.
- */
 function resolveCalorieAdjustment(
   tdee: number,
   goal: Goal,
@@ -143,11 +180,9 @@ function resolveCalorieAdjustment(
         : (weightLossSpeed ?? 'standard');
 
   const rule = CALORIE_ADJUSTMENT_RULES[ruleKey];
-  const percentageAmount = tdee * rule.percentage;
-  const cappedAmount = Math.min(percentageAmount, rule.maxAbsoluteKcal);
-
+  const magnitude = Math.min(tdee * rule.percentage, rule.maxAbsoluteKcal);
   const sign = goal === 'weight_gain' ? 1 : goal === 'maintenance' ? 0 : -1;
-  return sign * cappedAmount;
+  return sign * magnitude;
 }
 
 export function calculateTargetCalories(
@@ -155,10 +190,13 @@ export function calculateTargetCalories(
   goal: Goal,
   weightLossSpeed?: WeightLossSpeed
 ): number {
+  assertFinitePositive(tdee, 'tdee');
+
   const adjustment = resolveCalorieAdjustment(tdee, goal, weightLossSpeed);
   const target = tdee + adjustment;
 
-  // Safety floor: never recommend under 1200 kcal/day regardless of inputs.
+  // Product-level emergency floor. Clinical plans below this threshold should
+  // not be generated automatically by a general-purpose consumer app.
   return Math.max(1200, Math.round(target));
 }
 
@@ -166,53 +204,64 @@ export function calculateTargetCalories(
 // MACROS
 // ============================================================================
 
-const KCAL_PER_GRAM_PROTEIN = 4;
-const KCAL_PER_GRAM_FAT = 9;
-const KCAL_PER_GRAM_CARB = 4;
-
-const FAT_PERCENTAGE_OF_CALORIES = 0.25;
-const FAT_PERCENTAGE_CAP = 0.3;
-
 /**
- * Protein target (g/kg bodyweight) by goal. Deliberately kept in a
- * conservative 1.4-1.6 range rather than bodybuilding-cut numbers
- * (2.0-2.4g/kg) — a higher ceiling was tried before and directly caused
- * unrealistic portion sizes in the meal-plan engine (e.g. 16 egg whites
- * at breakfast for a single user). 1.4-1.6g/kg is well-supported for
- * general fat loss / maintenance / lean gain without inflating portions.
+ * Starting protein target (g/kg actual body weight) by goal. This is only the
+ * starting request: it is then constrained by the calorie budget and product
+ * guardrails so high body weights cannot force impossible portions.
  */
 const PROTEIN_G_PER_KG_BY_GOAL: Record<Goal, number> = {
-  weight_loss: 1.6, // slightly higher to help preserve muscle in a deficit
+  weight_loss: 1.6,
   maintenance: 1.4,
-  weight_gain: 1.6, // slightly higher to support muscle building
+  weight_gain: 1.6,
 };
 
 /**
- * Calculates final macro targets (grams + calorie breakdown) from a
- * target calorie budget, body weight, and goal.
+ * Calculates a feasible macro budget.
  *
- * Protein: goal-dependent g/kg (see PROTEIN_G_PER_KG_BY_GOAL above).
- * Fat: 25% of target calories, hard-capped at 30% of target calories.
- * Carbs: remainder of calories after protein + fat are subtracted.
+ * Protein:
+ *   min(weight-based target, 35% of calorie budget, 220 g/day)
+ * Fat:
+ *   ~25% of calories
+ * Carbohydrate:
+ *   exact remainder after rounded protein/fat grams
+ *
+ * The returned macro calorie fields are always derived from the returned grams,
+ * eliminating the old rounding mismatch between fatGrams and fatCal.
  */
 export function calculateMacros(
   targetCalories: number,
   weightKg: number,
   goal: Goal
 ): MacroTargets {
-  // --- Protein ---
-  const proteinGPerKg = PROTEIN_G_PER_KG_BY_GOAL[goal];
-  const proteinGrams = Math.round(weightKg * proteinGPerKg);
+  assertFinitePositive(targetCalories, 'targetCalories');
+  assertFinitePositive(weightKg, 'weightKg');
+
+  const rawProteinGrams = weightKg * PROTEIN_G_PER_KG_BY_GOAL[goal];
+  const calorieLimitedProteinGrams =
+    (targetCalories * MAX_PROTEIN_CALORIE_FRACTION) / KCAL_PER_GRAM_PROTEIN;
+
+  const proteinGrams = Math.max(
+    1,
+    Math.round(
+      Math.min(rawProteinGrams, calorieLimitedProteinGrams, MAX_PROTEIN_GRAMS_PER_DAY)
+    )
+  );
   const proteinCal = proteinGrams * KCAL_PER_GRAM_PROTEIN;
 
-  // --- Fat (25% base, capped at 30% of total calories) ---
-  const fatPercentage = Math.min(FAT_PERCENTAGE_OF_CALORIES, FAT_PERCENTAGE_CAP);
-  const fatCal = Math.round(targetCalories * fatPercentage);
-  const fatGrams = Math.round(fatCal / KCAL_PER_GRAM_FAT);
+  // Keep fat close to 25%, but make sure protein + fat cannot consume the
+  // entire calorie budget after integer rounding.
+  const desiredFatGrams = Math.round(
+    (targetCalories * FAT_CALORIE_FRACTION) / KCAL_PER_GRAM_FAT
+  );
+  const maxFeasibleFatGrams = Math.max(
+    1,
+    Math.floor((targetCalories - proteinCal - 4) / KCAL_PER_GRAM_FAT)
+  );
+  const fatGrams = clamp(desiredFatGrams, 1, maxFeasibleFatGrams);
+  const fatCal = fatGrams * KCAL_PER_GRAM_FAT;
 
-  // --- Carbs (remainder) ---
-  const remainingCal = Math.max(0, targetCalories - proteinCal - fatCal);
-  const carbGrams = Math.round(remainingCal / KCAL_PER_GRAM_CARB);
+  const remainingCalories = Math.max(0, targetCalories - proteinCal - fatCal);
+  const carbGrams = Math.max(0, Math.round(remainingCalories / KCAL_PER_GRAM_CARB));
   const carbCal = carbGrams * KCAL_PER_GRAM_CARB;
 
   return {
@@ -227,7 +276,7 @@ export function calculateMacros(
 }
 
 // ============================================================================
-// ORCHESTRATOR — runs the full deterministic pipeline in one call
+// ORCHESTRATOR
 // ============================================================================
 
 export interface FullNutritionCalcInput {
@@ -239,11 +288,10 @@ export interface FullNutritionCalcInput {
   goal: Goal;
   weightLossSpeed?: WeightLossSpeed;
   bodyFatPercentage?: number | null;
+  /** See calculateBMR. Defaults to false. */
+  useBodyFatFormula?: boolean;
   isWorkoutDay?: boolean;
 }
-
-/** Small deterministic bump for workout days: +150 kcal (mostly carbs handled downstream). */
-const WORKOUT_DAY_CALORIE_BONUS = 150;
 
 export function calculateFullNutritionPlan(input: FullNutritionCalcInput): MacroTargets {
   const age = calculateAge(input.birthDateISO);
@@ -254,10 +302,10 @@ export function calculateFullNutritionPlan(input: FullNutritionCalcInput): Macro
     age,
     gender: input.gender,
     bodyFatPercentage: input.bodyFatPercentage,
+    useBodyFatFormula: input.useBodyFatFormula ?? false,
   });
 
   const tdee = calculateTDEE(bmr, input.activityLevel);
-
   let targetCalories = calculateTargetCalories(tdee, input.goal, input.weightLossSpeed);
 
   if (input.isWorkoutDay) {
@@ -268,22 +316,19 @@ export function calculateFullNutritionPlan(input: FullNutritionCalcInput): Macro
 }
 
 // ============================================================================
-// FORMATTING HELPERS (Persian digits)
+// FORMATTING HELPERS
 // ============================================================================
 
 const PERSIAN_DIGITS = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
 
-/** Converts a number/numeric string to Persian (Farsi) digit glyphs. */
 export function toPersianDigits(value: number | string): string {
   return String(value).replace(/[0-9]/g, (digit) => PERSIAN_DIGITS[Number(digit)]);
 }
 
-/** Formats grams for display, e.g. 145 -> "۱۴۵ گرم". */
 export function formatGrams(grams: number): string {
   return `${toPersianDigits(Math.round(grams))} گرم`;
 }
 
-/** Formats kcal for display, e.g. 1850 -> "۱٬۸۵۰ کالری". */
 export function formatKcal(kcal: number): string {
   const formatted = Math.round(kcal).toLocaleString('en-US');
   return `${toPersianDigits(formatted)} کالری`;
