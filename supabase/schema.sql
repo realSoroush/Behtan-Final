@@ -70,7 +70,7 @@ create table if not exists public.user_profiles (
   height numeric,
   weight numeric,
   goal text check (goal in ('weight_loss', 'weight_gain', 'maintenance')),
-  activity_level text check (activity_level in ('sedentary', 'moderate', 'active')),
+  activity_level text check (activity_level in ('sedentary', 'lightly_active', 'moderate', 'active')),
   workout_location text check (workout_location in ('home', 'gym', 'none')),
   workout_days int2,
   motivation text,
@@ -81,6 +81,8 @@ create table if not exists public.user_profiles (
   body_fat_pct numeric,
   body_type text check (body_type in ('ectomorph', 'mesomorph', 'endomorph')),
   subscription_tier text check (subscription_tier in ('silver', 'gold')),
+  onboarding_step int2 not null default 1 check (onboarding_step between 1 and 11),
+  onboarding_draft_json jsonb,
   created_at timestamptz not null default now()
 );
 

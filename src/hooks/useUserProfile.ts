@@ -6,14 +6,14 @@ interface UseUserProfileReturn {
   profile: UserProfile | null;
   loading: boolean;
   error: string | null;
+  /**
+   * Upserts profile data and rejects when Supabase rejects the write.
+   * Callers can therefore prevent navigation on failed persistence.
+   */
   upsertProfile: (data: Partial<UserProfile>) => Promise<void>;
   /**
-   * Lightweight, silent autosave for onboarding-in-progress state.
-   * Does NOT toggle `loading` or trigger a refetch — it's meant to be
-   * called after every wizard step without causing UI flicker or
-   * re-render churn. Failures are swallowed (best-effort autosave);
-   * the wizard's local state is the source of truth during the session,
-   * this is only a safety net for resuming after a closed tab.
+   * Saves a committed onboarding checkpoint. `step` is the NEXT step the
+   * user should see when they resume on any device.
    */
   saveOnboardingProgress: (step: number, draft: OnboardingData) => Promise<void>;
   refetch: () => Promise<void>;
@@ -21,69 +21,100 @@ interface UseUserProfileReturn {
 
 export function useUserProfile(userId: string | undefined): UseUserProfileReturn {
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(false);
+  const [loadedUserId, setLoadedUserId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Derived instead of relying only on an effect-driven flag. When userId
+  // changes, this becomes true on that very render, so consumers can never
+  // mistake an as-yet-unfetched profile for "no saved profile".
+  const loading = Boolean(userId) && (fetching || loadedUserId !== userId);
+
   const fetch = useCallback(async () => {
-    if (!userId) return;
-    setLoading(true);
+    if (!userId) {
+      setProfile(null);
+      setLoadedUserId(null);
+      setFetching(false);
+      return;
+    }
+
+    setFetching(true);
     setError(null);
 
     const { data, error: sbError } = await supabase
       .from('user_profiles')
       .select('*')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
-    if (sbError && sbError.code !== 'PGRST116') {
-      // PGRST116 = no rows (first-time user, not an error)
+    if (sbError) {
       setError('خطا در دریافت اطلاعات پروفایل.');
     } else {
       setProfile(data ?? null);
     }
 
-    setLoading(false);
+    setLoadedUserId(userId);
+    setFetching(false);
   }, [userId]);
 
   useEffect(() => {
-    fetch();
+    void fetch();
   }, [fetch]);
 
-  const upsertProfile = async (partial: Partial<UserProfile>) => {
-    if (!userId) return;
-    setLoading(true);
+  const upsertProfile = useCallback(async (partial: Partial<UserProfile>) => {
+    if (!userId) {
+      throw new Error('Cannot save profile without an authenticated user.');
+    }
+
+    setError(null);
+
+    const { data, error: sbError } = await supabase
+      .from('user_profiles')
+      .upsert({ id: userId, ...partial }, { onConflict: 'id' })
+      .select('*')
+      .single();
+
+    if (sbError) {
+      setError('ذخیره اطلاعات با خطا مواجه شد.');
+      throw sbError;
+    }
+
+    setProfile(data as UserProfile);
+  }, [userId]);
+
+  const saveOnboardingProgress = useCallback(async (
+    step: number,
+    draft: OnboardingData
+  ) => {
+    if (!userId) {
+      throw new Error('Cannot save onboarding progress without an authenticated user.');
+    }
+
     setError(null);
 
     const { error: sbError } = await supabase
       .from('user_profiles')
-      .upsert({ id: userId, ...partial }, { onConflict: 'id' });
+      .upsert(
+        {
+          id: userId,
+          onboarding_step: step,
+          onboarding_draft_json: draft,
+        },
+        { onConflict: 'id' }
+      );
 
     if (sbError) {
-      setError('ذخیره اطلاعات با خطا مواجه شد.');
-    } else {
-      await fetch();
+      setError('ذخیره مرحله آنبوردینگ با خطا مواجه شد.');
+      throw sbError;
     }
+  }, [userId]);
 
-    setLoading(false);
+  return {
+    profile,
+    loading,
+    error,
+    upsertProfile,
+    saveOnboardingProgress,
+    refetch: fetch,
   };
-
-  const saveOnboardingProgress = async (step: number, draft: OnboardingData) => {
-    if (!userId) return;
-    // Best-effort, silent — no loading state, no refetch, no error surfaced
-    // to the UI. If this fails (e.g. offline for a moment), the wizard
-    // keeps working from local state; the next successful step-save will
-    // catch up. Resuming just falls back to step 1 in the worst case.
-    try {
-      await supabase
-        .from('user_profiles')
-        .upsert(
-          { id: userId, onboarding_step: step, onboarding_draft_json: draft },
-          { onConflict: 'id' }
-        );
-    } catch {
-      // Swallowed intentionally — see comment above.
-    }
-  };
-
-  return { profile, loading, error, upsertProfile, saveOnboardingProgress, refetch: fetch };
 }

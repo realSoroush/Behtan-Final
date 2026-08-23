@@ -79,7 +79,7 @@ export interface UserProfile {
   body_fat_pct: number | null;
   body_type: BodyType | null;
   subscription_tier: SubscriptionTier | null;
-  /** Which onboarding wizard step (1-11) the user last reached. */
+  /** Next onboarding wizard step (1-11) to show when the user resumes. */
   onboarding_step: number;
   /** Full in-progress OnboardingData snapshot, cleared once onboarding completes. */
   onboarding_draft_json: OnboardingData | null;
