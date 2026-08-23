@@ -51,27 +51,70 @@ function clamp(value: number, min: number, max: number): number {
 // AGE
 // ============================================================================
 
-/** Calculates whole-number age in years from an ISO birth date string. */
-export function calculateAge(birthDateISO: string): number {
-  const birthDate = new Date(birthDateISO);
-  if (Number.isNaN(birthDate.getTime())) {
+export const MIN_SUPPORTED_AGE = 18;
+export const MAX_SUPPORTED_AGE = 70;
+
+function parseIsoBirthDate(birthDateISO: string): Date {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(birthDateISO);
+  if (!match) {
     throw new Error('[nutritionHelpers] Invalid birth date.');
   }
 
-  const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const monthDiff = today.getMonth() - birthDate.getMonth();
-  const dayDiff = today.getDate() - birthDate.getDate();
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const birthDate = new Date(year, month - 1, day);
+
+  // Date() normalizes impossible dates (for example 2026-02-31), so verify
+  // each calendar component after construction instead of accepting normalization.
+  if (
+    birthDate.getFullYear() !== year ||
+    birthDate.getMonth() !== month - 1 ||
+    birthDate.getDate() !== day
+  ) {
+    throw new Error('[nutritionHelpers] Invalid birth date.');
+  }
+
+  return birthDate;
+}
+
+/**
+ * Calculates whole-number age in years from an ISO birth date string.
+ * Behtan currently supports adults aged 18 through 70, inclusive.
+ */
+export function calculateAge(birthDateISO: string, referenceDate: Date = new Date()): number {
+  const birthDate = parseIsoBirthDate(birthDateISO);
+  if (Number.isNaN(referenceDate.getTime())) {
+    throw new Error('[nutritionHelpers] Invalid reference date.');
+  }
+
+  let age = referenceDate.getFullYear() - birthDate.getFullYear();
+  const monthDiff = referenceDate.getMonth() - birthDate.getMonth();
+  const dayDiff = referenceDate.getDate() - birthDate.getDate();
 
   if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
     age -= 1;
   }
 
-  if (age < 0 || age > 120) {
-    throw new Error('[nutritionHelpers] Calculated age is outside the supported range.');
+  if (age < MIN_SUPPORTED_AGE || age > MAX_SUPPORTED_AGE) {
+    throw new Error(
+      `[nutritionHelpers] Calculated age must be between ${MIN_SUPPORTED_AGE} and ${MAX_SUPPORTED_AGE}.`
+    );
   }
 
   return age;
+}
+
+/** Safe UI wrapper: invalid/unsupported birth dates return null instead of throwing. */
+export function tryCalculateAge(
+  birthDateISO: string,
+  referenceDate: Date = new Date()
+): number | null {
+  try {
+    return calculateAge(birthDateISO, referenceDate);
+  } catch {
+    return null;
+  }
 }
 
 // ============================================================================

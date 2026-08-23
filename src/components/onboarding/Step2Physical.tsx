@@ -2,16 +2,53 @@ import { StepHeader } from '@/components/ui/StepHeader';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useOnboardingStore } from '@/hooks/useOnboardingStore';
-import { calculateAge } from '@/utils/nutritionHelpers';
+import {
+  MAX_SUPPORTED_AGE,
+  MIN_SUPPORTED_AGE,
+  tryCalculateAge,
+} from '@/utils/nutritionHelpers';
+
+function formatLocalIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * For an inclusive 18–70 age range:
+ * - latest allowed birthday = today minus 18 years
+ * - earliest allowed birthday = day after today minus 71 years
+ */
+function getAllowedBirthDateRange(referenceDate: Date = new Date()) {
+  const maxDate = new Date(
+    referenceDate.getFullYear() - MIN_SUPPORTED_AGE,
+    referenceDate.getMonth(),
+    referenceDate.getDate()
+  );
+
+  const minDate = new Date(
+    referenceDate.getFullYear() - (MAX_SUPPORTED_AGE + 1),
+    referenceDate.getMonth(),
+    referenceDate.getDate() + 1
+  );
+
+  return {
+    min: formatLocalIsoDate(minDate),
+    max: formatLocalIsoDate(maxDate),
+  };
+}
 
 export function Step2Physical() {
   const { data, updateData, nextStep, prevStep, currentStep } = useOnboardingStore();
 
-  const age = data.birthDate ? calculateAge(data.birthDate) : null;
-
-  const isValidAge = age !== null && age >= 10 && age <= 90;
+  // Never let a partially-entered or unsupported birth date throw during React render.
+  const age = data.birthDate ? tryCalculateAge(data.birthDate) : null;
+  const hasBirthDate = data.birthDate.length > 0;
+  const isValidAge = age !== null;
   const isValidHeight = data.height !== null && data.height >= 100 && data.height <= 250;
   const isValidWeight = data.weight !== null && data.weight >= 30 && data.weight <= 300;
+  const { min: minBirthDate, max: maxBirthDate } = getAllowedBirthDateRange();
 
   const canContinue = isValidAge && isValidHeight && isValidWeight;
 
@@ -33,17 +70,28 @@ export function Step2Physical() {
           type="date"
           value={data.birthDate}
           onChange={(e) => updateData({ birthDate: e.target.value })}
-          max={new Date().toISOString().slice(0, 10)}
-          className="w-full bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-2xl py-3.5 px-4 outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+          min={minBirthDate}
+          max={maxBirthDate}
+          aria-invalid={hasBirthDate && !isValidAge}
+          aria-describedby={hasBirthDate && !isValidAge ? 'birth-date-error' : undefined}
+          className={`w-full bg-neutral-50 dark:bg-neutral-800 border rounded-2xl py-3.5 px-4 outline-none focus:ring-2 focus:border-transparent transition-all ${
+            hasBirthDate && !isValidAge
+              ? 'border-red-400 focus:ring-red-400/30 dark:border-red-500'
+              : 'border-neutral-200 dark:border-neutral-700 focus:ring-primary-500'
+          }`}
           dir="ltr"
         />
-        {age !== null && isValidAge && (
+
+        {isValidAge && (
           <p className="text-sm text-primary-600 dark:text-primary-400 font-medium">
             سن شما: {age} سال
           </p>
         )}
-        {age !== null && !isValidAge && (
-          <p className="text-sm text-red-500">سن باید بین ۱۰ تا ۹۰ سال باشد.</p>
+
+        {hasBirthDate && !isValidAge && (
+          <p id="birth-date-error" role="alert" className="text-sm text-red-500">
+            سن مجاز برای استفاده از بهتان بین ۱۸ تا ۷۰ سال است.
+          </p>
         )}
       </div>
 
