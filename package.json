@@ -1,5 +1,5 @@
 {
-  "name": "persian-diet-app",
+  "name": "behtan-app",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "test:nutrition": "node --experimental-strip-types scripts/nutrition-engine.smoke-test.mjs",
     "test:onboarding": "node --experimental-strip-types scripts/onboarding-persistence.smoke-test.mjs",
-    "test:age": "node --experimental-strip-types scripts/age-validation.smoke-test.mjs"
+    "test:age": "node --experimental-strip-types scripts/age-validation.smoke-test.mjs",
+    "test:brand": "node scripts/brand.smoke-test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

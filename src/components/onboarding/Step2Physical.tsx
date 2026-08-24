@@ -90,7 +90,7 @@ export function Step2Physical() {
 
         {hasBirthDate && !isValidAge && (
           <p id="birth-date-error" role="alert" className="text-sm text-red-500">
-            سن مجاز برای استفاده از بهتان بین ۱۸ تا ۷۰ سال است.
+            سن مجاز برای استفاده از به‌تن بین ۱۸ تا ۷۰ سال است.
           </p>
         )}
       </div>

@@ -14,6 +14,7 @@ import {
   getSlotTargets,
 } from '@/utils/mealPlanEngine';
 import type { DailyMealPlan, FoodItem, MacroTargets, MealComponent } from '@/types';
+import { APP_LOGO_PATH, APP_NAME_FA } from '@/constants/brand';
 
 // ============================================================================
 // Helper: compute consumed macros from meal checkboxes
@@ -159,7 +160,7 @@ export function DashboardPage() {
             <p className="text-xs text-neutral-500 dark:text-neutral-400">{today}</p>
             <p className="font-bold text-neutral-900 dark:text-neutral-100 text-sm">برنامه غذایی امروز</p>
           </div>
-          <span className="text-2xl">🥗</span>
+          <img src={APP_LOGO_PATH} alt={`لوگوی ${APP_NAME_FA}`} className="h-8 w-8 object-contain" />
         </div>
       </header>
 

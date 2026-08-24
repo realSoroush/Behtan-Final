@@ -1,3 +1,4 @@
+import { APP_LOGO_PATH, APP_NAME_FA } from '@/constants/brand';
 import { useEffect, useRef } from 'react';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -181,8 +182,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 flex flex-col">
       <div className="text-center py-6 border-b border-neutral-100 dark:border-neutral-800">
-        <span className="text-2xl">🥗</span>
-        <span className="mr-2 font-bold text-lg text-neutral-800 dark:text-neutral-200">سلامتی من</span>
+        <img src={APP_LOGO_PATH} alt={`لوگوی ${APP_NAME_FA}`} className="inline-block h-8 w-8 object-contain align-middle" />
+        <span className="mr-2 font-bold text-lg text-neutral-800 dark:text-neutral-200">{APP_NAME_FA}</span>
       </div>
 
       <div className="flex-1 overflow-hidden">

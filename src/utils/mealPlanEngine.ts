@@ -787,13 +787,12 @@ function getResolvedOptions(
     throw new Error('[mealPlanEngine] No candidate templates to rank.');
   }
 
-  // Keep a small search frontier for daily optimization. A plan can be a
-  // slightly worse fit for one slot but materially better for the whole day
-  // (e.g. a protein-based night snack can correct a day-wide protein deficit).
-  return ranked
-    .filter((candidate) => candidate.resolved.kcalDeviation <= 0.12)
-    .slice(0, 4)
-    .concat(ranked.length > 0 && ranked.every((x) => x.resolved.kcalDeviation > 0.12) ? [ranked[0]] : []);
+  // Keep every eligible template in the day-level frontier. Some options are
+  // intentionally a poor fit for the slot in isolation (for example a lean
+  // protein night snack), but can be exactly what the whole day needs after
+  // global portion refinement. With the current catalog this is at most five
+  // options per slot, so the search remains bounded.
+  return ranked;
 }
 
 function buildMeal(option: ResolvedOption): Meal {
@@ -822,10 +821,10 @@ function scoreDailyTotals(actual: MacroVector, target: MacroVector): number {
   const proteinUnder = Math.max(0, target.protein - actual.protein) / Math.max(1, target.protein);
 
   return (
-    8 * kcalDev +
+    8.5 * kcalDev +
     4 * proteinDev +
-    2 * carbDev +
-    2 * fatDev +
+    4 * carbDev +
+    3 * fatDev +
     24 * kcalOverRatio * kcalOverRatio +
     80 * severeOver * severeOver +
     1.5 * proteinUnder
@@ -899,6 +898,193 @@ function chooseDailyCombination(
   return (tied.length > 0 ? tied[seed % tied.length] : best).options;
 }
 
+function subtractComponent(total: MacroVector, component: MealComponent): MacroVector {
+  return {
+    kcal: total.kcal - component.kcal,
+    protein: total.protein - component.protein,
+    carbs: total.carbs - component.carbs,
+    fat: total.fat - component.fat,
+  };
+}
+
+function addVector(a: MacroVector, b: MacroVector): MacroVector {
+  return {
+    kcal: a.kcal + b.kcal,
+    protein: a.protein + b.protein,
+    carbs: a.carbs + b.carbs,
+    fat: a.fat + b.fat,
+  };
+}
+
+/**
+ * Second-stage day-wide portion refinement.
+ *
+ * The template resolver optimizes each meal against its own slot budget. That is
+ * necessary for meal quality, but small per-slot rounding/food-composition errors
+ * can stack in the same direction over six meals. This pass keeps the selected
+ * foods/templates fixed and only nudges legal portion sizes to improve the whole
+ * day's calorie + macro fit.
+ */
+function refineDailyPortions(
+  chosen: ResolvedOption[],
+  targets: MacroTargets
+): ResolvedOption[] {
+  const dailyTarget: MacroVector = {
+    kcal: targets.targetCalories,
+    protein: targets.proteinGrams,
+    carbs: targets.carbGrams,
+    fat: targets.fatGrams,
+  };
+
+  const refined = chosen.map((option) => ({
+    ...option,
+    resolved: {
+      ...option.resolved,
+      components: option.resolved.components.map((component) => ({ ...component })),
+      totals: { ...option.resolved.totals },
+    },
+  }));
+
+  let dailyTotals = refined.reduce<MacroVector>(
+    (acc, option) => addVector(acc, option.resolved.totals),
+    { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+  );
+
+  const combinedScore = (
+    candidateDaily: MacroVector,
+    candidateMeal: MacroVector,
+    slotTarget: MacroVector
+  ) => {
+    const kcalRatio = candidateMeal.kcal / Math.max(1, slotTarget.kcal);
+    if (kcalRatio < 0.55 || kcalRatio > 1.35) return Number.POSITIVE_INFINITY;
+    return scoreDailyTotals(candidateDaily, dailyTarget) + 0.035 * scoreTotals(candidateMeal, slotTarget);
+  };
+
+  // Coordinate descent is deterministic and cheap here: ~20 components × a
+  // small candidate list × four passes. Stop early when a full pass is stable.
+  for (let pass = 0; pass < 4; pass++) {
+    let changed = false;
+
+    for (const option of refined) {
+      const share = SLOT_DISTRIBUTION[option.slot];
+      const slotTarget: MacroVector = {
+        kcal: dailyTarget.kcal * share.kcal,
+        protein: dailyTarget.protein * share.protein,
+        carbs: dailyTarget.carbs * share.carbs,
+        fat: dailyTarget.fat * share.fat,
+      };
+
+      for (let index = 0; index < option.resolved.components.length; index++) {
+        const current = option.resolved.components[index];
+        const withoutCurrentMeal = subtractComponent(option.resolved.totals, current);
+        const withoutCurrentDay = subtractComponent(dailyTotals, current);
+
+        let bestComponent = current;
+        let bestMeal = option.resolved.totals;
+        let bestDay = dailyTotals;
+        let bestScore = combinedScore(dailyTotals, option.resolved.totals, slotTarget);
+
+        for (const units of portionCandidates(current.foodItem, slotTarget)) {
+          const candidateComponent = componentFromUnits(current.foodItem, units);
+          const candidateMeal = addTotals(withoutCurrentMeal, candidateComponent);
+          const candidateDay = addTotals(withoutCurrentDay, candidateComponent);
+          const candidateScore = combinedScore(candidateDay, candidateMeal, slotTarget);
+
+          if (candidateScore + 1e-9 < bestScore) {
+            bestScore = candidateScore;
+            bestComponent = candidateComponent;
+            bestMeal = candidateMeal;
+            bestDay = candidateDay;
+          }
+        }
+
+        if (bestComponent.units !== current.units) {
+          option.resolved.components[index] = bestComponent;
+          option.resolved.totals = bestMeal;
+          dailyTotals = bestDay;
+          changed = true;
+        }
+      }
+    }
+
+    if (!changed) break;
+  }
+
+  for (const option of refined) {
+    option.resolved.totals = {
+      kcal: Math.round(option.resolved.totals.kcal),
+      protein: round1(option.resolved.totals.protein),
+      carbs: round1(option.resolved.totals.carbs),
+      fat: round1(option.resolved.totals.fat),
+    };
+  }
+
+  return refined;
+}
+
+function totalResolvedOptions(options: ResolvedOption[]): MacroVector {
+  return options.reduce<MacroVector>(
+    (acc, option) => addVector(acc, option.resolved.totals),
+    { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+  );
+}
+
+/**
+ * Coordinate descent can perfect portions inside a chosen template set, but it
+ * cannot replace a structurally carb-heavy snack with a protein/fat-heavier one.
+ * This deterministic local search tries one template replacement per slot and
+ * re-runs portion refinement, keeping a replacement only when the whole day's
+ * macro score improves.
+ */
+function refineDailyTemplates(
+  initial: ResolvedOption[],
+  optionsBySlot: ResolvedOption[][],
+  targets: MacroTargets
+): ResolvedOption[] {
+  const dailyTarget: MacroVector = {
+    kcal: targets.targetCalories,
+    protein: targets.proteinGrams,
+    carbs: targets.carbGrams,
+    fat: targets.fatGrams,
+  };
+
+  let best = refineDailyPortions(initial, targets);
+  let bestScore = scoreDailyTotals(totalResolvedOptions(best), dailyTarget);
+
+  for (let pass = 0; pass < 2; pass++) {
+    let changed = false;
+
+    for (let slotIndex = 0; slotIndex < optionsBySlot.length; slotIndex++) {
+      let slotBest = best;
+      let slotBestScore = bestScore;
+
+      for (const replacement of optionsBySlot[slotIndex]) {
+        if (replacement.template.id === best[slotIndex].template.id) continue;
+        const candidateBase = best.map((option, index) =>
+          index === slotIndex ? replacement : option
+        );
+        const candidate = refineDailyPortions(candidateBase, targets);
+        const candidateScore = scoreDailyTotals(totalResolvedOptions(candidate), dailyTarget);
+
+        if (candidateScore + 1e-9 < slotBestScore) {
+          slotBest = candidate;
+          slotBestScore = candidateScore;
+        }
+      }
+
+      if (slotBest !== best) {
+        best = slotBest;
+        bestScore = slotBestScore;
+        changed = true;
+      }
+    }
+
+    if (!changed) break;
+  }
+
+  return best;
+}
+
 // ============================================================================
 // 8 - MAIN ENTRY POINT
 // ============================================================================
@@ -936,7 +1122,8 @@ export function generateDailyMealPlan(
   });
 
   const chosen = chooseDailyCombination(optionsBySlot, targets, seed);
-  const meals = chosen.map(buildMeal);
+  const refined = refineDailyTemplates(chosen, optionsBySlot, targets);
+  const meals = refined.map(buildMeal);
 
   return { date, isWorkoutDay, targets, meals };
 }

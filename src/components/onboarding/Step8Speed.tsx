@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { OptionCard } from '@/components/ui/Card';
 import { useOnboardingStore } from '@/hooks/useOnboardingStore';
 import type { WeightLossSpeed } from '@/types';
+import { WEIGHT_LOSS_SPEED_POLICY, toPersianDigits } from '@/utils/nutritionHelpers';
 
 interface SpeedOption {
   value: WeightLossSpeed;
@@ -15,13 +16,16 @@ interface SpeedOption {
   safe: boolean;
 }
 
+const formatPercent = (value: number) => toPersianDigits(Math.round(value * 100));
+const formatKcal = (value: number) => toPersianDigits(value);
+
 const SPEEDS: SpeedOption[] = [
   {
     value: 'mild',
     icon: '🐢',
     label: 'ملایم',
-    range: '۱ تا ۲ کیلو در ماه',
-    deficit: 'کمبود ۳۰۰ کالری در روز',
+    range: 'آهسته و پایدار',
+    deficit: `کسری ${formatPercent(WEIGHT_LOSS_SPEED_POLICY.mild.percentage)}٪ از کالری نگهدارنده، حداکثر ${formatKcal(WEIGHT_LOSS_SPEED_POLICY.mild.maxAbsoluteKcal)} کالری`,
     color: 'text-green-600',
     safe: true,
   },
@@ -29,8 +33,8 @@ const SPEEDS: SpeedOption[] = [
     value: 'standard',
     icon: '🚀',
     label: 'استاندارد',
-    range: '۳ تا ۴ کیلو در ماه',
-    deficit: 'کمبود ۵۰۰ کالری در روز',
+    range: 'متعادل',
+    deficit: `کسری ${formatPercent(WEIGHT_LOSS_SPEED_POLICY.standard.percentage)}٪ از کالری نگهدارنده، حداکثر ${formatKcal(WEIGHT_LOSS_SPEED_POLICY.standard.maxAbsoluteKcal)} کالری`,
     color: 'text-yellow-600',
     safe: true,
   },
@@ -38,8 +42,8 @@ const SPEEDS: SpeedOption[] = [
     value: 'fast',
     icon: '⚡',
     label: 'سریع',
-    range: '۵ تا ۶ کیلو در ماه',
-    deficit: 'کمبود ۵۰۰ کالری + ورزش شدید',
+    range: 'تهاجمی‌تر',
+    deficit: `کسری ${formatPercent(WEIGHT_LOSS_SPEED_POLICY.fast.percentage)}٪ از کالری نگهدارنده، حداکثر ${formatKcal(WEIGHT_LOSS_SPEED_POLICY.fast.maxAbsoluteKcal)} کالری`,
     color: 'text-red-500',
     safe: false,
   },

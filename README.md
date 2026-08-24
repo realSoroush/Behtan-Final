@@ -1,4 +1,4 @@
-# 🥗 سلامتی من — Persian Smart Diet App
+# به‌تن (Behtan) — Persian Smart Nutrition App
 
 A modern, RTL-first, Persian-language health and diet SPA built with React + TypeScript + Supabase. All nutrition calculations are **100% deterministic math** — no AI hallucinations for calorie or macro data. AI is strictly limited to vision-based body composition analysis in the onboarding flow.
 
@@ -23,7 +23,7 @@ A modern, RTL-first, Persian-language health and diet SPA built with React + Typ
 ## 🗂️ Project Structure
 
 ```
-persian-diet-app/
+behtan-app/
 ├── src/
 │   ├── types/index.ts              # All TypeScript types/interfaces
 │   ├── lib/
@@ -60,7 +60,7 @@ persian-diet-app/
 
 ```bash
 git clone <your-repo>
-cd persian-diet-app
+cd behtan-app
 npm install
 ```
 

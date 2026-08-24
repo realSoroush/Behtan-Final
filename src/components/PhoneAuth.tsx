@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/hooks/useAuth';
+import { APP_LOGO_PATH, APP_NAME_FA } from '@/constants/brand';
 
 interface PhoneAuthProps {
   onAuthenticated: () => void;
@@ -44,9 +45,9 @@ export function PhoneAuth({ onAuthenticated }: PhoneAuthProps) {
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-          className="w-24 h-24 bg-primary-500 rounded-3xl flex items-center justify-center mb-6 shadow-xl shadow-primary-200 dark:shadow-primary-900/40"
+          className="w-24 h-24 rounded-3xl flex items-center justify-center mb-6 shadow-xl shadow-primary-200 dark:shadow-primary-900/40 overflow-hidden"
         >
-          <span className="text-5xl">🥗</span>
+          <img src={APP_LOGO_PATH} alt={`لوگوی ${APP_NAME_FA}`} className="w-full h-full object-contain" />
         </motion.div>
 
         <motion.div
@@ -55,7 +56,7 @@ export function PhoneAuth({ onAuthenticated }: PhoneAuthProps) {
           transition={{ delay: 0.15 }}
         >
           <h1 className="text-3xl font-extrabold text-neutral-900 dark:text-neutral-100">
-            سلامتی من
+            {APP_NAME_FA}
           </h1>
           <p className="text-neutral-500 dark:text-neutral-400 mt-2 leading-relaxed text-sm">
             برنامه تغذیه هوشمند و شخصی‌سازی‌شده

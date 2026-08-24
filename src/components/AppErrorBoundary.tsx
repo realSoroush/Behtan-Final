@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { APP_NAME_EN, APP_NAME_FA } from '@/constants/brand';
 
 interface AppErrorBoundaryProps {
   children: ReactNode;
@@ -20,7 +21,7 @@ export class AppErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('Unhandled Behtan UI error:', error, info);
+    console.error(`Unhandled ${APP_NAME_EN} UI error:`, error, info);
   }
 
   private reload = () => {
@@ -37,7 +38,7 @@ export class AppErrorBoundary extends Component<
             <AlertTriangle size={24} />
           </div>
           <h1 className="text-lg font-bold text-neutral-900 dark:text-neutral-100">
-            یک خطای غیرمنتظره رخ داد
+            {APP_NAME_FA} با یک خطای غیرمنتظره مواجه شد
           </h1>
           <p className="mt-2 text-sm leading-6 text-neutral-500 dark:text-neutral-400">
             اطلاعات ذخیره‌شده شما از بین نرفته است. صفحه را دوباره بارگذاری کنید و ادامه دهید.

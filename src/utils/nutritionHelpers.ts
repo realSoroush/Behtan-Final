@@ -192,12 +192,23 @@ export function calculateTDEE(bmr: number, activityLevel: ActivityLevel): number
 // TARGET CALORIES — TDEE + goal-based adjustment
 // ============================================================================
 
-interface CalorieAdjustmentRule {
+export interface CalorieAdjustmentRule {
   /** Fraction of TDEE to deduct/add. */
   percentage: number;
   /** Hard ceiling for that adjustment in kcal/day. */
   maxAbsoluteKcal: number;
 }
+
+/**
+ * Single source of truth for the three weight-loss speeds.
+ * Step8Speed imports this object directly, so the copy shown to the user can
+ * never silently drift away from the formula used by the nutrition engine.
+ */
+export const WEIGHT_LOSS_SPEED_POLICY: Readonly<Record<WeightLossSpeed, CalorieAdjustmentRule>> = {
+  mild: { percentage: 0.10, maxAbsoluteKcal: 350 },
+  standard: { percentage: 0.20, maxAbsoluteKcal: 600 },
+  fast: { percentage: 0.25, maxAbsoluteKcal: 750 },
+};
 
 const CALORIE_ADJUSTMENT_RULES: Record<
   'weight_gain' | 'maintenance' | WeightLossSpeed,
@@ -205,9 +216,7 @@ const CALORIE_ADJUSTMENT_RULES: Record<
 > = {
   weight_gain: { percentage: 0.15, maxAbsoluteKcal: 500 },
   maintenance: { percentage: 0, maxAbsoluteKcal: 0 },
-  mild: { percentage: 0.10, maxAbsoluteKcal: 350 },
-  standard: { percentage: 0.20, maxAbsoluteKcal: 600 },
-  fast: { percentage: 0.25, maxAbsoluteKcal: 750 },
+  ...WEIGHT_LOSS_SPEED_POLICY,
 };
 
 function resolveCalorieAdjustment(
@@ -248,9 +257,9 @@ export function calculateTargetCalories(
 // ============================================================================
 
 /**
- * Starting protein target (g/kg actual body weight) by goal. This is only the
- * starting request: it is then constrained by the calorie budget and product
- * guardrails so high body weights cannot force impossible portions.
+ * Starting protein target (g/kg protein-reference weight) by goal. For BMI <30
+ * the reference is actual body weight; for BMI >=30 the reference is adjusted
+ * before these multipliers are applied.
  */
 const PROTEIN_G_PER_KG_BY_GOAL: Record<Goal, number> = {
   weight_loss: 1.6,
@@ -262,7 +271,9 @@ const PROTEIN_G_PER_KG_BY_GOAL: Record<Goal, number> = {
  * Calculates a feasible macro budget.
  *
  * Protein:
- *   min(weight-based target, 35% of calorie budget, 220 g/day)
+ *   uses actual body weight below BMI 30, and an adjusted reference weight
+ *   above BMI 30 so adipose mass cannot linearly inflate the protein target;
+ *   then applies the 35%-of-calories and 220 g/day product guardrails.
  * Fat:
  *   ~25% of calories
  * Carbohydrate:
@@ -271,15 +282,32 @@ const PROTEIN_G_PER_KG_BY_GOAL: Record<Goal, number> = {
  * The returned macro calorie fields are always derived from the returned grams,
  * eliminating the old rounding mismatch between fatGrams and fatCal.
  */
+function proteinReferenceWeightKg(weightKg: number, heightCm?: number): number {
+  if (!heightCm || !Number.isFinite(heightCm) || heightCm <= 0) return weightKg;
+
+  const heightM = heightCm / 100;
+  const bmi = weightKg / (heightM * heightM);
+  if (bmi < 30) return weightKg;
+
+  // Product heuristic for obesity-range BMI: do not let protein scale 1:1
+  // with total body weight. Use BMI-25 reference weight plus 40% of the excess.
+  // The absolute and calorie-share caps below remain the final guardrails.
+  const bmi25Weight = 25 * heightM * heightM;
+  const adjustedWeight = bmi25Weight + 0.4 * (weightKg - bmi25Weight);
+  return clamp(adjustedWeight, bmi25Weight, weightKg);
+}
+
 export function calculateMacros(
   targetCalories: number,
   weightKg: number,
-  goal: Goal
+  goal: Goal,
+  heightCm?: number
 ): MacroTargets {
   assertFinitePositive(targetCalories, 'targetCalories');
   assertFinitePositive(weightKg, 'weightKg');
 
-  const rawProteinGrams = weightKg * PROTEIN_G_PER_KG_BY_GOAL[goal];
+  const referenceWeightKg = proteinReferenceWeightKg(weightKg, heightCm);
+  const rawProteinGrams = referenceWeightKg * PROTEIN_G_PER_KG_BY_GOAL[goal];
   const calorieLimitedProteinGrams =
     (targetCalories * MAX_PROTEIN_CALORIE_FRACTION) / KCAL_PER_GRAM_PROTEIN;
 
@@ -355,7 +383,7 @@ export function calculateFullNutritionPlan(input: FullNutritionCalcInput): Macro
     targetCalories += WORKOUT_DAY_CALORIE_BONUS;
   }
 
-  return calculateMacros(targetCalories, input.weightKg, input.goal);
+  return calculateMacros(targetCalories, input.weightKg, input.goal, input.heightCm);
 }
 
 // ============================================================================

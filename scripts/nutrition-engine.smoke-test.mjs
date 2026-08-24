@@ -11,6 +11,8 @@ import {
   calculateBMR,
   calculateFullNutritionPlan,
   calculateMacros,
+  calculateTargetCalories,
+  WEIGHT_LOSS_SPEED_POLICY,
 } from '../src/utils/nutritionHelpers.ts';
 import { generateDailyMealPlan } from '../src/utils/mealPlanEngine.ts';
 
@@ -79,13 +81,32 @@ const katchOptIn = calculateBMR({
 assert(mifflinDefault === mifflinNoBodyFat, 'Unverified body fat changed default BMR');
 assert(katchOptIn !== mifflinNoBodyFat, 'Explicit Katch-McArdle opt-in did not change BMR');
 
+
+// Weight-loss speed UI and engine share one policy object. Verify both the
+// percentage behavior and hard deficit caps that Step8Speed displays.
+assert(WEIGHT_LOSS_SPEED_POLICY.mild.percentage === 0.10, 'Mild speed policy drifted');
+assert(WEIGHT_LOSS_SPEED_POLICY.standard.percentage === 0.20, 'Standard speed policy drifted');
+assert(WEIGHT_LOSS_SPEED_POLICY.fast.percentage === 0.25, 'Fast speed policy drifted');
+assert(calculateTargetCalories(2000, 'weight_loss', 'mild') === 1800, 'Mild deficit mismatch');
+assert(calculateTargetCalories(2000, 'weight_loss', 'standard') === 1600, 'Standard deficit mismatch');
+assert(calculateTargetCalories(2000, 'weight_loss', 'fast') === 1500, 'Fast deficit mismatch');
+assert(calculateTargetCalories(4000, 'weight_loss', 'mild') === 3650, 'Mild deficit cap mismatch');
+assert(calculateTargetCalories(4000, 'weight_loss', 'standard') === 3400, 'Standard deficit cap mismatch');
+assert(calculateTargetCalories(4000, 'weight_loss', 'fast') === 3250, 'Fast deficit cap mismatch');
+
+// Obesity-range body weights should not make protein scale linearly forever.
+// With height supplied, calculateMacros uses an adjusted reference weight.
+const highWeightMacros = calculateMacros(3000, 200, 'weight_loss', 185);
+assert(highWeightMacros.proteinGrams < 220, `Adjusted high-weight protein target failed: ${highWeightMacros.proteinGrams}g`);
+assert(highWeightMacros.proteinGrams < 200 * 1.6, 'High-weight protein still scales directly from total body weight');
+
 // ---------------------------------------------------------------------------
 // 2) Meal engine matrix
 // ---------------------------------------------------------------------------
 const weights = [45, 80, 150, 200];
 const heights = [160, 185];
 const genders = ['male', 'female'];
-const activities = ['sedentary', 'active'];
+const activities = ['sedentary', 'lightly_active', 'moderate', 'active'];
 const goals = ['weight_loss', 'maintenance', 'weight_gain'];
 const workoutFlags = [false, true];
 
@@ -138,7 +159,6 @@ for (const weightKg of weights) {
               );
               const totals = sumPlan(plan);
 
-              // Diet/allergy constraints must never be relaxed as a fallback.
               for (const meal of plan.meals) {
                 for (const component of meal.components) {
                   const food = component.foodItem;
@@ -167,31 +187,25 @@ for (const weightKg of weights) {
               maxAbsCarbDeviation = Math.max(maxAbsCarbDeviation, Math.abs(carbDev));
               maxAbsFatDeviation = Math.max(maxAbsFatDeviation, Math.abs(fatDev));
 
-              // Primary engine invariant: never reproduce the old +50% calorie overshoot.
               assert(
                 kcalDev <= 0.03,
                 `Calorie overshoot >3%: ${(kcalDev * 100).toFixed(1)}%, target=${targets.targetCalories}, actual=${totals.kcal}`
               );
-
-              // Across this intentionally broad 45–200kg matrix, portion constraints
-              // should still keep daily energy reasonably close to the target.
               assert(
-                kcalDev >= -0.07,
-                `Calorie undershoot >7%: ${(kcalDev * 100).toFixed(1)}%, target=${targets.targetCalories}, actual=${totals.kcal}`
-              );
-
-
-              assert(
-                totals.protein <= targets.proteinGrams * 1.25,
-                `Protein overshoot >25%: target=${targets.proteinGrams}, actual=${totals.protein}`
+                kcalDev >= -0.05,
+                `Calorie undershoot >5%: ${(kcalDev * 100).toFixed(1)}%, target=${targets.targetCalories}, actual=${totals.kcal}`
               );
               assert(
-                totals.carbs <= targets.carbGrams * 1.25,
-                `Carb overshoot >25%: target=${targets.carbGrams}, actual=${totals.carbs}`
+                Math.abs(proteinDev) <= 0.10,
+                `Protein deviation >10%: ${(proteinDev * 100).toFixed(1)}%, target=${targets.proteinGrams}, actual=${totals.protein}`
               );
               assert(
-                totals.fat <= targets.fatGrams * 1.25,
-                `Fat overshoot >25%: target=${targets.fatGrams}, actual=${totals.fat}`
+                Math.abs(carbDev) <= 0.10,
+                `Carb deviation >10%: ${(carbDev * 100).toFixed(1)}%, target=${targets.carbGrams}, actual=${totals.carbs}`
+              );
+              assert(
+                Math.abs(fatDev) <= 0.10,
+                `Fat deviation >10%: ${(fatDev * 100).toFixed(1)}%, target=${targets.fatGrams}, actual=${totals.fat}`
               );
             }
           }
