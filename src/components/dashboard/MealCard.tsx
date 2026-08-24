@@ -19,9 +19,11 @@ function ComponentRow({ component, onSwap }: ComponentRowProps) {
   // Display quantity in the food's natural unit (عدد/برش/اسکوپ) when it's
   // a countable item, otherwise show grams directly.
   const displayAmount =
-    foodItem.unitLabel === 'گرم'
-      ? `${toPersianDigits(grams)} گرم`
-      : `${toPersianDigits(component.units)} ${foodItem.unitLabel} (${toPersianDigits(grams)} گرم)`;
+    foodItem.id === 'low_fat_milk'
+      ? `${toPersianDigits(component.units)} ${foodItem.unitLabel} (${toPersianDigits(grams)} میلی‌لیتر)`
+      : foodItem.unitLabel === 'گرم'
+        ? `${toPersianDigits(grams)} گرم`
+        : `${toPersianDigits(component.units)} ${foodItem.unitLabel} (${toPersianDigits(grams)} گرم)`;
 
   return (
     <div className="flex items-start gap-3 py-2.5 border-b border-neutral-50 dark:border-neutral-800 last:border-0">

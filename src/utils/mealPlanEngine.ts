@@ -160,6 +160,13 @@ const FOOD_ITEMS: FoodItem[] = [
   { id: 'banana', name: 'موز', role: 'fruit', emoji: '🍌',
     unitLabel: 'عدد', gramsPerUnit: 120, kcalPerUnit: 107, proteinPerUnit: 1.3, carbsPerUnit: 27, fatPerUnit: 0.4,
     allergyFlags: [], excludedForVegetarian: [] },
+
+  // USDA FoodData Central SR Legacy (FDC 168191), rounded per 24g Medjool date.
+  // A dense whole-food carb option helps high-energy plans without inflating
+  // rice/potato portions beyond practical serving limits.
+  { id: 'medjool_date', name: 'خرمای مدجول', role: 'fruit', emoji: '🌴',
+    unitLabel: 'عدد', gramsPerUnit: 24, kcalPerUnit: 67, proteinPerUnit: 0.4, carbsPerUnit: 18, fatPerUnit: 0.04,
+    allergyFlags: [], excludedForVegetarian: [] },
 ];
 
 const foodById = (id: string): FoodItem => {
@@ -192,7 +199,8 @@ export const FOOD_SUBSTITUTES: FoodSubstituteGroup[] = [
   { foodItemId: 'walnut', substituteIds: ['mixed_nuts', 'avocado_half'] },
   { foodItemId: 'mixed_nuts', substituteIds: ['walnut', 'avocado_half'] },
   { foodItemId: 'apple', substituteIds: ['banana'] },
-  { foodItemId: 'banana', substituteIds: ['apple'] },
+  { foodItemId: 'banana', substituteIds: ['apple', 'medjool_date'] },
+  { foodItemId: 'medjool_date', substituteIds: ['banana', 'apple'] },
 ];
 
 export function getSubstitutesFor(foodItemId: string): FoodItem[] {
@@ -276,6 +284,37 @@ const MEAL_TEMPLATES: MealTemplate[] = [
     slots: [
       { role: 'protein', primaryFoodItemId: 'pea_protein', dynamicUnits: true },
       { role: 'fruit', primaryFoodItemId: 'apple', dynamicUnits: false, fixedUnits: 1 },
+    ],
+    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
+  },
+  {
+    id: 'ms_dates_milk', slot: 'morning_snack', displayName: 'خرما با شیر کم‌چرب',
+    slots: [
+      { role: 'fruit', primaryFoodItemId: 'medjool_date', dynamicUnits: true },
+      { role: 'dairy', primaryFoodItemId: 'low_fat_milk', dynamicUnits: true },
+    ],
+    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
+  },
+  {
+    id: 'ms_dates', slot: 'morning_snack', displayName: 'خرمای مدجول',
+    slots: [
+      { role: 'fruit', primaryFoodItemId: 'medjool_date', dynamicUnits: true },
+    ],
+    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
+  },
+  {
+    id: 'ms_banana_dates', slot: 'morning_snack', displayName: 'موز و خرما',
+    slots: [
+      { role: 'fruit', primaryFoodItemId: 'banana', dynamicUnits: true },
+      { role: 'fruit', primaryFoodItemId: 'medjool_date', dynamicUnits: true },
+    ],
+    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
+  },
+  {
+    id: 'ms_toast_banana', slot: 'morning_snack', displayName: 'نان تست سبوس‌دار و موز',
+    slots: [
+      { role: 'starch', primaryFoodItemId: 'whole_grain_toast', dynamicUnits: true },
+      { role: 'fruit', primaryFoodItemId: 'banana', dynamicUnits: true },
     ],
     isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
   },
@@ -365,6 +404,39 @@ const MEAL_TEMPLATES: MealTemplate[] = [
     ],
     isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
   },
+  {
+    id: 'as_potato_dates', slot: 'afternoon_snack', displayName: 'سیب‌زمینی و خرما',
+    slots: [
+      { role: 'starch', primaryFoodItemId: 'boiled_potato', dynamicUnits: true },
+      { role: 'fruit', primaryFoodItemId: 'medjool_date', dynamicUnits: true },
+    ],
+    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
+  },
+  {
+    id: 'as_banana_dates', slot: 'afternoon_snack', displayName: 'موز و خرما',
+    slots: [
+      { role: 'fruit', primaryFoodItemId: 'banana', dynamicUnits: true },
+      { role: 'fruit', primaryFoodItemId: 'medjool_date', dynamicUnits: true },
+    ],
+    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
+  },
+  {
+    id: 'as_banana_dates_avocado', slot: 'afternoon_snack', displayName: 'موز، خرما و آووکادو',
+    slots: [
+      { role: 'fruit', primaryFoodItemId: 'banana', dynamicUnits: true },
+      { role: 'fruit', primaryFoodItemId: 'medjool_date', dynamicUnits: true },
+      { role: 'fat', primaryFoodItemId: 'avocado_half', dynamicUnits: true },
+    ],
+    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
+  },
+  {
+    id: 'as_toast_dates', slot: 'afternoon_snack', displayName: 'نان تست سبوس‌دار و خرما',
+    slots: [
+      { role: 'starch', primaryFoodItemId: 'whole_grain_toast', dynamicUnits: true },
+      { role: 'fruit', primaryFoodItemId: 'medjool_date', dynamicUnits: true },
+    ],
+    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
+  },
 
   // Dinner
   {
@@ -438,6 +510,29 @@ const MEAL_TEMPLATES: MealTemplate[] = [
     ],
     isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
   },
+  {
+    id: 'ns_dates', slot: 'night_snack', displayName: 'خرمای مدجول',
+    slots: [
+      { role: 'fruit', primaryFoodItemId: 'medjool_date', dynamicUnits: true },
+    ],
+    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
+  },
+  {
+    id: 'ns_banana_dates', slot: 'night_snack', displayName: 'موز و خرما',
+    slots: [
+      { role: 'fruit', primaryFoodItemId: 'banana', dynamicUnits: true },
+      { role: 'fruit', primaryFoodItemId: 'medjool_date', dynamicUnits: true },
+    ],
+    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
+  },
+  {
+    id: 'ns_toast_dates', slot: 'night_snack', displayName: 'نان تست سبوس‌دار و خرما',
+    slots: [
+      { role: 'starch', primaryFoodItemId: 'whole_grain_toast', dynamicUnits: true },
+      { role: 'fruit', primaryFoodItemId: 'medjool_date', dynamicUnits: true },
+    ],
+    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
+  },
 ];
 
 // ============================================================================
@@ -452,12 +547,16 @@ interface SlotShare {
 }
 
 const SLOT_DISTRIBUTION: Record<MealSlot, SlotShare> = {
-  breakfast:        { kcal: 0.20, protein: 0.21, carbs: 0.14, fat: 0.26 },
-  morning_snack:    { kcal: 0.11, protein: 0.15, carbs: 0.08, fat: 0.08 },
-  lunch:            { kcal: 0.34, protein: 0.26, carbs: 0.40, fat: 0.38 },
-  afternoon_snack:  { kcal: 0.12, protein: 0.12, carbs: 0.18, fat: 0.04 },
-  dinner:           { kcal: 0.18, protein: 0.22, carbs: 0.14, fat: 0.20 },
-  night_snack:      { kcal: 0.05, protein: 0.04, carbs: 0.06, fat: 0.04 },
+  // Calories stay on the verified v2 split. Carbs/fats are distributed more
+  // evenly so the optimizer does not try to cram 40% of the day's carbs into
+  // lunch (the main cause of extreme rice portions). Daily macro targets are
+  // unchanged; this is only a meal-allocation policy.
+  breakfast:        { kcal: 0.20, protein: 0.21, carbs: 0.20, fat: 0.25 },
+  morning_snack:    { kcal: 0.11, protein: 0.15, carbs: 0.10, fat: 0.10 },
+  lunch:            { kcal: 0.34, protein: 0.26, carbs: 0.30, fat: 0.30 },
+  afternoon_snack:  { kcal: 0.12, protein: 0.12, carbs: 0.20, fat: 0.10 },
+  dinner:           { kcal: 0.18, protein: 0.22, carbs: 0.15, fat: 0.20 },
+  night_snack:      { kcal: 0.05, protein: 0.04, carbs: 0.05, fat: 0.05 },
 };
 
 const MEAL_SLOT_LABELS: Record<MealSlot, string> = {
@@ -501,6 +600,20 @@ export class MealPlanGenerationError extends Error {
     super(message);
     this.name = 'MealPlanGenerationError';
     this.slot = slot;
+  }
+}
+
+export class MealPlanFeasibilityError extends Error {
+  target: MacroVector;
+  actual: MacroVector;
+
+  constructor(target: MacroVector, actual: MacroVector) {
+    super(
+      'با مواد غذایی و محدودیت‌های فعلی، ساخت برنامه‌ای با حجم واقعی و نزدیک به اهداف تغذیه‌ای شما ممکن نیست. لطفاً محدودیت‌های غذایی را بررسی کنید یا بعداً دوباره تلاش کنید.'
+    );
+    this.name = 'MealPlanFeasibilityError';
+    this.target = target;
+    this.actual = actual;
   }
 }
 
@@ -555,63 +668,139 @@ function range(min: number, max: number, step: number): number[] {
 }
 
 /**
- * Plausible portion candidates. These bounds are intentionally conservative:
- * the optimizer may choose among them, but cannot invent a 600g steak or 12
- * scoops of whey simply to satisfy a macro target.
+ * Portion realism rules are product guardrails, not medical prescriptions.
+ * They prevent the optimizer from satisfying macros by inflating one food to
+ * an obviously impractical amount. `typicalUnits` is the preferred center,
+ * `softMaxUnits` starts a realism penalty, and `hardMaxUnits` is absolute.
+ *
+ * The food macros above make the preparation state explicit in the id/name
+ * (for example `*_cooked` and `oats_dry`). These limits therefore apply to
+ * the same state shown to the user.
  */
+type PortionRule = {
+  minUnits: number;
+  typicalUnits: number;
+  softMaxUnits: number;
+  hardMaxUnits: number;
+  step: number;
+};
+
+const PORTION_RULES: Partial<Record<string, PortionRule>> = {
+  egg_white:          { minUnits: 1,    typicalUnits: 4,    softMaxUnits: 7,    hardMaxUnits: 10,   step: 1 },
+  egg_whole:          { minUnits: 1,    typicalUnits: 2,    softMaxUnits: 3,    hardMaxUnits: 4,    step: 1 },
+  chicken_breast:     { minUnits: 0.5,  typicalUnits: 1.5,  softMaxUnits: 2,    hardMaxUnits: 2.5,  step: 0.25 },
+  grilled_fish:       { minUnits: 0.5,  typicalUnits: 1.5,  softMaxUnits: 2,    hardMaxUnits: 2.5,  step: 0.25 },
+  lean_beef:          { minUnits: 0.5,  typicalUnits: 1.5,  softMaxUnits: 2,    hardMaxUnits: 2.25, step: 0.25 },
+  ground_beef_lean:   { minUnits: 0.5,  typicalUnits: 1.5,  softMaxUnits: 2,    hardMaxUnits: 2.25, step: 0.25 },
+  whey_protein:       { minUnits: 0.5,  typicalUnits: 1,    softMaxUnits: 1.5,  hardMaxUnits: 2,    step: 0.5 },
+  pea_protein:        { minUnits: 0.5,  typicalUnits: 1,    softMaxUnits: 1.5,  hardMaxUnits: 2,    step: 0.5 },
+  soy_chunks:         { minUnits: 0.25, typicalUnits: 0.5,  softMaxUnits: 0.75, hardMaxUnits: 1,    step: 0.25 },
+  lentils_cooked:     { minUnits: 0.5,  typicalUnits: 1.5,  softMaxUnits: 2,    hardMaxUnits: 2.5,  step: 0.25 },
+
+  brown_rice_cooked:  { minUnits: 0.5,  typicalUnits: 1.5,  softMaxUnits: 2.25, hardMaxUnits: 3,    step: 0.25 },
+  white_rice_cooked:  { minUnits: 0.5,  typicalUnits: 1.5,  softMaxUnits: 2.25, hardMaxUnits: 3,    step: 0.25 },
+  quinoa_cooked:      { minUnits: 0.5,  typicalUnits: 1.5,  softMaxUnits: 2.25, hardMaxUnits: 3,    step: 0.25 },
+  oats_dry:           { minUnits: 0.5,  typicalUnits: 1,    softMaxUnits: 1.5,  hardMaxUnits: 2,    step: 0.25 },
+  whole_grain_toast:  { minUnits: 1,    typicalUnits: 2,    softMaxUnits: 3,    hardMaxUnits: 4,    step: 1 },
+  boiled_potato:      { minUnits: 0.5,  typicalUnits: 2,    softMaxUnits: 3,    hardMaxUnits: 3.5,  step: 0.25 },
+
+  mixed_salad:        { minUnits: 0.5,  typicalUnits: 1,    softMaxUnits: 1.5,  hardMaxUnits: 2,    step: 0.5 },
+  steamed_vegetables: { minUnits: 0.5,  typicalUnits: 1.5,  softMaxUnits: 2.5,  hardMaxUnits: 3,    step: 0.5 },
+  spinach_borani:     { minUnits: 0.5,  typicalUnits: 1,    softMaxUnits: 1.5,  hardMaxUnits: 2,    step: 0.5 },
+
+  olive_oil:          { minUnits: 0.25, typicalUnits: 0.5,  softMaxUnits: 1,    hardMaxUnits: 1.5,  step: 0.25 },
+  walnut:             { minUnits: 1,    typicalUnits: 2,    softMaxUnits: 4,    hardMaxUnits: 6,    step: 1 },
+  mixed_nuts:         { minUnits: 0.25, typicalUnits: 0.75, softMaxUnits: 1,    hardMaxUnits: 1.5,  step: 0.25 },
+  avocado_half:       { minUnits: 0.5,  typicalUnits: 1,    softMaxUnits: 1.5,  hardMaxUnits: 2,    step: 0.5 },
+
+  low_fat_cheese:     { minUnits: 0.5,  typicalUnits: 1,    softMaxUnits: 1.5,  hardMaxUnits: 2,    step: 0.5 },
+  low_fat_milk:       { minUnits: 0.5,  typicalUnits: 1,    softMaxUnits: 1,    hardMaxUnits: 1.2,  step: 0.1 },
+  low_fat_yogurt:     { minUnits: 0.5,  typicalUnits: 1.5,  softMaxUnits: 2,    hardMaxUnits: 2.5,  step: 0.5 },
+
+  apple:              { minUnits: 0.5,  typicalUnits: 1,    softMaxUnits: 1.5,  hardMaxUnits: 2,    step: 0.5 },
+  banana:             { minUnits: 0.5,  typicalUnits: 1,    softMaxUnits: 1.5,  hardMaxUnits: 2,    step: 0.5 },
+  medjool_date:       { minUnits: 1,    typicalUnits: 2,    softMaxUnits: 2,    hardMaxUnits: 3,    step: 1 },
+};
+
+function fallbackPortionRule(food: FoodItem): PortionRule {
+  if (food.role === 'protein') return { minUnits: 0.5, typicalUnits: 1.5, softMaxUnits: 2, hardMaxUnits: 2.5, step: 0.25 };
+  if (food.role === 'starch') return { minUnits: 0.5, typicalUnits: 1.5, softMaxUnits: 2.25, hardMaxUnits: 3, step: 0.25 };
+  if (food.role === 'vegetable') return { minUnits: 0.5, typicalUnits: 1, softMaxUnits: 2, hardMaxUnits: 3, step: 0.5 };
+  if (food.role === 'dairy') return { minUnits: 0.5, typicalUnits: 1, softMaxUnits: 1.5, hardMaxUnits: 2, step: 0.5 };
+  if (food.role === 'fat') return { minUnits: 0.25, typicalUnits: 0.5, softMaxUnits: 1, hardMaxUnits: 1.5, step: 0.25 };
+  return { minUnits: 0.5, typicalUnits: 1, softMaxUnits: 1.5, hardMaxUnits: 2, step: 0.5 };
+}
+
+function portionRuleFor(food: FoodItem): PortionRule {
+  return PORTION_RULES[food.id] ?? fallbackPortionRule(food);
+}
+
+function desiredUnitsForTarget(food: FoodItem, target: MacroVector): number {
+  if (food.role === 'starch' && food.carbsPerUnit > 0) return target.carbs / food.carbsPerUnit;
+  if (food.role === 'fat' && food.fatPerUnit > 0) return target.fat / food.fatPerUnit;
+  if (food.role === 'protein' && food.proteinPerUnit > 0) return target.protein / food.proteinPerUnit;
+  if (food.role === 'dairy' && food.proteinPerUnit > 0) return target.protein / food.proteinPerUnit;
+  if (food.role === 'fruit' && food.carbsPerUnit > 0) return target.carbs / food.carbsPerUnit;
+  return portionRuleFor(food).typicalUnits;
+}
+
 function portionCandidates(food: FoodItem, target?: MacroVector): number[] {
-  let min = 0.5;
-  let baseMax = 2;
-  let hardMax = 3;
-  let step = 0.5;
+  const rule = portionRuleFor(food);
+  if (!target) return range(rule.minUnits, rule.softMaxUnits, rule.step);
 
-  switch (food.id) {
-    case 'egg_white': min = 1; baseMax = 8; hardMax = 12; step = 1; break;
-    case 'egg_whole': min = 1; baseMax = 3; hardMax = 5; step = 1; break;
-    case 'whole_grain_toast': min = 1; baseMax = 3; hardMax = 6; step = 1; break;
-    case 'walnut': min = 1; baseMax = 4; hardMax = 8; step = 1; break;
-    case 'apple':
-    case 'banana':
-      min = 0.5; baseMax = 1.5; hardMax = 2.5; step = 0.5; break;
-    case 'avocado_half': min = 0.5; baseMax = 1.5; hardMax = 3; step = 0.5; break;
-    case 'olive_oil': min = 0.25; baseMax = 1; hardMax = 3; step = 0.25; break;
-    case 'whey_protein':
-    case 'pea_protein': min = 0.25; baseMax = 2; hardMax = 3; step = 0.25; break;
-    case 'low_fat_milk': min = 0.5; baseMax = 1.5; hardMax = 3; step = 0.5; break;
-    case 'mixed_nuts': min = 0.25; baseMax = 1; hardMax = 2; step = 0.25; break;
-    case 'oats_dry': min = 0.5; baseMax = 1.5; hardMax = 3; step = 0.25; break;
-    case 'low_fat_cheese': min = 0.5; baseMax = 1.5; hardMax = 3; step = 0.5; break;
-    case 'soy_chunks': min = 0.25; baseMax = 1; hardMax = 2.5; step = 0.25; break;
-    case 'lentils_cooked': min = 0.25; baseMax = 2.5; hardMax = 5; step = 0.25; break;
-    case 'low_fat_yogurt': min = 0.5; baseMax = 2; hardMax = 4; step = 0.5; break;
-    case 'spinach_borani': min = 0.5; baseMax = 1.5; hardMax = 3; step = 0.5; break;
-    default:
-      if (food.role === 'protein') { min = 0.25; baseMax = 2; hardMax = 4; step = 0.25; }
-      else if (food.role === 'starch') { min = 0.5; baseMax = 2.5; hardMax = 7; step = 0.25; }
-      else if (food.role === 'vegetable') { min = 0.5; baseMax = 2; hardMax = 4; step = 0.5; }
-      else if (food.role === 'dairy') { min = 0.5; baseMax = 2; hardMax = 4; step = 0.5; }
-      else if (food.role === 'fat') { min = 0.25; baseMax = 1; hardMax = 3; step = 0.25; }
-      else { min = 0.5; baseMax = 1.5; hardMax = 2.5; step = 0.5; }
-  }
+  const desiredUnits = desiredUnitsForTarget(food, target);
+  // Search slightly past the desired amount when necessary, but never relax
+  // the hard ceiling. High-energy users are handled by distributing food
+  // across the day, not by turning one serving into an extreme portion.
+  const adaptiveMax = Math.min(
+    rule.hardMaxUnits,
+    Math.max(rule.softMaxUnits, desiredUnits * 1.15)
+  );
+  const snappedMax = Math.max(
+    rule.minUnits,
+    Math.floor((adaptiveMax + 1e-9) / rule.step) * rule.step
+  );
+  return range(rule.minUnits, snappedMax, rule.step);
+}
 
-  if (!target) return range(min, baseMax, step);
+function portionRealismPenalty(food: FoodItem, units: number): number {
+  const rule = portionRuleFor(food);
+  if (units > rule.hardMaxUnits + 1e-9) return Number.POSITIVE_INFINITY;
 
-  let desiredUnits = baseMax;
-  if (food.role === 'starch' && food.carbsPerUnit > 0) {
-    desiredUnits = target.carbs / food.carbsPerUnit;
-  } else if (food.role === 'fat' && food.fatPerUnit > 0) {
-    desiredUnits = target.fat / food.fatPerUnit;
-  } else if (food.role === 'protein' && food.proteinPerUnit > 0) {
-    desiredUnits = target.protein / food.proteinPerUnit;
-  } else if (food.role === 'dairy' && food.proteinPerUnit > 0) {
-    desiredUnits = target.protein / food.proteinPerUnit;
-  } else if (food.role === 'fruit' && food.carbsPerUnit > 0) {
-    desiredUnits = target.carbs / food.carbsPerUnit;
-  }
+  const typicalDistance = Math.abs(units - rule.typicalUnits) / Math.max(rule.typicalUnits, rule.step);
+  const overSoft = Math.max(0, units - rule.softMaxUnits) / Math.max(rule.hardMaxUnits - rule.softMaxUnits, rule.step);
 
-  const adaptiveMax = Math.min(hardMax, Math.max(baseMax, desiredUnits * 1.25));
-  const snappedMax = Math.max(min, Math.floor(adaptiveMax / step) * step);
-  return range(min, snappedMax, step);
+  // Staying near a typical serving is a small preference; crossing Soft Max
+  // is a much stronger signal. Hard Max is enforced separately and absolutely.
+  return 0.015 * typicalDistance * typicalDistance + 0.35 * overSoft * overSoft;
+}
+
+function mealMassLimitGrams(slot: MealSlot, slotKcalTarget: number): number {
+  const base: Record<MealSlot, number> = {
+    breakfast: 650,
+    morning_snack: 425,
+    lunch: 900,
+    afternoon_snack: 500,
+    dinner: 800,
+    night_snack: 350,
+  };
+
+  // For unusually high-energy plans allow some extra total meal volume, while
+  // individual-food hard limits remain unchanged. The upper bound keeps a
+  // single meal from drifting toward kilogram-plus portions.
+  const extra = Math.max(0, slotKcalTarget - 800) * 0.35;
+  return Math.min(base[slot] + extra, slot === 'lunch' ? 1050 : slot === 'dinner' ? 950 : base[slot] + 150);
+}
+
+function mealMassGrams(components: MealComponent[]): number {
+  return components.reduce((sum, component) => sum + component.grams, 0);
+}
+
+function mealRealismPenalty(components: MealComponent[]): number {
+  return components.reduce(
+    (sum, component) => sum + portionRealismPenalty(component.foodItem, component.units),
+    0
+  );
 }
 
 function normalizedDeviation(actual: number, target: number): number {
@@ -635,7 +824,7 @@ function scoreTotals(actual: MacroVector, target: MacroVector): number {
 
   return (
     7 * kcalDev +
-    2.25 * proteinDev +
+    3.5 * proteinDev +
     1.1 * carbDev +
     1.1 * fatDev +
     20 * kcalOverRatio * kcalOverRatio +
@@ -701,12 +890,23 @@ function resolveTemplate(template: MealTemplate, slotTargets: MacroVector): Reso
     const carbDev = boundDeviation(totals.carbs, remaining.min.carbs, remaining.max.carbs, slotTargets.carbs);
     const fatDev = boundDeviation(totals.fat, remaining.min.fat, remaining.max.fat, slotTargets.fat);
     const alreadyOver = Math.max(0, totals.kcal / Math.max(1, slotTargets.kcal) - 1.05);
-    return 7 * kcalDev + 2.25 * proteinDev + 1.1 * carbDev + 1.1 * fatDev + 50 * alreadyOver * alreadyOver;
+    return 7 * kcalDev + 3.5 * proteinDev + 1.1 * carbDev + 1.1 * fatDev + 50 * alreadyOver * alreadyOver;
   };
 
-  type BeamState = { components: MealComponent[]; totals: MacroVector };
+  type BeamState = {
+    components: MealComponent[];
+    totals: MacroVector;
+    grams: number;
+    realismPenalty: number;
+  };
   const BEAM_WIDTH = 120;
-  let beam: BeamState[] = [{ components: [], totals: { kcal: 0, protein: 0, carbs: 0, fat: 0 } }];
+  const hardMealMass = mealMassLimitGrams(template.slot, slotTargets.kcal);
+  let beam: BeamState[] = [{
+    components: [],
+    totals: { kcal: 0, protein: 0, carbs: 0, fat: 0 },
+    grams: 0,
+    realismPenalty: 0,
+  }];
 
   for (let index = 0; index < foods.length; index++) {
     const food = foods[index];
@@ -716,16 +916,27 @@ function resolveTemplate(template: MealTemplate, slotTargets: MacroVector): Reso
       for (const units of candidateSets[index]) {
         const component = componentFromUnits(food, units);
         const totals = addTotals(state.totals, component);
+        const grams = state.grams + component.grams;
 
-        // Remaining components only add positive calories; branches already far
-        // above the slot budget cannot recover.
+        // Remaining components only add calories and mass; branches already far
+        // above either hard boundary cannot recover.
         if (totals.kcal > slotTargets.kcal * 1.35 && index < foods.length - 1) continue;
-        expanded.push({ components: [...state.components, component], totals });
+        if (grams > hardMealMass) continue;
+
+        expanded.push({
+          components: [...state.components, component],
+          totals,
+          grams,
+          realismPenalty: state.realismPenalty + portionRealismPenalty(food, units),
+        });
       }
     }
 
     const remaining = remainingBounds[index + 1];
-    expanded.sort((a, b) => lowerBoundScore(a.totals, remaining) - lowerBoundScore(b.totals, remaining));
+    expanded.sort((a, b) =>
+      (lowerBoundScore(a.totals, remaining) + a.realismPenalty) -
+      (lowerBoundScore(b.totals, remaining) + b.realismPenalty)
+    );
     beam = expanded.slice(0, BEAM_WIDTH);
   }
 
@@ -737,11 +948,12 @@ function resolveTemplate(template: MealTemplate, slotTargets: MacroVector): Reso
     const aOver = a.totals.kcal > slotTargets.kcal * 1.05 ? 1 : 0;
     const bOver = b.totals.kcal > slotTargets.kcal * 1.05 ? 1 : 0;
     if (aOver !== bOver) return aOver - bOver;
-    return scoreTotals(a.totals, slotTargets) - scoreTotals(b.totals, slotTargets);
+    return (scoreTotals(a.totals, slotTargets) + a.realismPenalty) -
+      (scoreTotals(b.totals, slotTargets) + b.realismPenalty);
   });
 
   const best = beam[0];
-  const bestScore = scoreTotals(best.totals, slotTargets);
+  const bestScore = scoreTotals(best.totals, slotTargets) + best.realismPenalty;
 
   return {
     components: best.components,
@@ -822,7 +1034,7 @@ function scoreDailyTotals(actual: MacroVector, target: MacroVector): number {
 
   return (
     8.5 * kcalDev +
-    4 * proteinDev +
+    6 * proteinDev +
     4 * carbDev +
     3 * fatDev +
     24 * kcalOverRatio * kcalOverRatio +
@@ -843,54 +1055,93 @@ function chooseDailyCombination(
     fat: targets.fatGrams,
   };
 
+  type Bounds = { min: MacroVector; max: MacroVector };
+  const suffixBounds: Bounds[] = Array.from({ length: optionsBySlot.length + 1 }, () => ({
+    min: { kcal: 0, protein: 0, carbs: 0, fat: 0 },
+    max: { kcal: 0, protein: 0, carbs: 0, fat: 0 },
+  }));
+
+  for (let index = optionsBySlot.length - 1; index >= 0; index--) {
+    const options = optionsBySlot[index];
+    const min: MacroVector = {
+      kcal: Math.min(...options.map((o) => o.resolved.totals.kcal)),
+      protein: Math.min(...options.map((o) => o.resolved.totals.protein)),
+      carbs: Math.min(...options.map((o) => o.resolved.totals.carbs)),
+      fat: Math.min(...options.map((o) => o.resolved.totals.fat)),
+    };
+    const max: MacroVector = {
+      kcal: Math.max(...options.map((o) => o.resolved.totals.kcal)),
+      protein: Math.max(...options.map((o) => o.resolved.totals.protein)),
+      carbs: Math.max(...options.map((o) => o.resolved.totals.carbs)),
+      fat: Math.max(...options.map((o) => o.resolved.totals.fat)),
+    };
+    suffixBounds[index] = {
+      min: addVector(min, suffixBounds[index + 1].min),
+      max: addVector(max, suffixBounds[index + 1].max),
+    };
+  }
+
+  const boundDeviation = (current: number, remaining: { min: number; max: number }, target: number) => {
+    const minPossible = current + remaining.min;
+    const maxPossible = current + remaining.max;
+    if (target < minPossible) return (minPossible - target) / Math.max(1, target);
+    if (target > maxPossible) return (target - maxPossible) / Math.max(1, target);
+    return 0;
+  };
+
+  const lowerBoundDailyScore = (totals: MacroVector, remaining: Bounds) => {
+    const kcalDev = boundDeviation(totals.kcal, { min: remaining.min.kcal, max: remaining.max.kcal }, dailyTarget.kcal);
+    const proteinDev = boundDeviation(totals.protein, { min: remaining.min.protein, max: remaining.max.protein }, dailyTarget.protein);
+    const carbDev = boundDeviation(totals.carbs, { min: remaining.min.carbs, max: remaining.max.carbs }, dailyTarget.carbs);
+    const fatDev = boundDeviation(totals.fat, { min: remaining.min.fat, max: remaining.max.fat }, dailyTarget.fat);
+    const alreadyOver = Math.max(0, totals.kcal / Math.max(1, dailyTarget.kcal) - 1.03);
+    return 8.5 * kcalDev + 6 * proteinDev + 4 * carbDev + 3 * fatDev + 80 * alreadyOver * alreadyOver;
+  };
+
   type CandidateDay = {
     options: ResolvedOption[];
     totals: MacroVector;
-    score: number;
+    localScoreSum: number;
   };
 
-  const candidates: CandidateDay[] = [];
+  const DAY_BEAM_WIDTH = 400;
+  let beam: CandidateDay[] = [{
+    options: [],
+    totals: { kcal: 0, protein: 0, carbs: 0, fat: 0 },
+    localScoreSum: 0,
+  }];
 
-  const walk = (
-    slotIndex: number,
-    chosen: ResolvedOption[],
-    totals: MacroVector,
-    localScoreSum: number
-  ) => {
-    if (slotIndex === optionsBySlot.length) {
-      const dailyScore = scoreDailyTotals(totals, dailyTarget);
-      // Daily fit dominates. The small local term prevents pathological meal
-      // composition when two day-level solutions are nearly identical.
-      const score = dailyScore + 0.02 * localScoreSum;
-      candidates.push({ options: chosen, totals, score });
-      return;
+  for (let slotIndex = 0; slotIndex < optionsBySlot.length; slotIndex++) {
+    const expanded: CandidateDay[] = [];
+    for (const state of beam) {
+      for (const option of optionsBySlot[slotIndex]) {
+        expanded.push({
+          options: [...state.options, option],
+          totals: addVector(state.totals, option.resolved.totals),
+          localScoreSum: state.localScoreSum + option.resolved.score,
+        });
+      }
     }
 
-    for (const option of optionsBySlot[slotIndex]) {
-      const nextTotals: MacroVector = {
-        kcal: totals.kcal + option.resolved.totals.kcal,
-        protein: totals.protein + option.resolved.totals.protein,
-        carbs: totals.carbs + option.resolved.totals.carbs,
-        fat: totals.fat + option.resolved.totals.fat,
-      };
-      walk(
-        slotIndex + 1,
-        [...chosen, option],
-        nextTotals,
-        localScoreSum + option.resolved.score
-      );
-    }
-  };
+    const remaining = suffixBounds[slotIndex + 1];
+    expanded.sort((a, b) =>
+      (lowerBoundDailyScore(a.totals, remaining) + 0.02 * a.localScoreSum) -
+      (lowerBoundDailyScore(b.totals, remaining) + 0.02 * b.localScoreSum)
+    );
+    beam = expanded.slice(0, DAY_BEAM_WIDTH);
+  }
 
-  walk(0, [], { kcal: 0, protein: 0, carbs: 0, fat: 0 }, 0);
-  candidates.sort((a, b) => a.score - b.score);
+  const completed = beam
+    .map((candidate) => ({
+      ...candidate,
+      score: scoreDailyTotals(candidate.totals, dailyTarget) + 0.02 * candidate.localScoreSum,
+    }))
+    .sort((a, b) => a.score - b.score);
 
-  const best = candidates[0];
+  const best = completed[0];
   if (!best) throw new Error('[mealPlanEngine] Could not build a daily combination.');
 
-  // Correctness beats variety. Only rotate among effectively tied solutions;
-  // otherwise always choose the mathematically best day.
-  const tied = candidates.filter((candidate) =>
+  const tied = completed.filter((candidate) =>
     Math.abs(candidate.score - best.score) < 0.005 &&
     candidate.totals.kcal <= dailyTarget.kcal * 1.03
   );
@@ -953,11 +1204,20 @@ function refineDailyPortions(
   const combinedScore = (
     candidateDaily: MacroVector,
     candidateMeal: MacroVector,
-    slotTarget: MacroVector
+    slotTarget: MacroVector,
+    components: MealComponent[],
+    slot: MealSlot
   ) => {
     const kcalRatio = candidateMeal.kcal / Math.max(1, slotTarget.kcal);
     if (kcalRatio < 0.55 || kcalRatio > 1.35) return Number.POSITIVE_INFINITY;
-    return scoreDailyTotals(candidateDaily, dailyTarget) + 0.035 * scoreTotals(candidateMeal, slotTarget);
+    if (mealMassGrams(components) > mealMassLimitGrams(slot, slotTarget.kcal)) {
+      return Number.POSITIVE_INFINITY;
+    }
+    return (
+      scoreDailyTotals(candidateDaily, dailyTarget) +
+      0.035 * scoreTotals(candidateMeal, slotTarget) +
+      0.05 * mealRealismPenalty(components)
+    );
   };
 
   // Coordinate descent is deterministic and cheap here: ~20 components × a
@@ -982,13 +1242,28 @@ function refineDailyPortions(
         let bestComponent = current;
         let bestMeal = option.resolved.totals;
         let bestDay = dailyTotals;
-        let bestScore = combinedScore(dailyTotals, option.resolved.totals, slotTarget);
+        let bestScore = combinedScore(
+          dailyTotals,
+          option.resolved.totals,
+          slotTarget,
+          option.resolved.components,
+          option.slot
+        );
 
         for (const units of portionCandidates(current.foodItem, slotTarget)) {
           const candidateComponent = componentFromUnits(current.foodItem, units);
           const candidateMeal = addTotals(withoutCurrentMeal, candidateComponent);
           const candidateDay = addTotals(withoutCurrentDay, candidateComponent);
-          const candidateScore = combinedScore(candidateDay, candidateMeal, slotTarget);
+          const candidateComponents = option.resolved.components.map((component, candidateIndex) =>
+            candidateIndex === index ? candidateComponent : component
+          );
+          const candidateScore = combinedScore(
+            candidateDay,
+            candidateMeal,
+            slotTarget,
+            candidateComponents,
+            option.slot
+          );
 
           if (candidateScore + 1e-9 < bestScore) {
             bestScore = candidateScore;
@@ -1029,6 +1304,15 @@ function totalResolvedOptions(options: ResolvedOption[]): MacroVector {
   );
 }
 
+function scoreResolvedDay(options: ResolvedOption[], dailyTarget: MacroVector): number {
+  const nutritionScore = scoreDailyTotals(totalResolvedOptions(options), dailyTarget);
+  const realismScore = options.reduce(
+    (sum, option) => sum + mealRealismPenalty(option.resolved.components),
+    0
+  );
+  return nutritionScore + 0.05 * realismScore;
+}
+
 /**
  * Coordinate descent can perfect portions inside a chosen template set, but it
  * cannot replace a structurally carb-heavy snack with a protein/fat-heavier one.
@@ -1049,7 +1333,7 @@ function refineDailyTemplates(
   };
 
   let best = refineDailyPortions(initial, targets);
-  let bestScore = scoreDailyTotals(totalResolvedOptions(best), dailyTarget);
+  let bestScore = scoreResolvedDay(best, dailyTarget);
 
   for (let pass = 0; pass < 2; pass++) {
     let changed = false;
@@ -1064,7 +1348,7 @@ function refineDailyTemplates(
           index === slotIndex ? replacement : option
         );
         const candidate = refineDailyPortions(candidateBase, targets);
-        const candidateScore = scoreDailyTotals(totalResolvedOptions(candidate), dailyTarget);
+        const candidateScore = scoreResolvedDay(candidate, dailyTarget);
 
         if (candidateScore + 1e-9 < slotBestScore) {
           slotBest = candidate;
@@ -1083,6 +1367,39 @@ function refineDailyTemplates(
   }
 
   return best;
+}
+
+function assertDailyPlanFeasible(options: ResolvedOption[], targets: MacroTargets): void {
+  const actual = totalResolvedOptions(options);
+  const target: MacroVector = {
+    kcal: targets.targetCalories,
+    protein: targets.proteinGrams,
+    carbs: targets.carbGrams,
+    fat: targets.fatGrams,
+  };
+
+  const kcalDeviation = (actual.kcal - target.kcal) / Math.max(1, target.kcal);
+  const proteinDeviation = normalizedDeviation(actual.protein, target.protein);
+  const carbDeviation = normalizedDeviation(actual.carbs, target.carbs);
+  const fatDeviation = normalizedDeviation(actual.fat, target.fat);
+
+  // Accuracy gates from Nutrition v2. Realism constraints are never relaxed
+  // to make an infeasible day look successful; the caller gets an explicit
+  // error instead of a misleading plan.
+  const macrosVeryClose =
+    proteinDeviation <= 0.03 &&
+    carbDeviation <= 0.03 &&
+    fatDeviation <= 0.03;
+  const minimumCalorieDeviation = macrosVeryClose ? -0.06 : -0.05;
+
+  const feasible =
+    kcalDeviation <= 0.03 &&
+    kcalDeviation >= minimumCalorieDeviation &&
+    proteinDeviation <= 0.10 &&
+    carbDeviation <= 0.10 &&
+    fatDeviation <= 0.10;
+
+  if (!feasible) throw new MealPlanFeasibilityError(target, actual);
 }
 
 // ============================================================================
@@ -1123,6 +1440,7 @@ export function generateDailyMealPlan(
 
   const chosen = chooseDailyCombination(optionsBySlot, targets, seed);
   const refined = refineDailyTemplates(chosen, optionsBySlot, targets);
+  assertDailyPlanFeasible(refined, targets);
   const meals = refined.map(buildMeal);
 
   return { date, isWorkoutDay, targets, meals };

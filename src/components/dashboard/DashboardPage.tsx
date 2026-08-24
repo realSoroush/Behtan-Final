@@ -72,11 +72,35 @@ export function DashboardPage() {
   }, [profile, isWorkoutDay]);
 
   // ---- Generate meal plan (no DB fetch needed - engine is self-contained) ----
-  const mealPlan = useMemo<DailyMealPlan | null>(() => {
-    if (!targets || !profile?.weight || !profile?.dietary_preferences_json) return null;
-    const dateKey = `${new Date().toISOString().slice(0, 10)}-v${planVersion}`;
-    return generateDailyMealPlan(targets, profile.weight, profile.dietary_preferences_json, isWorkoutDay, dateKey);
+  // Generation can intentionally fail when nutrition targets cannot be met
+  // without violating practical portion limits. Keep that failure local to the
+  // dashboard instead of letting it crash the React tree / Error Boundary.
+  const mealPlanResult = useMemo<{ plan: DailyMealPlan | null; error: string | null }>(() => {
+    if (!targets || !profile?.weight || !profile?.dietary_preferences_json) {
+      return { plan: null, error: null };
+    }
+
+    try {
+      const dateKey = `${new Date().toISOString().slice(0, 10)}-v${planVersion}`;
+      return {
+        plan: generateDailyMealPlan(
+          targets,
+          profile.weight,
+          profile.dietary_preferences_json,
+          isWorkoutDay,
+          dateKey
+        ),
+        error: null,
+      };
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : 'تولید برنامه غذایی با خطا مواجه شد.';
+      return { plan: null, error: message };
+    }
   }, [targets, profile, isWorkoutDay, planVersion]);
+
+  const mealPlan = mealPlanResult.plan;
 
   // Apply per-meal consumed toggles and any swaps on top of the generated plan
   const [swappedPlan, setSwappedPlan] = useState<DailyMealPlan | null>(null);
@@ -184,7 +208,21 @@ export function DashboardPage() {
         </button>
 
         {/* Meals section */}
-        {activePlan ? (
+        {mealPlanResult.error ? (
+          <div className="rounded-2xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 p-5 text-center space-y-3">
+            <AlertCircle size={34} className="text-amber-600 dark:text-amber-400 mx-auto" />
+            <p className="font-bold text-neutral-900 dark:text-neutral-100">امکان ساخت برنامه واقع‌بینانه وجود ندارد</p>
+            <p className="text-sm leading-6 text-neutral-600 dark:text-neutral-300">{mealPlanResult.error}</p>
+            <button
+              type="button"
+              onClick={() => { setPlanVersion((v) => v + 1); resetSwapped(); }}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 text-sm font-semibold"
+            >
+              <RefreshCw size={14} />
+              تلاش دوباره
+            </button>
+          </div>
+        ) : activePlan ? (
           <div className="space-y-3">
             <h2 className="font-bold text-neutral-900 dark:text-neutral-100">وعده‌های غذایی امروز</h2>
             <p className="text-xs text-neutral-500 dark:text-neutral-400">

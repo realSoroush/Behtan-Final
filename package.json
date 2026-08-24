@@ -11,7 +11,8 @@
     "test:nutrition": "node --experimental-strip-types scripts/nutrition-engine.smoke-test.mjs",
     "test:onboarding": "node --experimental-strip-types scripts/onboarding-persistence.smoke-test.mjs",
     "test:age": "node --experimental-strip-types scripts/age-validation.smoke-test.mjs",
-    "test:brand": "node scripts/brand.smoke-test.mjs"
+    "test:brand": "node scripts/brand.smoke-test.mjs",
+    "test:portions": "node --experimental-strip-types scripts/portion-realism.smoke-test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
