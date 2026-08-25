@@ -7,8 +7,11 @@
  * regression matrix. Nutrition target formulas are not changed here.
  */
 
+import { installTestNutritionCatalog } from './setup-test-nutrition-catalog.mjs';
 import { calculateFullNutritionPlan } from '../src/utils/nutritionHelpers.ts';
 import { generateDailyMealPlan, MealPlanFeasibilityError } from '../src/utils/mealPlanEngine.ts';
+
+installTestNutritionCatalog();
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);

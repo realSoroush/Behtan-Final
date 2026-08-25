@@ -1,14 +1,13 @@
 /**
  * useAuth.ts — No-OTP Phone Auth (register + silent returning-login)
  * ─────────────────────────────────────────────────────────────────────────────
- * Auth model:
- *   • Phone number is the user's unique identity.
- *   • On phone entry the app checks user_profiles.phone:
- *       – Not found  → create Supabase account + insert profile row → session
- *                       (new user → App.tsx routes to onboarding).
- *       – Found      → silently sign in with the same derived credentials
- *                       (returning user → App.tsx routes to dashboard).
- *         No OTP, no extra screen — this is intentional for MVP/testing.
+ * Auth model (temporary MVP/testing bridge):
+ *   • Phone number is normalized and mapped to a synthetic email.
+ *   • The app first attempts sign-in. If no matching auth account exists, it
+ *     attempts sign-up, then creates/repairs the user's profile row.
+ *   • We intentionally DO NOT query user_profiles before authentication: RLS
+ *     correctly blocks that anonymous lookup and it previously caused returning
+ *     users to fall into signUp() and receive HTTP 422.
  *   • Sessions persist in localStorage (Supabase default: 60-day TTL with
  *     auto-refresh), so on top of this, most returning users never even see
  *     the phone screen again — this path only matters after signOut(),
@@ -20,9 +19,10 @@
  *
  * Synthetic email format:  989123456789@salahatiman.ir
  * Derived password:        98912345678_slmt
- * (Neither is a real email or a real secret — the phone IS the identity.
- *  This is an explicit MVP tradeoff: anyone who knows a phone number can
- *  sign in as that user. Fine for testing; revisit before real launch.)
+ * SECURITY BLOCKER BEFORE PUBLIC LAUNCH:
+ * The derived password is predictable from the phone number. This flow is only
+ * a functional bridge for MVP testing and MUST be replaced by a real ownership
+ * proof (OTP or another secure authentication method) before public launch.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -121,7 +121,6 @@ export function useAuth(): UseAuthReturn {
   const loginOrRegisterPhone = async (phone: string): Promise<void> => {
     setState((s) => ({ ...s, loading: true, error: null }));
 
-    // 1. Validate format
     if (!isValidIranPhone(phone)) {
       setState((s) => ({
         ...s,
@@ -135,87 +134,57 @@ export function useAuth(): UseAuthReturn {
     const email = toSyntheticEmail(normalized);
     const password = toDerivedPassword(normalized);
 
-    try {
-      // 2. Look up the phone in user_profiles to decide the branch
-      const { data: existing, error: checkError } = await supabase
+    const ensureProfileRow = async (userId: string) => {
+      const { error: profileError } = await supabase
         .from('user_profiles')
-        .select('id')
-        .eq('phone', normalized)
-        .maybeSingle();
+        .upsert({ id: userId, phone: normalized }, { onConflict: 'id' });
 
-      if (checkError) {
-        throw new Error('خطا در بررسی شماره. اتصال اینترنت را بررسی کنید.');
+      if (profileError) {
+        throw new Error('خطا در ذخیره اطلاعات حساب. دوباره تلاش کنید.');
       }
+    };
 
-      if (existing) {
-        // ── Returning user: silent sign-in, no OTP ──────────────────────────
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+    try {
+      // Returning users are resolved by Auth itself. This avoids the previous
+      // anonymous SELECT on user_profiles, which RLS correctly prevents.
+      const signInResult = await supabase.auth.signInWithPassword({ email, password });
 
-        if (signInError) {
-          // Rare edge case: profile row exists but auth credentials don't
-          // match (e.g. manually edited DB). Not the common path.
-          throw new Error(
-            'ورود با این شماره ممکن نشد. لطفاً با پشتیبانی تماس بگیرید.'
-          );
-        }
-
-        // onAuthStateChange fires → App.tsx sees an existing profile → dashboard
+      if (!signInResult.error && signInResult.data.user) {
+        await ensureProfileRow(signInResult.data.user.id);
         setState((s) => ({ ...s, loading: false }));
         return;
       }
 
-      // ── New user: register ────────────────────────────────────────────────
+      // No usable session with the deterministic credentials: attempt account
+      // creation. If Auth says the user already exists, credentials no longer
+      // match and we fail closed instead of repeatedly calling signup.
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
       });
 
       if (signUpError) {
-        // Handle the rare race where the auth row exists but profile doesn't
+        const lowerMessage = signUpError.message.toLowerCase();
         if (
-          signUpError.message.toLowerCase().includes('already registered') ||
-          signUpError.message.toLowerCase().includes('user already registered')
+          lowerMessage.includes('already registered') ||
+          lowerMessage.includes('user already registered') ||
+          signUpError.status === 422
         ) {
-          // Someone else created the auth user without a profile row somehow.
-          // Fall back to sign-in with the same derived credentials.
-          const { error: fallbackSignInError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-          });
-          if (fallbackSignInError) {
-            throw new Error('این شماره قبلاً استفاده شده و ورود با آن ممکن نیست.');
-          }
-          setState((s) => ({ ...s, loading: false }));
-          return;
+          throw new Error(
+            'این شماره قبلاً ثبت شده اما ورود امن با آن انجام نشد. لطفاً با پشتیبانی تماس بگیرید.'
+          );
         }
-        throw new Error('خطا در ایجاد حساب. دوباره تلاش کنید.');
+        throw new Error('خطا در ایجاد حساب. اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.');
       }
 
-      // Guard: email confirmation is blocking the session
-      if (!data.session) {
+      if (!data.session || !data.user) {
         await supabase.auth.signOut();
         throw new Error(
-          'لطفاً در داشبورد Supabase، گزینه "Enable email confirmations" را غیرفعال کنید و دوباره تلاش کنید.'
+          'ایجاد نشست کاربری انجام نشد. تنظیمات تأیید ایمیل Supabase را بررسی کنید.'
         );
       }
 
-      // Insert the phone number into user_profiles
-      // (RLS: auth.uid() = id — the new session satisfies this)
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .upsert({ id: data.user!.id, phone: normalized });
-
-      if (profileError) {
-        // Auth user was created but profile insert failed.
-        // Roll back the auth user to avoid orphans.
-        await supabase.auth.signOut();
-        throw new Error('خطا در ذخیره اطلاعات. دوباره تلاش کنید.');
-      }
-
-      // onAuthStateChange fires automatically → App.tsx transitions to onboarding
+      await ensureProfileRow(data.user.id);
       setState((s) => ({ ...s, loading: false }));
     } catch (err) {
       const message =

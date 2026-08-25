@@ -1,0 +1,2000 @@
+{
+  "FOOD_ITEMS": [
+    {
+      "id": "egg_white",
+      "name": "سفیده تخم‌مرغ",
+      "role": "protein",
+      "emoji": "🥚",
+      "unitLabel": "عدد",
+      "gramsPerUnit": 33,
+      "kcalPerUnit": 17,
+      "proteinPerUnit": 3.6,
+      "carbsPerUnit": 0.2,
+      "fatPerUnit": 0.1,
+      "allergyFlags": [],
+      "excludedForVegetarian": [
+        "vegan"
+      ]
+    },
+    {
+      "id": "egg_whole",
+      "name": "تخم‌مرغ کامل",
+      "role": "protein",
+      "emoji": "🥚",
+      "unitLabel": "عدد",
+      "gramsPerUnit": 50,
+      "kcalPerUnit": 78,
+      "proteinPerUnit": 6.3,
+      "carbsPerUnit": 0.6,
+      "fatPerUnit": 5.3,
+      "allergyFlags": [],
+      "excludedForVegetarian": [
+        "vegan"
+      ]
+    },
+    {
+      "id": "chicken_breast",
+      "name": "سینه مرغ پخته",
+      "role": "protein",
+      "emoji": "🍗",
+      "unitLabel": "گرم",
+      "gramsPerUnit": 100,
+      "kcalPerUnit": 165,
+      "proteinPerUnit": 31,
+      "carbsPerUnit": 0,
+      "fatPerUnit": 3.6,
+      "allergyFlags": [],
+      "excludedForVegetarian": [
+        "vegan",
+        "lacto_ovo",
+        "raw"
+      ]
+    },
+    {
+      "id": "grilled_fish",
+      "name": "ماهی کبابی",
+      "role": "protein",
+      "emoji": "🐟",
+      "unitLabel": "گرم",
+      "gramsPerUnit": 100,
+      "kcalPerUnit": 128,
+      "proteinPerUnit": 20,
+      "carbsPerUnit": 0,
+      "fatPerUnit": 5,
+      "allergyFlags": [
+        "seafood"
+      ],
+      "excludedForVegetarian": [
+        "vegan",
+        "lacto_ovo",
+        "raw"
+      ]
+    },
+    {
+      "id": "lean_beef",
+      "name": "گوشت گاو کم‌چرب",
+      "role": "protein",
+      "emoji": "🥩",
+      "unitLabel": "گرم",
+      "gramsPerUnit": 100,
+      "kcalPerUnit": 175,
+      "proteinPerUnit": 26,
+      "carbsPerUnit": 0,
+      "fatPerUnit": 7,
+      "allergyFlags": [],
+      "excludedForVegetarian": [
+        "vegan",
+        "lacto_ovo",
+        "pescatarian",
+        "raw"
+      ]
+    },
+    {
+      "id": "ground_beef_lean",
+      "name": "گوشت چرخ‌کرده کم‌چرب",
+      "role": "protein",
+      "emoji": "🥩",
+      "unitLabel": "گرم",
+      "gramsPerUnit": 100,
+      "kcalPerUnit": 160,
+      "proteinPerUnit": 22,
+      "carbsPerUnit": 0,
+      "fatPerUnit": 8,
+      "allergyFlags": [],
+      "excludedForVegetarian": [
+        "vegan",
+        "lacto_ovo",
+        "pescatarian",
+        "raw"
+      ]
+    },
+    {
+      "id": "whey_protein",
+      "name": "پودر پروتئین وی",
+      "role": "protein",
+      "emoji": "🥤",
+      "unitLabel": "اسکوپ",
+      "gramsPerUnit": 30,
+      "kcalPerUnit": 120,
+      "proteinPerUnit": 24,
+      "carbsPerUnit": 3,
+      "fatPerUnit": 2,
+      "allergyFlags": [
+        "dairy"
+      ],
+      "excludedForVegetarian": [
+        "vegan",
+        "raw"
+      ]
+    },
+    {
+      "id": "pea_protein",
+      "name": "پروتئین نخود",
+      "role": "protein",
+      "emoji": "🥤",
+      "unitLabel": "اسکوپ",
+      "gramsPerUnit": 30,
+      "kcalPerUnit": 110,
+      "proteinPerUnit": 24,
+      "carbsPerUnit": 2,
+      "fatPerUnit": 1.5,
+      "allergyFlags": [],
+      "excludedForVegetarian": []
+    },
+    {
+      "id": "soy_chunks",
+      "name": "سویا",
+      "role": "protein",
+      "emoji": "🫘",
+      "unitLabel": "گرم",
+      "gramsPerUnit": 100,
+      "kcalPerUnit": 345,
+      "proteinPerUnit": 47,
+      "carbsPerUnit": 30,
+      "fatPerUnit": 1,
+      "allergyFlags": [
+        "soy"
+      ],
+      "excludedForVegetarian": []
+    },
+    {
+      "id": "lentils_cooked",
+      "name": "عدس پخته",
+      "role": "protein",
+      "emoji": "🍲",
+      "unitLabel": "گرم",
+      "gramsPerUnit": 100,
+      "kcalPerUnit": 116,
+      "proteinPerUnit": 9,
+      "carbsPerUnit": 20,
+      "fatPerUnit": 0.4,
+      "allergyFlags": [],
+      "excludedForVegetarian": []
+    },
+    {
+      "id": "brown_rice_cooked",
+      "name": "برنج قهوه‌ای پخته",
+      "role": "starch",
+      "emoji": "🍚",
+      "unitLabel": "گرم",
+      "gramsPerUnit": 100,
+      "kcalPerUnit": 112,
+      "proteinPerUnit": 2.6,
+      "carbsPerUnit": 23,
+      "fatPerUnit": 0.9,
+      "allergyFlags": [],
+      "excludedForVegetarian": []
+    },
+    {
+      "id": "white_rice_cooked",
+      "name": "برنج سفید پخته",
+      "role": "starch",
+      "emoji": "🍚",
+      "unitLabel": "گرم",
+      "gramsPerUnit": 100,
+      "kcalPerUnit": 130,
+      "proteinPerUnit": 2.4,
+      "carbsPerUnit": 28,
+      "fatPerUnit": 0.2,
+      "allergyFlags": [],
+      "excludedForVegetarian": []
+    },
+    {
+      "id": "quinoa_cooked",
+      "name": "کینوا پخته",
+      "role": "starch",
+      "emoji": "🍚",
+      "unitLabel": "گرم",
+      "gramsPerUnit": 100,
+      "kcalPerUnit": 120,
+      "proteinPerUnit": 4.4,
+      "carbsPerUnit": 21,
+      "fatPerUnit": 1.9,
+      "allergyFlags": [],
+      "excludedForVegetarian": []
+    },
+    {
+      "id": "oats_dry",
+      "name": "جو پرک",
+      "role": "starch",
+      "emoji": "🥣",
+      "unitLabel": "گرم",
+      "gramsPerUnit": 50,
+      "kcalPerUnit": 188,
+      "proteinPerUnit": 6.5,
+      "carbsPerUnit": 32,
+      "fatPerUnit": 3.5,
+      "allergyFlags": [
+        "gluten"
+      ],
+      "excludedForVegetarian": []
+    },
+    {
+      "id": "whole_grain_toast",
+      "name": "نان تست سبوس‌دار",
+      "role": "starch",
+      "emoji": "🍞",
+      "unitLabel": "برش",
+      "gramsPerUnit": 30,
+      "kcalPerUnit": 70,
+      "proteinPerUnit": 3,
+      "carbsPerUnit": 12,
+      "fatPerUnit": 1,
+      "allergyFlags": [
+        "gluten"
+      ],
+      "excludedForVegetarian": []
+    },
+    {
+      "id": "sangak_bread",
+      "name": "نان سنگک",
+      "role": "starch",
+      "emoji": "🫓",
+      "unitLabel": "گرم",
+      "gramsPerUnit": 50,
+      "kcalPerUnit": 129,
+      "proteinPerUnit": 3.85,
+      "carbsPerUnit": 28.7,
+      "fatPerUnit": 0.35,
+      "allergyFlags": [
+        "gluten"
+      ],
+      "excludedForVegetarian": []
+    },
+    {
+      "id": "boiled_potato",
+      "name": "سیب‌زمینی آب‌پز",
+      "role": "starch",
+      "emoji": "🥔",
+      "unitLabel": "گرم",
+      "gramsPerUnit": 100,
+      "kcalPerUnit": 87,
+      "proteinPerUnit": 2,
+      "carbsPerUnit": 20,
+      "fatPerUnit": 0.1,
+      "allergyFlags": [],
+      "excludedForVegetarian": []
+    },
+    {
+      "id": "mixed_salad",
+      "name": "سالاد سبزیجات",
+      "role": "vegetable",
+      "emoji": "🥗",
+      "unitLabel": "کاسه",
+      "gramsPerUnit": 150,
+      "kcalPerUnit": 30,
+      "proteinPerUnit": 1.5,
+      "carbsPerUnit": 6,
+      "fatPerUnit": 0.2,
+      "allergyFlags": [],
+      "excludedForVegetarian": []
+    },
+    {
+      "id": "fresh_cucumber_tomato",
+      "name": "خیار و گوجه تازه",
+      "role": "vegetable",
+      "emoji": "🥒",
+      "unitLabel": "گرم",
+      "gramsPerUnit": 150,
+      "kcalPerUnit": 25,
+      "proteinPerUnit": 1.2,
+      "carbsPerUnit": 5.6,
+      "fatPerUnit": 0.2,
+      "allergyFlags": [],
+      "excludedForVegetarian": []
+    },
+    {
+      "id": "steamed_vegetables",
+      "name": "سبزیجات بخارپز",
+      "role": "vegetable",
+      "emoji": "🥦",
+      "unitLabel": "گرم",
+      "gramsPerUnit": 100,
+      "kcalPerUnit": 30,
+      "proteinPerUnit": 2,
+      "carbsPerUnit": 6,
+      "fatPerUnit": 0.2,
+      "allergyFlags": [],
+      "excludedForVegetarian": []
+    },
+    {
+      "id": "spinach_borani",
+      "name": "بورانی اسفناج",
+      "role": "vegetable",
+      "emoji": "🥬",
+      "unitLabel": "گرم",
+      "gramsPerUnit": 100,
+      "kcalPerUnit": 73,
+      "proteinPerUnit": 3,
+      "carbsPerUnit": 6,
+      "fatPerUnit": 4,
+      "allergyFlags": [
+        "dairy"
+      ],
+      "excludedForVegetarian": []
+    },
+    {
+      "id": "olive_oil",
+      "name": "روغن زیتون",
+      "role": "fat",
+      "emoji": "🫒",
+      "unitLabel": "قاشق",
+      "gramsPerUnit": 14,
+      "kcalPerUnit": 119,
+      "proteinPerUnit": 0,
+      "carbsPerUnit": 0,
+      "fatPerUnit": 14,
+      "allergyFlags": [],
+      "excludedForVegetarian": []
+    },
+    {
+      "id": "walnut",
+      "name": "گردو",
+      "role": "fat",
+      "emoji": "🌰",
+      "unitLabel": "عدد",
+      "gramsPerUnit": 6,
+      "kcalPerUnit": 39,
+      "proteinPerUnit": 0.9,
+      "carbsPerUnit": 0.8,
+      "fatPerUnit": 3.9,
+      "allergyFlags": [
+        "peanut"
+      ],
+      "excludedForVegetarian": []
+    },
+    {
+      "id": "mixed_nuts",
+      "name": "آجیل خام",
+      "role": "fat",
+      "emoji": "🥜",
+      "unitLabel": "گرم",
+      "gramsPerUnit": 25,
+      "kcalPerUnit": 157,
+      "proteinPerUnit": 5,
+      "carbsPerUnit": 5,
+      "fatPerUnit": 13,
+      "allergyFlags": [
+        "peanut"
+      ],
+      "excludedForVegetarian": []
+    },
+    {
+      "id": "avocado_half",
+      "name": "آووکادو",
+      "role": "fat",
+      "emoji": "🥑",
+      "unitLabel": "عدد",
+      "gramsPerUnit": 75,
+      "kcalPerUnit": 120,
+      "proteinPerUnit": 1.5,
+      "carbsPerUnit": 6,
+      "fatPerUnit": 11,
+      "allergyFlags": [],
+      "excludedForVegetarian": []
+    },
+    {
+      "id": "low_fat_cheese",
+      "name": "پنیر کم‌چرب",
+      "role": "dairy",
+      "emoji": "🧀",
+      "unitLabel": "گرم",
+      "gramsPerUnit": 30,
+      "kcalPerUnit": 46,
+      "proteinPerUnit": 6,
+      "carbsPerUnit": 1,
+      "fatPerUnit": 2,
+      "allergyFlags": [
+        "dairy"
+      ],
+      "excludedForVegetarian": [
+        "vegan"
+      ]
+    },
+    {
+      "id": "low_fat_milk",
+      "name": "شیر کم‌چرب",
+      "role": "dairy",
+      "emoji": "🥛",
+      "unitLabel": "لیوان",
+      "gramsPerUnit": 250,
+      "kcalPerUnit": 102,
+      "proteinPerUnit": 8,
+      "carbsPerUnit": 12,
+      "fatPerUnit": 2,
+      "allergyFlags": [
+        "dairy"
+      ],
+      "excludedForVegetarian": [
+        "vegan"
+      ]
+    },
+    {
+      "id": "low_fat_yogurt",
+      "name": "ماست کم‌چرب",
+      "role": "dairy",
+      "emoji": "🥣",
+      "unitLabel": "گرم",
+      "gramsPerUnit": 100,
+      "kcalPerUnit": 45,
+      "proteinPerUnit": 5,
+      "carbsPerUnit": 6,
+      "fatPerUnit": 0.5,
+      "allergyFlags": [
+        "dairy"
+      ],
+      "excludedForVegetarian": [
+        "vegan"
+      ]
+    },
+    {
+      "id": "apple",
+      "name": "سیب",
+      "role": "fruit",
+      "emoji": "🍎",
+      "unitLabel": "عدد",
+      "gramsPerUnit": 150,
+      "kcalPerUnit": 78,
+      "proteinPerUnit": 0.4,
+      "carbsPerUnit": 21,
+      "fatPerUnit": 0.3,
+      "allergyFlags": [],
+      "excludedForVegetarian": []
+    },
+    {
+      "id": "banana",
+      "name": "موز",
+      "role": "fruit",
+      "emoji": "🍌",
+      "unitLabel": "عدد",
+      "gramsPerUnit": 120,
+      "kcalPerUnit": 107,
+      "proteinPerUnit": 1.3,
+      "carbsPerUnit": 27,
+      "fatPerUnit": 0.4,
+      "allergyFlags": [],
+      "excludedForVegetarian": []
+    },
+    {
+      "id": "medjool_date",
+      "name": "خرمای مدجول",
+      "role": "fruit",
+      "emoji": "🌴",
+      "unitLabel": "عدد",
+      "gramsPerUnit": 24,
+      "kcalPerUnit": 67,
+      "proteinPerUnit": 0.4,
+      "carbsPerUnit": 18,
+      "fatPerUnit": 0.04,
+      "allergyFlags": [],
+      "excludedForVegetarian": []
+    }
+  ],
+  "FOOD_SUBSTITUTES": [
+    {
+      "foodItemId": "brown_rice_cooked",
+      "substituteIds": [
+        "white_rice_cooked",
+        "quinoa_cooked",
+        "boiled_potato",
+        "sangak_bread"
+      ]
+    },
+    {
+      "foodItemId": "white_rice_cooked",
+      "substituteIds": [
+        "brown_rice_cooked",
+        "quinoa_cooked",
+        "boiled_potato",
+        "sangak_bread"
+      ]
+    },
+    {
+      "foodItemId": "quinoa_cooked",
+      "substituteIds": [
+        "brown_rice_cooked",
+        "white_rice_cooked",
+        "boiled_potato",
+        "sangak_bread"
+      ]
+    },
+    {
+      "foodItemId": "boiled_potato",
+      "substituteIds": [
+        "white_rice_cooked",
+        "brown_rice_cooked",
+        "quinoa_cooked",
+        "sangak_bread"
+      ]
+    },
+    {
+      "foodItemId": "whole_grain_toast",
+      "substituteIds": [
+        "sangak_bread"
+      ]
+    },
+    {
+      "foodItemId": "sangak_bread",
+      "substituteIds": [
+        "whole_grain_toast",
+        "white_rice_cooked",
+        "boiled_potato"
+      ]
+    },
+    {
+      "foodItemId": "chicken_breast",
+      "substituteIds": [
+        "grilled_fish",
+        "lean_beef",
+        "ground_beef_lean"
+      ]
+    },
+    {
+      "foodItemId": "grilled_fish",
+      "substituteIds": [
+        "chicken_breast",
+        "lean_beef"
+      ]
+    },
+    {
+      "foodItemId": "lean_beef",
+      "substituteIds": [
+        "chicken_breast",
+        "grilled_fish",
+        "ground_beef_lean"
+      ]
+    },
+    {
+      "foodItemId": "ground_beef_lean",
+      "substituteIds": [
+        "lean_beef",
+        "chicken_breast"
+      ]
+    },
+    {
+      "foodItemId": "whey_protein",
+      "substituteIds": [
+        "pea_protein"
+      ]
+    },
+    {
+      "foodItemId": "pea_protein",
+      "substituteIds": [
+        "whey_protein"
+      ]
+    },
+    {
+      "foodItemId": "egg_white",
+      "substituteIds": [
+        "egg_whole"
+      ]
+    },
+    {
+      "foodItemId": "egg_whole",
+      "substituteIds": [
+        "egg_white"
+      ]
+    },
+    {
+      "foodItemId": "low_fat_milk",
+      "substituteIds": [
+        "low_fat_yogurt"
+      ]
+    },
+    {
+      "foodItemId": "low_fat_yogurt",
+      "substituteIds": [
+        "low_fat_milk"
+      ]
+    },
+    {
+      "foodItemId": "walnut",
+      "substituteIds": [
+        "mixed_nuts",
+        "avocado_half"
+      ]
+    },
+    {
+      "foodItemId": "mixed_nuts",
+      "substituteIds": [
+        "walnut",
+        "avocado_half"
+      ]
+    },
+    {
+      "foodItemId": "apple",
+      "substituteIds": [
+        "banana",
+        "medjool_date"
+      ]
+    },
+    {
+      "foodItemId": "banana",
+      "substituteIds": [
+        "apple",
+        "medjool_date"
+      ]
+    },
+    {
+      "foodItemId": "medjool_date",
+      "substituteIds": [
+        "banana",
+        "apple"
+      ]
+    }
+  ],
+  "MEAL_TEMPLATES": [
+    {
+      "id": "bk_sangak_cheese_walnut",
+      "slot": "breakfast",
+      "displayName": "نان سنگک، پنیر، گردو و خیار و گوجه",
+      "slots": [
+        {
+          "role": "starch",
+          "primaryFoodItemId": "sangak_bread",
+          "dynamicUnits": true
+        },
+        {
+          "role": "dairy",
+          "primaryFoodItemId": "low_fat_cheese",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "walnut",
+          "dynamicUnits": true
+        },
+        {
+          "role": "vegetable",
+          "primaryFoodItemId": "fresh_cucumber_tomato",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "bk_eggs_sangak",
+      "slot": "breakfast",
+      "displayName": "تخم‌مرغ با نان سنگک و خیار و گوجه",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "egg_whole",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "sangak_bread",
+          "dynamicUnits": true
+        },
+        {
+          "role": "vegetable",
+          "primaryFoodItemId": "fresh_cucumber_tomato",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "bk_mixed_eggs_sangak",
+      "slot": "breakfast",
+      "displayName": "تخم‌مرغ و سفیده با نان سنگک",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "egg_whole",
+          "dynamicUnits": true
+        },
+        {
+          "role": "protein",
+          "primaryFoodItemId": "egg_white",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "sangak_bread",
+          "dynamicUnits": true
+        },
+        {
+          "role": "vegetable",
+          "primaryFoodItemId": "fresh_cucumber_tomato",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "bk_adasi_sangak",
+      "slot": "breakfast",
+      "displayName": "عدسی با نان سنگک و خیار و گوجه",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "lentils_cooked",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "sangak_bread",
+          "dynamicUnits": true
+        },
+        {
+          "role": "vegetable",
+          "primaryFoodItemId": "fresh_cucumber_tomato",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "bk_vegan_lentil_pea",
+      "slot": "breakfast",
+      "displayName": "عدسی با نوشیدنی پروتئین گیاهی و خیار و گوجه",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "lentils_cooked",
+          "dynamicUnits": true
+        },
+        {
+          "role": "protein",
+          "primaryFoodItemId": "pea_protein",
+          "dynamicUnits": true
+        },
+        {
+          "role": "vegetable",
+          "primaryFoodItemId": "fresh_cucumber_tomato",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "olive_oil",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "restrictedDietOnly": true,
+      "vegetarianStatusesOnly": [
+        "vegan"
+      ],
+      "goalTags": []
+    },
+    {
+      "id": "bk_restricted_eggs_potato",
+      "slot": "breakfast",
+      "displayName": "تخم‌مرغ با سیب‌زمینی آب‌پز و خیار و گوجه",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "egg_whole",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "boiled_potato",
+          "dynamicUnits": true
+        },
+        {
+          "role": "dairy",
+          "primaryFoodItemId": "low_fat_cheese",
+          "dynamicUnits": true
+        },
+        {
+          "role": "vegetable",
+          "primaryFoodItemId": "fresh_cucumber_tomato",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "restrictedDietOnly": true,
+      "goalTags": []
+    },
+    {
+      "id": "bk_restricted_lentil_potato",
+      "slot": "breakfast",
+      "displayName": "عدسی با سیب‌زمینی آب‌پز و خیار و گوجه",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "lentils_cooked",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "boiled_potato",
+          "dynamicUnits": true
+        },
+        {
+          "role": "vegetable",
+          "primaryFoodItemId": "fresh_cucumber_tomato",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "olive_oil",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "restrictedDietOnly": true,
+      "goalTags": []
+    },
+    {
+      "id": "ms_whey_milk",
+      "slot": "morning_snack",
+      "displayName": "پروتئین وی با شیر کم‌چرب",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "whey_protein",
+          "dynamicUnits": true
+        },
+        {
+          "role": "dairy",
+          "primaryFoodItemId": "low_fat_milk",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        }
+      ],
+      "isWorkoutDayOnly": true,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "ms_lentil_apple",
+      "slot": "morning_snack",
+      "displayName": "عدسی و سیب",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "lentils_cooked",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "apple",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "ms_pea_apple",
+      "slot": "morning_snack",
+      "displayName": "پروتئین نخود و سیب",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "pea_protein",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "apple",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "ms_dates_milk",
+      "slot": "morning_snack",
+      "displayName": "خرما با شیر کم‌چرب",
+      "slots": [
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "medjool_date",
+          "dynamicUnits": true
+        },
+        {
+          "role": "dairy",
+          "primaryFoodItemId": "low_fat_milk",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "ms_dates",
+      "slot": "morning_snack",
+      "displayName": "خرمای مدجول",
+      "slots": [
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "medjool_date",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "ms_banana_dates",
+      "slot": "morning_snack",
+      "displayName": "موز و خرما",
+      "slots": [
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "banana",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "medjool_date",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "ms_toast_banana",
+      "slot": "morning_snack",
+      "displayName": "نان تست سبوس‌دار و موز",
+      "slots": [
+        {
+          "role": "starch",
+          "primaryFoodItemId": "whole_grain_toast",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "banana",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "ln_chicken_rice_yogurt",
+      "slot": "lunch",
+      "displayName": "مرغ با برنج، سالاد و ماست",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "chicken_breast",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "white_rice_cooked",
+          "dynamicUnits": true
+        },
+        {
+          "role": "vegetable",
+          "primaryFoodItemId": "mixed_salad",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "olive_oil",
+          "dynamicUnits": true
+        },
+        {
+          "role": "dairy",
+          "primaryFoodItemId": "low_fat_yogurt",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "ln_fish_rice_salad",
+      "slot": "lunch",
+      "displayName": "ماهی کبابی با برنج و سالاد",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "grilled_fish",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "white_rice_cooked",
+          "dynamicUnits": true
+        },
+        {
+          "role": "vegetable",
+          "primaryFoodItemId": "mixed_salad",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "olive_oil",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "ln_beef_rice_salad",
+      "slot": "lunch",
+      "displayName": "گوشت کم‌چرب با برنج و سالاد",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "ground_beef_lean",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "white_rice_cooked",
+          "dynamicUnits": true
+        },
+        {
+          "role": "vegetable",
+          "primaryFoodItemId": "mixed_salad",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "olive_oil",
+          "dynamicUnits": true
+        },
+        {
+          "role": "dairy",
+          "primaryFoodItemId": "low_fat_yogurt",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "ln_adas_polo_beef",
+      "slot": "lunch",
+      "displayName": "عدس‌پلو با گوشت کم‌چرب و سالاد",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "ground_beef_lean",
+          "dynamicUnits": true
+        },
+        {
+          "role": "protein",
+          "primaryFoodItemId": "lentils_cooked",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "white_rice_cooked",
+          "dynamicUnits": true
+        },
+        {
+          "role": "vegetable",
+          "primaryFoodItemId": "mixed_salad",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "ln_vegan_pea_lentil_rice",
+      "slot": "lunch",
+      "displayName": "عدس‌پلو سبک با نوشیدنی پروتئین گیاهی",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "pea_protein",
+          "dynamicUnits": true
+        },
+        {
+          "role": "protein",
+          "primaryFoodItemId": "lentils_cooked",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "white_rice_cooked",
+          "dynamicUnits": true
+        },
+        {
+          "role": "vegetable",
+          "primaryFoodItemId": "mixed_salad",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "olive_oil",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "restrictedDietOnly": true,
+      "vegetarianStatusesOnly": [
+        "vegan"
+      ],
+      "goalTags": []
+    },
+    {
+      "id": "ln_vegan_soy_rice",
+      "slot": "lunch",
+      "displayName": "سویا با برنج و سالاد",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "soy_chunks",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "white_rice_cooked",
+          "dynamicUnits": true
+        },
+        {
+          "role": "vegetable",
+          "primaryFoodItemId": "mixed_salad",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "olive_oil",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "restrictedDietOnly": true,
+      "vegetarianStatusesOnly": [
+        "vegan",
+        "lacto_ovo"
+      ],
+      "goalTags": []
+    },
+    {
+      "id": "ln_adas_polo_vegan",
+      "slot": "lunch",
+      "displayName": "عدس‌پلو با سالاد",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "lentils_cooked",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "white_rice_cooked",
+          "dynamicUnits": true
+        },
+        {
+          "role": "vegetable",
+          "primaryFoodItemId": "mixed_salad",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "olive_oil",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "as_potato_chicken",
+      "slot": "afternoon_snack",
+      "displayName": "سیب‌زمینی و فیله مرغ",
+      "slots": [
+        {
+          "role": "starch",
+          "primaryFoodItemId": "boiled_potato",
+          "dynamicUnits": true
+        },
+        {
+          "role": "protein",
+          "primaryFoodItemId": "chicken_breast",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": true,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "as_whey_nuts",
+      "slot": "afternoon_snack",
+      "displayName": "پروتئین وی و آجیل",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "whey_protein",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "mixed_nuts",
+          "dynamicUnits": false,
+          "fixedUnits": 0.5
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": true,
+      "goalTags": []
+    },
+    {
+      "id": "as_potato_lentil",
+      "slot": "afternoon_snack",
+      "displayName": "سیب‌زمینی و عدسی",
+      "slots": [
+        {
+          "role": "starch",
+          "primaryFoodItemId": "boiled_potato",
+          "dynamicUnits": true
+        },
+        {
+          "role": "protein",
+          "primaryFoodItemId": "lentils_cooked",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "olive_oil",
+          "dynamicUnits": false,
+          "fixedUnits": 0.25
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "as_pea_potato",
+      "slot": "afternoon_snack",
+      "displayName": "پروتئین نخود و سیب‌زمینی",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "pea_protein",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "boiled_potato",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "as_potato_dates",
+      "slot": "afternoon_snack",
+      "displayName": "سیب‌زمینی و خرما",
+      "slots": [
+        {
+          "role": "starch",
+          "primaryFoodItemId": "boiled_potato",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "medjool_date",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "as_banana_dates",
+      "slot": "afternoon_snack",
+      "displayName": "موز و خرما",
+      "slots": [
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "banana",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "medjool_date",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "as_banana_dates_avocado",
+      "slot": "afternoon_snack",
+      "displayName": "موز، خرما و آووکادو",
+      "slots": [
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "banana",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "medjool_date",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "avocado_half",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "as_toast_dates",
+      "slot": "afternoon_snack",
+      "displayName": "نان تست سبوس‌دار و خرما",
+      "slots": [
+        {
+          "role": "starch",
+          "primaryFoodItemId": "whole_grain_toast",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "medjool_date",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "dn_eggs_sangak",
+      "slot": "dinner",
+      "displayName": "تخم‌مرغ با نان سنگک و خیار و گوجه",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "egg_whole",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "sangak_bread",
+          "dynamicUnits": true
+        },
+        {
+          "role": "vegetable",
+          "primaryFoodItemId": "fresh_cucumber_tomato",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "dn_chicken_sangak",
+      "slot": "dinner",
+      "displayName": "مرغ با نان سنگک، سالاد و ماست",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "chicken_breast",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "sangak_bread",
+          "dynamicUnits": true
+        },
+        {
+          "role": "vegetable",
+          "primaryFoodItemId": "mixed_salad",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "olive_oil",
+          "dynamicUnits": true
+        },
+        {
+          "role": "dairy",
+          "primaryFoodItemId": "low_fat_yogurt",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "dn_adasi_sangak",
+      "slot": "dinner",
+      "displayName": "عدسی با نان سنگک و خیار و گوجه",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "lentils_cooked",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "sangak_bread",
+          "dynamicUnits": true
+        },
+        {
+          "role": "vegetable",
+          "primaryFoodItemId": "fresh_cucumber_tomato",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "olive_oil",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "dn_fish_potato_salad",
+      "slot": "dinner",
+      "displayName": "ماهی کبابی با سیب‌زمینی و سالاد",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "grilled_fish",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "boiled_potato",
+          "dynamicUnits": true
+        },
+        {
+          "role": "vegetable",
+          "primaryFoodItemId": "mixed_salad",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "olive_oil",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "dn_vegan_pea_lentil_potato",
+      "slot": "dinner",
+      "displayName": "عدسی سبک با سیب‌زمینی و نوشیدنی پروتئین گیاهی",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "pea_protein",
+          "dynamicUnits": true
+        },
+        {
+          "role": "protein",
+          "primaryFoodItemId": "lentils_cooked",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "boiled_potato",
+          "dynamicUnits": true
+        },
+        {
+          "role": "vegetable",
+          "primaryFoodItemId": "mixed_salad",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "olive_oil",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "restrictedDietOnly": true,
+      "vegetarianStatusesOnly": [
+        "vegan"
+      ],
+      "goalTags": []
+    },
+    {
+      "id": "dn_vegan_soy_potato",
+      "slot": "dinner",
+      "displayName": "سویا با سیب‌زمینی آب‌پز و سالاد",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "soy_chunks",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "boiled_potato",
+          "dynamicUnits": true
+        },
+        {
+          "role": "vegetable",
+          "primaryFoodItemId": "mixed_salad",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "olive_oil",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "restrictedDietOnly": true,
+      "vegetarianStatusesOnly": [
+        "vegan",
+        "lacto_ovo"
+      ],
+      "goalTags": []
+    },
+    {
+      "id": "dn_restricted_chicken_potato",
+      "slot": "dinner",
+      "displayName": "مرغ با سیب‌زمینی آب‌پز، سالاد و ماست",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "chicken_breast",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "boiled_potato",
+          "dynamicUnits": true
+        },
+        {
+          "role": "vegetable",
+          "primaryFoodItemId": "mixed_salad",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "olive_oil",
+          "dynamicUnits": true
+        },
+        {
+          "role": "dairy",
+          "primaryFoodItemId": "low_fat_yogurt",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "restrictedDietOnly": true,
+      "goalTags": []
+    },
+    {
+      "id": "dn_restricted_lentil_potato",
+      "slot": "dinner",
+      "displayName": "عدسی با سیب‌زمینی آب‌پز و سالاد",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "lentils_cooked",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "boiled_potato",
+          "dynamicUnits": true
+        },
+        {
+          "role": "vegetable",
+          "primaryFoodItemId": "mixed_salad",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "olive_oil",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "restrictedDietOnly": true,
+      "goalTags": []
+    },
+    {
+      "id": "ns_milk",
+      "slot": "night_snack",
+      "displayName": "شیر کم‌چرب",
+      "slots": [
+        {
+          "role": "dairy",
+          "primaryFoodItemId": "low_fat_milk",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "ns_apple",
+      "slot": "night_snack",
+      "displayName": "سیب",
+      "slots": [
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "apple",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "ns_pea",
+      "slot": "night_snack",
+      "displayName": "نیم‌اسکوپ پروتئین نخود",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "pea_protein",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "ns_dates",
+      "slot": "night_snack",
+      "displayName": "خرمای مدجول",
+      "slots": [
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "medjool_date",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "ns_banana_dates",
+      "slot": "night_snack",
+      "displayName": "موز و خرما",
+      "slots": [
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "banana",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "medjool_date",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "ns_toast_dates",
+      "slot": "night_snack",
+      "displayName": "نان تست سبوس‌دار و خرما",
+      "slots": [
+        {
+          "role": "starch",
+          "primaryFoodItemId": "whole_grain_toast",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "medjool_date",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    }
+  ],
+  "PORTION_RULES": {
+    "egg_white": {
+      "minUnits": 1,
+      "typicalUnits": 3,
+      "softMaxUnits": 5,
+      "hardMaxUnits": 6,
+      "step": 1
+    },
+    "egg_whole": {
+      "minUnits": 1,
+      "typicalUnits": 2,
+      "softMaxUnits": 3,
+      "hardMaxUnits": 4,
+      "step": 1
+    },
+    "chicken_breast": {
+      "minUnits": 0.5,
+      "typicalUnits": 1.5,
+      "softMaxUnits": 2,
+      "hardMaxUnits": 2.5,
+      "step": 0.25
+    },
+    "grilled_fish": {
+      "minUnits": 0.5,
+      "typicalUnits": 1.5,
+      "softMaxUnits": 2,
+      "hardMaxUnits": 2.5,
+      "step": 0.25
+    },
+    "lean_beef": {
+      "minUnits": 0.5,
+      "typicalUnits": 1.5,
+      "softMaxUnits": 2,
+      "hardMaxUnits": 2.25,
+      "step": 0.25
+    },
+    "ground_beef_lean": {
+      "minUnits": 0.5,
+      "typicalUnits": 1.5,
+      "softMaxUnits": 2,
+      "hardMaxUnits": 2.25,
+      "step": 0.25
+    },
+    "whey_protein": {
+      "minUnits": 0.5,
+      "typicalUnits": 1,
+      "softMaxUnits": 1.5,
+      "hardMaxUnits": 2,
+      "step": 0.5
+    },
+    "pea_protein": {
+      "minUnits": 0.5,
+      "typicalUnits": 1,
+      "softMaxUnits": 1.5,
+      "hardMaxUnits": 2,
+      "step": 0.5
+    },
+    "soy_chunks": {
+      "minUnits": 0.25,
+      "typicalUnits": 0.5,
+      "softMaxUnits": 0.75,
+      "hardMaxUnits": 1,
+      "step": 0.25
+    },
+    "lentils_cooked": {
+      "minUnits": 0.5,
+      "typicalUnits": 1.5,
+      "softMaxUnits": 2,
+      "hardMaxUnits": 2.5,
+      "step": 0.25
+    },
+    "brown_rice_cooked": {
+      "minUnits": 0.5,
+      "typicalUnits": 1.5,
+      "softMaxUnits": 2.25,
+      "hardMaxUnits": 3,
+      "step": 0.25
+    },
+    "white_rice_cooked": {
+      "minUnits": 0.5,
+      "typicalUnits": 1.5,
+      "softMaxUnits": 2.25,
+      "hardMaxUnits": 3,
+      "step": 0.25
+    },
+    "quinoa_cooked": {
+      "minUnits": 0.5,
+      "typicalUnits": 1.5,
+      "softMaxUnits": 2.25,
+      "hardMaxUnits": 3,
+      "step": 0.25
+    },
+    "oats_dry": {
+      "minUnits": 0.5,
+      "typicalUnits": 1,
+      "softMaxUnits": 1.5,
+      "hardMaxUnits": 2,
+      "step": 0.25
+    },
+    "whole_grain_toast": {
+      "minUnits": 1,
+      "typicalUnits": 2,
+      "softMaxUnits": 3,
+      "hardMaxUnits": 4,
+      "step": 1
+    },
+    "sangak_bread": {
+      "minUnits": 0.5,
+      "typicalUnits": 2,
+      "softMaxUnits": 2.5,
+      "hardMaxUnits": 3,
+      "step": 0.5
+    },
+    "boiled_potato": {
+      "minUnits": 0.5,
+      "typicalUnits": 2,
+      "softMaxUnits": 3,
+      "hardMaxUnits": 3.5,
+      "step": 0.25
+    },
+    "mixed_salad": {
+      "minUnits": 0.5,
+      "typicalUnits": 1,
+      "softMaxUnits": 1.5,
+      "hardMaxUnits": 2,
+      "step": 0.5
+    },
+    "fresh_cucumber_tomato": {
+      "minUnits": 0.5,
+      "typicalUnits": 1,
+      "softMaxUnits": 1.5,
+      "hardMaxUnits": 2,
+      "step": 0.5
+    },
+    "steamed_vegetables": {
+      "minUnits": 0.5,
+      "typicalUnits": 1.5,
+      "softMaxUnits": 2.5,
+      "hardMaxUnits": 3,
+      "step": 0.5
+    },
+    "spinach_borani": {
+      "minUnits": 0.5,
+      "typicalUnits": 1,
+      "softMaxUnits": 1.5,
+      "hardMaxUnits": 2,
+      "step": 0.5
+    },
+    "olive_oil": {
+      "minUnits": 0.25,
+      "typicalUnits": 0.5,
+      "softMaxUnits": 1.25,
+      "hardMaxUnits": 2,
+      "step": 0.25
+    },
+    "walnut": {
+      "minUnits": 1,
+      "typicalUnits": 2,
+      "softMaxUnits": 4,
+      "hardMaxUnits": 6,
+      "step": 1
+    },
+    "mixed_nuts": {
+      "minUnits": 0.25,
+      "typicalUnits": 0.75,
+      "softMaxUnits": 1,
+      "hardMaxUnits": 1.5,
+      "step": 0.25
+    },
+    "avocado_half": {
+      "minUnits": 0.5,
+      "typicalUnits": 1,
+      "softMaxUnits": 1.5,
+      "hardMaxUnits": 2,
+      "step": 0.5
+    },
+    "low_fat_cheese": {
+      "minUnits": 0.5,
+      "typicalUnits": 1,
+      "softMaxUnits": 1.5,
+      "hardMaxUnits": 2,
+      "step": 0.5
+    },
+    "low_fat_milk": {
+      "minUnits": 0.5,
+      "typicalUnits": 1,
+      "softMaxUnits": 1,
+      "hardMaxUnits": 1.2,
+      "step": 0.1
+    },
+    "low_fat_yogurt": {
+      "minUnits": 0.5,
+      "typicalUnits": 1.5,
+      "softMaxUnits": 2,
+      "hardMaxUnits": 2.5,
+      "step": 0.5
+    },
+    "apple": {
+      "minUnits": 0.5,
+      "typicalUnits": 1,
+      "softMaxUnits": 1.5,
+      "hardMaxUnits": 2,
+      "step": 0.5
+    },
+    "banana": {
+      "minUnits": 0.5,
+      "typicalUnits": 1,
+      "softMaxUnits": 1.5,
+      "hardMaxUnits": 2,
+      "step": 0.5
+    },
+    "medjool_date": {
+      "minUnits": 1,
+      "typicalUnits": 2,
+      "softMaxUnits": 2,
+      "hardMaxUnits": 3,
+      "step": 1
+    }
+  }
+}

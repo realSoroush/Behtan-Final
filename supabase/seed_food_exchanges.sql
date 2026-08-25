@@ -1,3 +1,4 @@
+-- LEGACY: production Behtan no longer reads this table. Keep only for compatibility/reference.
 -- ============================================================================
 -- Seed data: food_exchanges
 -- Realistic starter set covering every category referenced by the meal

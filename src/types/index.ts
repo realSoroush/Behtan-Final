@@ -83,6 +83,8 @@ export interface UserProfile {
   onboarding_step: number;
   /** Full in-progress OnboardingData snapshot, cleared once onboarding completes. */
   onboarding_draft_json: OnboardingData | null;
+  /** True only after the final onboarding write succeeds. */
+  onboarding_completed: boolean;
   created_at: string;
 }
 
@@ -133,6 +135,26 @@ export interface FoodItem {
   excludedForVegetarian: VegetarianStatus[];
 }
 
+/** Practical serving guardrails stored alongside each food in Supabase. */
+export interface PortionRule {
+  minUnits: number;
+  typicalUnits: number;
+  softMaxUnits: number;
+  hardMaxUnits: number;
+  step: number;
+}
+
+/**
+ * The complete runtime nutrition catalog. Production obtains this from
+ * Supabase; smoke tests use a frozen fixture generated from the same seed.
+ */
+export interface NutritionCatalog {
+  foods: FoodItem[];
+  substitutes: FoodSubstituteGroup[];
+  mealTemplates: MealTemplate[];
+  portionRules: Record<string, PortionRule>;
+}
+
 /**
  * Substitution edge: foodItemId can be swapped for any id in substituteIds.
  * Mirrors a future `food_substitutes(food_item_id, substitute_food_item_id)`
@@ -176,6 +198,10 @@ export interface MealTemplate {
   isWorkoutDayOnly: boolean;
   isRestDayOnly: boolean;
   maxPerWeek?: number;
+  /** Hide specialist fallback templates from unrestricted users. */
+  restrictedDietOnly?: boolean;
+  /** Optional diet-status gate for specialist templates (for example vegan-only). */
+  vegetarianStatusesOnly?: VegetarianStatus[];
   goalTags: Goal[]; // which goals this template suits (empty = all goals)
 }
 
@@ -205,6 +231,25 @@ export interface Meal {
   totalCarbs: number;
   totalFat: number;
   consumed: boolean;
+}
+
+/**
+ * A pre-calculated food swap. The replacement amount is solved against the
+ * ORIGINAL component, not against the whole meal target. This prevents a
+ * swap from silently deleting protein/carbs/fat just because the rest of the
+ * meal happens to keep the total score acceptable.
+ */
+export interface FoodSwapOption {
+  foodItem: FoodItem;
+  replacementComponent: MealComponent;
+  updatedMeal: Meal;
+  isEquivalent: boolean;
+  reason?: string;
+  score: number;
+  kcalDeviationPct: number;
+  proteinDeviationPct: number;
+  carbDeviationPct: number;
+  fatDeviationPct: number;
 }
 
 export interface DailyMealPlan {

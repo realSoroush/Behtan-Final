@@ -12,7 +12,10 @@
     "test:onboarding": "node --experimental-strip-types scripts/onboarding-persistence.smoke-test.mjs",
     "test:age": "node --experimental-strip-types scripts/age-validation.smoke-test.mjs",
     "test:brand": "node scripts/brand.smoke-test.mjs",
-    "test:portions": "node --experimental-strip-types scripts/portion-realism.smoke-test.mjs"
+    "test:portions": "node --experimental-strip-types scripts/portion-realism.smoke-test.mjs",
+    "test:swap": "node --experimental-strip-types scripts/swap-equivalence.smoke-test.mjs",
+    "test:menus": "node --experimental-strip-types scripts/iranian-main-meals.smoke-test.mjs",
+    "test:data": "node --experimental-strip-types scripts/supabase-data-contract.smoke-test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

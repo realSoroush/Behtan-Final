@@ -31,8 +31,9 @@ export default function App() {
       setView('auth');
       return;
     }
-    // User is authenticated. Show onboarding if no profile data yet.
-    if (!profile || !profile.goal) {
+    // Only the final onboarding commit marks a profile complete. A user who
+    // finished Step 3 (goal) but left later must still resume onboarding.
+    if (!profile || profile.onboarding_completed !== true) {
       setView('onboarding');
       return;
     }

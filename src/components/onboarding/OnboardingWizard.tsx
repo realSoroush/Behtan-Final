@@ -134,6 +134,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       // Completion is committed atomically with clearing the resume draft.
       onboarding_step: 1,
       onboarding_draft_json: null,
+      onboarding_completed: true,
     };
 
     try {

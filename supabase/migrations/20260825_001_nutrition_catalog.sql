@@ -1,127 +1,29 @@
--- ============================================================================
--- Behtan — Supabase Schema
--- Run this in the Supabase SQL Editor (or via `supabase db push`).
--- ============================================================================
+-- Behtan MVP — live nutrition catalog + onboarding completion contract
+-- Safe to run in Supabase SQL Editor. This migration is additive and does not
+-- drop the legacy food_exchanges table; production code stops reading it.
 
--- Enable UUID generation if not already enabled
-create extension if not exists "uuid-ossp";
+begin;
 
--- ============================================================================
--- TABLE: food_exchanges
--- Reference nutrition data. Read-only for clients (public read, no write).
--- ============================================================================
+-- ---------------------------------------------------------------------------
+-- 1) User-profile completion state
+-- ---------------------------------------------------------------------------
+alter table public.user_profiles
+  add column if not exists onboarding_completed boolean not null default false;
 
-create table if not exists public.food_exchanges (
-  id text primary key,
-  category text not null check (
-    category in (
-      'starch',
-      'meat_lean',
-      'meat_medium_fat',
-      'meat_high_fat',
-      'meat_very_lean',
-      'vegetable',
-      'fruit',
-      'dairy_skim',
-      'dairy_low_fat',
-      'dairy_whole',
-      'fat',
-      'mixed_dish',
-      'legume'
-    )
-  ),
-  name text not null,
-  amount text not null,
-  "weightGrams" int4 not null,
-  kcal int4 not null,
-  carbs int4 not null,
-  protein int4 not null,
-  fat int4 not null,
-  fiber int4 not null default 0,
-  sugar int4 not null default 0,
-  gi_level text not null check (gi_level in ('Low', 'Medium', 'High'))
-);
-
-comment on table public.food_exchanges is
-  'Legacy exchange reference table. Retained for compatibility; the production meal engine reads food_items instead.';
-
-alter table public.food_exchanges enable row level security;
-
-create policy "food_exchanges are publicly readable"
-  on public.food_exchanges
-  for select
-  using (true);
-
--- No insert/update/delete policies for anon/authenticated roles:
--- this table is managed only via the service role (admin/CMS).
-
--- ============================================================================
--- TABLE: user_profiles
--- One row per authenticated user (id = auth.users.id).
--- ============================================================================
-
-create table if not exists public.user_profiles (
-  id uuid primary key references auth.users (id) on delete cascade,
-  phone text,
-  gender text check (gender in ('male', 'female')),
-  province text,
-  city text,
-  birth_date date,
-  height numeric,
-  weight numeric,
-  goal text check (goal in ('weight_loss', 'weight_gain', 'maintenance')),
-  activity_level text check (activity_level in ('sedentary', 'lightly_active', 'moderate', 'active')),
-  workout_location text check (workout_location in ('home', 'gym', 'none')),
-  workout_days int2,
-  motivation text,
-  schedule_json jsonb,
-  medical_conditions_json jsonb,
-  dietary_preferences_json jsonb,
-  weight_loss_speed text check (weight_loss_speed in ('mild', 'standard', 'fast')),
-  body_fat_pct numeric,
-  body_type text check (body_type in ('ectomorph', 'mesomorph', 'endomorph')),
-  subscription_tier text check (subscription_tier in ('silver', 'gold')),
-  onboarding_step int2 not null default 1 check (onboarding_step between 1 and 11),
-  onboarding_draft_json jsonb,
-  onboarding_completed boolean not null default false,
-  created_at timestamptz not null default now()
-);
-
-comment on table public.user_profiles is
-  'Onboarding + profile data. Nutrition numbers are computed client-side via nutritionHelpers.ts, never stored as AI output.';
-
-alter table public.user_profiles enable row level security;
-
-create policy "Users can view their own profile"
-  on public.user_profiles
-  for select
-  using (auth.uid() = id);
-
-create policy "Users can insert their own profile"
-  on public.user_profiles
-  for insert
-  with check (auth.uid() = id);
-
-create policy "Users can update their own profile"
-  on public.user_profiles
-  for update
-  using (auth.uid() = id)
-  with check (auth.uid() = id);
-
--- ============================================================================
--- Helpful index for lookups
--- ============================================================================
-
-create index if not exists idx_food_exchanges_category
-  on public.food_exchanges (category);
-
-create index if not exists idx_user_profiles_phone
-  on public.user_profiles (phone);
-
-
--- ============================================================================
--- LIVE NUTRITION CATALOG (production source of truth)
--- ============================================================================
+-- Mark only clearly completed legacy profiles as complete. A profile that has
+-- merely reached Step 3 (goal) must not be routed to the dashboard.
+update public.user_profiles
+set onboarding_completed = true
+where onboarding_completed = false
+  and onboarding_draft_json is null
+  and gender is not null
+  and birth_date is not null
+  and height is not null
+  and weight is not null
+  and goal is not null
+  and activity_level is not null
+  and dietary_preferences_json is not null
+  and subscription_tier is not null;
 
 -- ---------------------------------------------------------------------------
 -- 2) Atomic food catalog
@@ -316,3 +218,4 @@ comment on table public.meal_templates is
 comment on table public.meal_template_slots is
   'Ordered foods that compose each meal template.';
 
+commit;

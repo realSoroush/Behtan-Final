@@ -7,6 +7,7 @@
  * Node's type-stripping mode. It does not require Vitest or any extra package.
  */
 
+import { installTestNutritionCatalog } from './setup-test-nutrition-catalog.mjs';
 import {
   calculateBMR,
   calculateFullNutritionPlan,
@@ -15,6 +16,8 @@ import {
   WEIGHT_LOSS_SPEED_POLICY,
 } from '../src/utils/nutritionHelpers.ts';
 import { generateDailyMealPlan, MealPlanFeasibilityError } from '../src/utils/mealPlanEngine.ts';
+
+installTestNutritionCatalog();
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);

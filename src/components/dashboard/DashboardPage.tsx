@@ -6,14 +6,13 @@ import { MealCard } from './MealCard';
 import { FoodSwapModal } from './FoodSwapModal';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { useNutritionCatalog } from '@/hooks/useNutritionCatalog';
 import { calculateFullNutritionPlan, toPersianDigits } from '@/utils/nutritionHelpers';
 import {
   generateDailyMealPlan,
-  getSwapCandidatesForComponent,
-  swapComponentInMeal,
-  getSlotTargets,
+  getSwapOptionsForMeal,
 } from '@/utils/mealPlanEngine';
-import type { DailyMealPlan, FoodItem, MacroTargets, MealComponent } from '@/types';
+import type { DailyMealPlan, FoodSwapOption, MacroTargets, MealComponent } from '@/types';
 import { APP_LOGO_PATH, APP_NAME_FA } from '@/constants/brand';
 
 // ============================================================================
@@ -43,6 +42,12 @@ function computeConsumedMacros(plan: DailyMealPlan): MacroTargets {
 export function DashboardPage() {
   const { user, signOut } = useAuth();
   const { profile, loading: profileLoading, error: profileError } = useUserProfile(user?.id);
+  const {
+    catalog,
+    loading: catalogLoading,
+    error: catalogError,
+    refetch: refetchCatalog,
+  } = useNutritionCatalog();
 
   const [isWorkoutDay, setIsWorkoutDay] = useState(false);
 
@@ -71,12 +76,12 @@ export function DashboardPage() {
     });
   }, [profile, isWorkoutDay]);
 
-  // ---- Generate meal plan (no DB fetch needed - engine is self-contained) ----
+  // ---- Generate meal plan after the live Supabase nutrition catalog loads ----
   // Generation can intentionally fail when nutrition targets cannot be met
   // without violating practical portion limits. Keep that failure local to the
   // dashboard instead of letting it crash the React tree / Error Boundary.
   const mealPlanResult = useMemo<{ plan: DailyMealPlan | null; error: string | null }>(() => {
-    if (!targets || !profile?.weight || !profile?.dietary_preferences_json) {
+    if (!catalog || !targets || !profile?.weight || !profile?.dietary_preferences_json) {
       return { plan: null, error: null };
     }
 
@@ -98,7 +103,7 @@ export function DashboardPage() {
         : 'تولید برنامه غذایی با خطا مواجه شد.';
       return { plan: null, error: message };
     }
-  }, [targets, profile, isWorkoutDay, planVersion]);
+  }, [catalog, targets, profile, isWorkoutDay, planVersion]);
 
   const mealPlan = mealPlanResult.plan;
 
@@ -122,14 +127,11 @@ export function DashboardPage() {
     setSwapComponentIndex(componentIdx);
   };
 
-  const handleSwapSelect = (replacement: FoodItem) => {
-    if (!activePlan || swapMealIndex === null || swapComponentIndex === null || !targets) return;
-    const meal = activePlan.meals[swapMealIndex];
-    const slotTargets = getSlotTargets(meal.slot, targets);
-    const updatedMeal = swapComponentInMeal(meal, swapComponentIndex, replacement, slotTargets);
+  const handleSwapSelect = (option: FoodSwapOption) => {
+    if (!option.isEquivalent || !activePlan || swapMealIndex === null) return;
     const updated = {
       ...activePlan,
-      meals: activePlan.meals.map((m, i) => (i === swapMealIndex ? updatedMeal : m)),
+      meals: activePlan.meals.map((m, i) => (i === swapMealIndex ? option.updatedMeal : m)),
     };
     setSwappedPlan(updated);
   };
@@ -139,20 +141,50 @@ export function DashboardPage() {
       ? activePlan.meals[swapMealIndex]?.components[swapComponentIndex] ?? null
       : null;
 
-  const swapCandidates = useMemo<FoodItem[]>(() => {
-    if (!swapCurrentComponent || !profile?.dietary_preferences_json) return [];
-    return getSwapCandidatesForComponent(swapCurrentComponent, profile.dietary_preferences_json);
-  }, [swapCurrentComponent, profile]);
+  const swapCandidates = useMemo<FoodSwapOption[]>(() => {
+    if (
+      !catalog ||
+      !swapCurrentComponent ||
+      !profile?.dietary_preferences_json ||
+      !activePlan ||
+      swapMealIndex === null ||
+      swapComponentIndex === null
+    ) return [];
+    return getSwapOptionsForMeal(
+      activePlan.meals[swapMealIndex],
+      swapComponentIndex,
+      profile.dietary_preferences_json
+    );
+  }, [catalog, swapCurrentComponent, profile, activePlan, swapMealIndex, swapComponentIndex]);
 
   const consumed = activePlan ? computeConsumedMacros(activePlan) : null;
 
   // ---- Loading / error states ----
-  if (profileLoading) {
+  if (profileLoading || catalogLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-3">
           <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-neutral-500 dark:text-neutral-400">در حال بارگذاری برنامه...</p>
+          <p className="text-neutral-500 dark:text-neutral-400">در حال بارگذاری برنامه و دیتابیس غذایی...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (catalogError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-5">
+        <div className="max-w-sm text-center space-y-4">
+          <AlertCircle size={40} className="text-red-500 mx-auto" />
+          <p className="font-semibold text-neutral-700 dark:text-neutral-300">{catalogError}</p>
+          <button
+            type="button"
+            onClick={() => void refetchCatalog()}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-sm font-semibold"
+          >
+            <RefreshCw size={14} />
+            تلاش دوباره
+          </button>
         </div>
       </div>
     );

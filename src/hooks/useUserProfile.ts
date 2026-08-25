@@ -99,6 +99,7 @@ export function useUserProfile(userId: string | undefined): UseUserProfileReturn
           id: userId,
           onboarding_step: step,
           onboarding_draft_json: draft,
+          onboarding_completed: false,
         },
         { onConflict: 'id' }
       );

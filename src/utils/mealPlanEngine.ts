@@ -4,9 +4,9 @@
  * DYNAMIC, deterministic meal-plan generation. No AI, no invented numbers.
  *
  * Architecture (bottom to top):
- *   1. FOOD_ITEMS            - atomic foods with real per-unit macros
- *   2. FOOD_SUBSTITUTES      - swap groups (e.g. برنج قهوه‌ای <-> برنج سفید/کینوا)
- *   3. MEAL_TEMPLATES        - meal *structure* (roles, not fixed grams)
+ *   1. Supabase food_items          - atomic foods + serving guardrails
+ *   2. Supabase food_substitutes    - approved swap graph
+ *   3. Supabase meal_templates      - culturally coherent meal structures
  *   4. SLOT_DISTRIBUTION     - reverse-engineered from a real, verified
  *                              professional diet plan (see below)
  *   5. generateDailyMealPlan - fills each template dynamically per user
@@ -23,517 +23,54 @@ import type {
   DailyMealPlan,
   DietaryPreferencesJson,
   FoodItem,
-  FoodSubstituteGroup,
+  FoodSwapOption,
   MacroTargets,
   Meal,
   MealComponent,
   MealSlot,
   MealTemplate,
+  NutritionCatalog,
+  PortionRule,
 } from '@/types';
-
 // ============================================================================
-// 1 - FOOD ITEMS (atomic building blocks)
-// ─────────────────────────────────────────────────────────────────────────
-// Real per-unit macros. Anything with gramsPerUnit=100 is a "per-100g" food
-// (rice, chicken, fish, meat) so units directly represent hundreds of grams.
-// Countable foods (eggs, walnuts, bread slices) use their natural unit.
+// RUNTIME NUTRITION CATALOG
 // ============================================================================
+// Production data is loaded from Supabase before meal generation. Keeping the
+// engine dependent on an injected catalog prevents a hidden second source of
+// truth in the app bundle while preserving deterministic, pure calculations.
+let ACTIVE_CATALOG: NutritionCatalog | null = null;
 
-const FOOD_ITEMS: FoodItem[] = [
-  // -- Protein sources ------------------------------------------------------
-  { id: 'egg_white', name: 'سفیده تخم‌مرغ', role: 'protein', emoji: '🥚',
-    unitLabel: 'عدد', gramsPerUnit: 33, kcalPerUnit: 17, proteinPerUnit: 3.6, carbsPerUnit: 0.2, fatPerUnit: 0.1,
-    allergyFlags: [], excludedForVegetarian: ['vegan'] },
+export class NutritionCatalogNotLoadedError extends Error {
+  constructor() {
+    super('دیتابیس غذایی به‌تن هنوز بارگذاری نشده است.');
+    this.name = 'NutritionCatalogNotLoadedError';
+  }
+}
 
-  { id: 'egg_whole', name: 'تخم‌مرغ کامل', role: 'protein', emoji: '🥚',
-    unitLabel: 'عدد', gramsPerUnit: 50, kcalPerUnit: 78, proteinPerUnit: 6.3, carbsPerUnit: 0.6, fatPerUnit: 5.3,
-    allergyFlags: [], excludedForVegetarian: ['vegan'] },
+export function configureNutritionCatalog(catalog: NutritionCatalog): void {
+  ACTIVE_CATALOG = catalog;
+}
 
-  { id: 'chicken_breast', name: 'سینه مرغ پخته', role: 'protein', emoji: '🍗',
-    unitLabel: 'گرم', gramsPerUnit: 100, kcalPerUnit: 165, proteinPerUnit: 31, carbsPerUnit: 0, fatPerUnit: 3.6,
-    allergyFlags: [], excludedForVegetarian: ['vegan', 'lacto_ovo', 'raw'] },
+export function clearNutritionCatalog(): void {
+  ACTIVE_CATALOG = null;
+}
 
-  { id: 'grilled_fish', name: 'ماهی کبابی', role: 'protein', emoji: '🐟',
-    unitLabel: 'گرم', gramsPerUnit: 100, kcalPerUnit: 128, proteinPerUnit: 20, carbsPerUnit: 0, fatPerUnit: 5,
-    allergyFlags: ['seafood'], excludedForVegetarian: ['vegan', 'lacto_ovo', 'raw'] },
-
-  { id: 'lean_beef', name: 'گوشت گاو کم‌چرب', role: 'protein', emoji: '🥩',
-    unitLabel: 'گرم', gramsPerUnit: 100, kcalPerUnit: 175, proteinPerUnit: 26, carbsPerUnit: 0, fatPerUnit: 7,
-    allergyFlags: [], excludedForVegetarian: ['vegan', 'lacto_ovo', 'pescatarian', 'raw'] },
-
-  { id: 'ground_beef_lean', name: 'گوشت چرخ‌کرده کم‌چرب', role: 'protein', emoji: '🥩',
-    unitLabel: 'گرم', gramsPerUnit: 100, kcalPerUnit: 160, proteinPerUnit: 22, carbsPerUnit: 0, fatPerUnit: 8,
-    allergyFlags: [], excludedForVegetarian: ['vegan', 'lacto_ovo', 'pescatarian', 'raw'] },
-
-  { id: 'whey_protein', name: 'پودر پروتئین وی', role: 'protein', emoji: '🥤',
-    unitLabel: 'اسکوپ', gramsPerUnit: 30, kcalPerUnit: 120, proteinPerUnit: 24, carbsPerUnit: 3, fatPerUnit: 2,
-    allergyFlags: ['dairy'], excludedForVegetarian: ['vegan', 'raw'] },
-
-  // Generic pea-protein isolate profile. Kept as a separate plant-based
-  // building block so vegan + soy-free plans have a dense protein source
-  // instead of violating dietary constraints or exploding calories with legumes.
-  { id: 'pea_protein', name: 'پروتئین نخود', role: 'protein', emoji: '🥤',
-    unitLabel: 'اسکوپ', gramsPerUnit: 30, kcalPerUnit: 110, proteinPerUnit: 24, carbsPerUnit: 2, fatPerUnit: 1.5,
-    allergyFlags: [], excludedForVegetarian: [] },
-
-  { id: 'soy_chunks', name: 'سویا', role: 'protein', emoji: '🫘',
-    unitLabel: 'گرم', gramsPerUnit: 100, kcalPerUnit: 345, proteinPerUnit: 47, carbsPerUnit: 30, fatPerUnit: 1,
-    allergyFlags: ['soy'], excludedForVegetarian: [] },
-
-  { id: 'lentils_cooked', name: 'عدس پخته', role: 'protein', emoji: '🍲',
-    unitLabel: 'گرم', gramsPerUnit: 100, kcalPerUnit: 116, proteinPerUnit: 9, carbsPerUnit: 20, fatPerUnit: 0.4,
-    allergyFlags: [], excludedForVegetarian: [] },
-
-  // -- Starch / carb sources (mutually substitutable) -----------------------
-  { id: 'brown_rice_cooked', name: 'برنج قهوه‌ای پخته', role: 'starch', emoji: '🍚',
-    unitLabel: 'گرم', gramsPerUnit: 100, kcalPerUnit: 112, proteinPerUnit: 2.6, carbsPerUnit: 23, fatPerUnit: 0.9,
-    allergyFlags: [], excludedForVegetarian: [] },
-
-  { id: 'white_rice_cooked', name: 'برنج سفید پخته', role: 'starch', emoji: '🍚',
-    unitLabel: 'گرم', gramsPerUnit: 100, kcalPerUnit: 130, proteinPerUnit: 2.4, carbsPerUnit: 28, fatPerUnit: 0.2,
-    allergyFlags: [], excludedForVegetarian: [] },
-
-  { id: 'quinoa_cooked', name: 'کینوا پخته', role: 'starch', emoji: '🍚',
-    unitLabel: 'گرم', gramsPerUnit: 100, kcalPerUnit: 120, proteinPerUnit: 4.4, carbsPerUnit: 21, fatPerUnit: 1.9,
-    allergyFlags: [], excludedForVegetarian: [] },
-
-  { id: 'oats_dry', name: 'جو پرک', role: 'starch', emoji: '🥣',
-    unitLabel: 'گرم', gramsPerUnit: 50, kcalPerUnit: 188, proteinPerUnit: 6.5, carbsPerUnit: 32, fatPerUnit: 3.5,
-    allergyFlags: ['gluten'], excludedForVegetarian: [] },
-
-  { id: 'whole_grain_toast', name: 'نان تست سبوس‌دار', role: 'starch', emoji: '🍞',
-    unitLabel: 'برش', gramsPerUnit: 30, kcalPerUnit: 70, proteinPerUnit: 3, carbsPerUnit: 12, fatPerUnit: 1,
-    allergyFlags: ['gluten'], excludedForVegetarian: [] },
-
-  { id: 'boiled_potato', name: 'سیب‌زمینی آب‌پز', role: 'starch', emoji: '🥔',
-    unitLabel: 'گرم', gramsPerUnit: 100, kcalPerUnit: 87, proteinPerUnit: 2, carbsPerUnit: 20, fatPerUnit: 0.1,
-    allergyFlags: [], excludedForVegetarian: [] },
-
-  // -- Vegetables (fixed, low-impact) -----------------------------------------
-  { id: 'mixed_salad', name: 'سالاد سبزیجات', role: 'vegetable', emoji: '🥗',
-    unitLabel: 'کاسه', gramsPerUnit: 150, kcalPerUnit: 30, proteinPerUnit: 1.5, carbsPerUnit: 6, fatPerUnit: 0.2,
-    allergyFlags: [], excludedForVegetarian: [] },
-
-  { id: 'steamed_vegetables', name: 'سبزیجات بخارپز', role: 'vegetable', emoji: '🥦',
-    unitLabel: 'گرم', gramsPerUnit: 100, kcalPerUnit: 30, proteinPerUnit: 2, carbsPerUnit: 6, fatPerUnit: 0.2,
-    allergyFlags: [], excludedForVegetarian: [] },
-
-  { id: 'spinach_borani', name: 'بورانی اسفناج', role: 'vegetable', emoji: '🥬',
-    unitLabel: 'گرم', gramsPerUnit: 100, kcalPerUnit: 73, proteinPerUnit: 3, carbsPerUnit: 6, fatPerUnit: 4,
-    allergyFlags: ['dairy'], excludedForVegetarian: [] },
-
-  // -- Fats --------------------------------------------------------------------
-  { id: 'olive_oil', name: 'روغن زیتون', role: 'fat', emoji: '🫒',
-    unitLabel: 'قاشق', gramsPerUnit: 14, kcalPerUnit: 119, proteinPerUnit: 0, carbsPerUnit: 0, fatPerUnit: 14,
-    allergyFlags: [], excludedForVegetarian: [] },
-
-  { id: 'walnut', name: 'گردو', role: 'fat', emoji: '🌰',
-    unitLabel: 'عدد', gramsPerUnit: 6, kcalPerUnit: 39, proteinPerUnit: 0.9, carbsPerUnit: 0.8, fatPerUnit: 3.9,
-    allergyFlags: ['peanut'], excludedForVegetarian: [] },
-
-  { id: 'mixed_nuts', name: 'آجیل خام', role: 'fat', emoji: '🥜',
-    unitLabel: 'گرم', gramsPerUnit: 25, kcalPerUnit: 157, proteinPerUnit: 5, carbsPerUnit: 5, fatPerUnit: 13,
-    allergyFlags: ['peanut'], excludedForVegetarian: [] },
-
-  { id: 'avocado_half', name: 'آووکادو', role: 'fat', emoji: '🥑',
-    unitLabel: 'عدد', gramsPerUnit: 75, kcalPerUnit: 120, proteinPerUnit: 1.5, carbsPerUnit: 6, fatPerUnit: 11,
-    allergyFlags: [], excludedForVegetarian: [] },
-
-  // -- Dairy ---------------------------------------------------------------
-  { id: 'low_fat_cheese', name: 'پنیر کم‌چرب', role: 'dairy', emoji: '🧀',
-    unitLabel: 'گرم', gramsPerUnit: 30, kcalPerUnit: 46, proteinPerUnit: 6, carbsPerUnit: 1, fatPerUnit: 2,
-    allergyFlags: ['dairy'], excludedForVegetarian: ['vegan'] },
-
-  { id: 'low_fat_milk', name: 'شیر کم‌چرب', role: 'dairy', emoji: '🥛',
-    unitLabel: 'لیوان', gramsPerUnit: 250, kcalPerUnit: 102, proteinPerUnit: 8, carbsPerUnit: 12, fatPerUnit: 2,
-    allergyFlags: ['dairy'], excludedForVegetarian: ['vegan'] },
-
-  { id: 'low_fat_yogurt', name: 'ماست کم‌چرب', role: 'dairy', emoji: '🥣',
-    unitLabel: 'گرم', gramsPerUnit: 100, kcalPerUnit: 45, proteinPerUnit: 5, carbsPerUnit: 6, fatPerUnit: 0.5,
-    allergyFlags: ['dairy'], excludedForVegetarian: ['vegan'] },
-
-  // -- Fruit -----------------------------------------------------------------
-  { id: 'apple', name: 'سیب', role: 'fruit', emoji: '🍎',
-    unitLabel: 'عدد', gramsPerUnit: 150, kcalPerUnit: 78, proteinPerUnit: 0.4, carbsPerUnit: 21, fatPerUnit: 0.3,
-    allergyFlags: [], excludedForVegetarian: [] },
-
-  { id: 'banana', name: 'موز', role: 'fruit', emoji: '🍌',
-    unitLabel: 'عدد', gramsPerUnit: 120, kcalPerUnit: 107, proteinPerUnit: 1.3, carbsPerUnit: 27, fatPerUnit: 0.4,
-    allergyFlags: [], excludedForVegetarian: [] },
-
-  // USDA FoodData Central SR Legacy (FDC 168191), rounded per 24g Medjool date.
-  // A dense whole-food carb option helps high-energy plans without inflating
-  // rice/potato portions beyond practical serving limits.
-  { id: 'medjool_date', name: 'خرمای مدجول', role: 'fruit', emoji: '🌴',
-    unitLabel: 'عدد', gramsPerUnit: 24, kcalPerUnit: 67, proteinPerUnit: 0.4, carbsPerUnit: 18, fatPerUnit: 0.04,
-    allergyFlags: [], excludedForVegetarian: [] },
-];
+function requireNutritionCatalog(): NutritionCatalog {
+  if (!ACTIVE_CATALOG) throw new NutritionCatalogNotLoadedError();
+  return ACTIVE_CATALOG;
+}
 
 const foodById = (id: string): FoodItem => {
-  const f = FOOD_ITEMS.find((x) => x.id === id);
+  const f = requireNutritionCatalog().foods.find((x) => x.id === id);
   if (!f) throw new Error(`[mealPlanEngine] Unknown food item id: ${id}`);
   return f;
 };
 
-// ============================================================================
-// 2 - SUBSTITUTION GROUPS
-// ─────────────────────────────────────────────────────────────────────────
-// Swapping stays within the same FoodRole so the meal's balance barely
-// shifts. This is the exact mechanism the user asked for: "برنج قهوه‌ای
-// نخوره، پس باید معادلش رو بهش بده".
-// ============================================================================
-
-export const FOOD_SUBSTITUTES: FoodSubstituteGroup[] = [
-  { foodItemId: 'brown_rice_cooked', substituteIds: ['white_rice_cooked', 'quinoa_cooked', 'boiled_potato'] },
-  { foodItemId: 'white_rice_cooked', substituteIds: ['brown_rice_cooked', 'quinoa_cooked', 'boiled_potato'] },
-  { foodItemId: 'quinoa_cooked', substituteIds: ['brown_rice_cooked', 'white_rice_cooked'] },
-  { foodItemId: 'chicken_breast', substituteIds: ['grilled_fish', 'lean_beef', 'ground_beef_lean'] },
-  { foodItemId: 'grilled_fish', substituteIds: ['chicken_breast', 'lean_beef'] },
-  { foodItemId: 'lean_beef', substituteIds: ['chicken_breast', 'grilled_fish', 'ground_beef_lean'] },
-  { foodItemId: 'whey_protein', substituteIds: ['pea_protein'] },
-  { foodItemId: 'pea_protein', substituteIds: ['whey_protein'] },
-  { foodItemId: 'egg_white', substituteIds: ['egg_whole'] },
-  { foodItemId: 'egg_whole', substituteIds: ['egg_white'] },
-  { foodItemId: 'low_fat_milk', substituteIds: ['low_fat_yogurt'] },
-  { foodItemId: 'low_fat_yogurt', substituteIds: ['low_fat_milk'] },
-  { foodItemId: 'walnut', substituteIds: ['mixed_nuts', 'avocado_half'] },
-  { foodItemId: 'mixed_nuts', substituteIds: ['walnut', 'avocado_half'] },
-  { foodItemId: 'apple', substituteIds: ['banana'] },
-  { foodItemId: 'banana', substituteIds: ['apple', 'medjool_date'] },
-  { foodItemId: 'medjool_date', substituteIds: ['banana', 'apple'] },
-];
-
 export function getSubstitutesFor(foodItemId: string): FoodItem[] {
-  const group = FOOD_SUBSTITUTES.find((g) => g.foodItemId === foodItemId);
+  const group = requireNutritionCatalog().substitutes.find((g) => g.foodItemId === foodItemId);
   if (!group) return [];
   return group.substituteIds.map(foodById);
 }
-
-// ============================================================================
-// 3 - MEAL TEMPLATES
-// ============================================================================
-// Templates define meal composition, not final portion sizes. In v2 every
-// component is portion-optimized against the meal's calorie + macro budget.
-// `dynamicUnits` and `fixedUnits` are retained for compatibility and as a
-// nominal portion hint, but fixed foods are no longer scaled by body weight.
-
-const MEAL_TEMPLATES: MealTemplate[] = [
-  // Breakfast
-  {
-    id: 'bk_eggs_toast', slot: 'breakfast', displayName: 'تخم‌مرغ و نان تست سبوس‌دار',
-    slots: [
-      { role: 'protein', primaryFoodItemId: 'egg_white', dynamicUnits: true },
-      { role: 'starch', primaryFoodItemId: 'whole_grain_toast', dynamicUnits: false, fixedUnits: 2 },
-      { role: 'dairy', primaryFoodItemId: 'low_fat_cheese', dynamicUnits: false, fixedUnits: 1 },
-      { role: 'fat', primaryFoodItemId: 'walnut', dynamicUnits: false, fixedUnits: 2 },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-  {
-    id: 'bk_oats_banana', slot: 'breakfast', displayName: 'جو پرک با موز و شیر',
-    slots: [
-      { role: 'starch', primaryFoodItemId: 'oats_dry', dynamicUnits: false, fixedUnits: 1 },
-      { role: 'fruit', primaryFoodItemId: 'banana', dynamicUnits: false, fixedUnits: 1 },
-      { role: 'dairy', primaryFoodItemId: 'low_fat_milk', dynamicUnits: false, fixedUnits: 1 },
-      { role: 'protein', primaryFoodItemId: 'whey_protein', dynamicUnits: true },
-      { role: 'fat', primaryFoodItemId: 'walnut', dynamicUnits: false, fixedUnits: 2 },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-  // Universal allergy-friendly / vegan-safe fallback
-  {
-    id: 'bk_lentil_apple', slot: 'breakfast', displayName: 'عدسی و سیب',
-    slots: [
-      { role: 'protein', primaryFoodItemId: 'lentils_cooked', dynamicUnits: true },
-      { role: 'fruit', primaryFoodItemId: 'apple', dynamicUnits: false, fixedUnits: 1 },
-      { role: 'fat', primaryFoodItemId: 'avocado_half', dynamicUnits: false, fixedUnits: 0.5 },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-
-  {
-    id: 'bk_pea_banana', slot: 'breakfast', displayName: 'شیک پروتئین نخود با موز',
-    slots: [
-      { role: 'protein', primaryFoodItemId: 'pea_protein', dynamicUnits: true },
-      { role: 'fruit', primaryFoodItemId: 'banana', dynamicUnits: false, fixedUnits: 1 },
-      { role: 'fat', primaryFoodItemId: 'avocado_half', dynamicUnits: false, fixedUnits: 0.5 },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-
-  // Morning snack
-  {
-    id: 'ms_whey_milk', slot: 'morning_snack', displayName: 'پروتئین وی با شیر کم‌چرب',
-    slots: [
-      { role: 'protein', primaryFoodItemId: 'whey_protein', dynamicUnits: true },
-      { role: 'dairy', primaryFoodItemId: 'low_fat_milk', dynamicUnits: false, fixedUnits: 1 },
-    ],
-    isWorkoutDayOnly: true, isRestDayOnly: false, goalTags: [],
-  },
-  {
-    id: 'ms_lentil_apple', slot: 'morning_snack', displayName: 'عدسی و سیب',
-    slots: [
-      { role: 'protein', primaryFoodItemId: 'lentils_cooked', dynamicUnits: true },
-      { role: 'fruit', primaryFoodItemId: 'apple', dynamicUnits: false, fixedUnits: 1 },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-
-  {
-    id: 'ms_pea_apple', slot: 'morning_snack', displayName: 'پروتئین نخود و سیب',
-    slots: [
-      { role: 'protein', primaryFoodItemId: 'pea_protein', dynamicUnits: true },
-      { role: 'fruit', primaryFoodItemId: 'apple', dynamicUnits: false, fixedUnits: 1 },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-  {
-    id: 'ms_dates_milk', slot: 'morning_snack', displayName: 'خرما با شیر کم‌چرب',
-    slots: [
-      { role: 'fruit', primaryFoodItemId: 'medjool_date', dynamicUnits: true },
-      { role: 'dairy', primaryFoodItemId: 'low_fat_milk', dynamicUnits: true },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-  {
-    id: 'ms_dates', slot: 'morning_snack', displayName: 'خرمای مدجول',
-    slots: [
-      { role: 'fruit', primaryFoodItemId: 'medjool_date', dynamicUnits: true },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-  {
-    id: 'ms_banana_dates', slot: 'morning_snack', displayName: 'موز و خرما',
-    slots: [
-      { role: 'fruit', primaryFoodItemId: 'banana', dynamicUnits: true },
-      { role: 'fruit', primaryFoodItemId: 'medjool_date', dynamicUnits: true },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-  {
-    id: 'ms_toast_banana', slot: 'morning_snack', displayName: 'نان تست سبوس‌دار و موز',
-    slots: [
-      { role: 'starch', primaryFoodItemId: 'whole_grain_toast', dynamicUnits: true },
-      { role: 'fruit', primaryFoodItemId: 'banana', dynamicUnits: true },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-
-  // Lunch
-  {
-    id: 'ln_chicken_rice', slot: 'lunch', displayName: 'سینه مرغ با برنج قهوه‌ای',
-    slots: [
-      { role: 'protein', primaryFoodItemId: 'chicken_breast', dynamicUnits: true },
-      { role: 'starch', primaryFoodItemId: 'brown_rice_cooked', dynamicUnits: true },
-      { role: 'vegetable', primaryFoodItemId: 'mixed_salad', dynamicUnits: false, fixedUnits: 1 },
-      { role: 'fat', primaryFoodItemId: 'olive_oil', dynamicUnits: false, fixedUnits: 0.5 },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-  {
-    id: 'ln_fish_rice', slot: 'lunch', displayName: 'ماهی کبابی با برنج قهوه‌ای',
-    slots: [
-      { role: 'protein', primaryFoodItemId: 'grilled_fish', dynamicUnits: true },
-      { role: 'starch', primaryFoodItemId: 'brown_rice_cooked', dynamicUnits: true },
-      { role: 'vegetable', primaryFoodItemId: 'mixed_salad', dynamicUnits: false, fixedUnits: 1 },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-  {
-    id: 'ln_beef_lentil_rice', slot: 'lunch', displayName: 'عدس‌پلو با گوشت چرخ‌کرده',
-    slots: [
-      { role: 'protein', primaryFoodItemId: 'ground_beef_lean', dynamicUnits: true },
-      { role: 'starch', primaryFoodItemId: 'brown_rice_cooked', dynamicUnits: false, fixedUnits: 1 },
-      { role: 'vegetable', primaryFoodItemId: 'steamed_vegetables', dynamicUnits: false, fixedUnits: 1 },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-  {
-    id: 'ln_soy_rice', slot: 'lunch', displayName: 'برنج با سویا',
-    slots: [
-      { role: 'protein', primaryFoodItemId: 'soy_chunks', dynamicUnits: true },
-      { role: 'starch', primaryFoodItemId: 'white_rice_cooked', dynamicUnits: true },
-      { role: 'vegetable', primaryFoodItemId: 'mixed_salad', dynamicUnits: false, fixedUnits: 1 },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, maxPerWeek: 2, goalTags: [],
-  },
-  {
-    id: 'ln_lentil_rice', slot: 'lunch', displayName: 'عدس و برنج با سالاد',
-    slots: [
-      { role: 'protein', primaryFoodItemId: 'pea_protein', dynamicUnits: true },
-      { role: 'protein', primaryFoodItemId: 'lentils_cooked', dynamicUnits: true },
-      { role: 'starch', primaryFoodItemId: 'brown_rice_cooked', dynamicUnits: true },
-      { role: 'vegetable', primaryFoodItemId: 'mixed_salad', dynamicUnits: false, fixedUnits: 1 },
-      { role: 'fat', primaryFoodItemId: 'olive_oil', dynamicUnits: false, fixedUnits: 0.5 },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-
-  // Afternoon snack
-  {
-    id: 'as_potato_chicken', slot: 'afternoon_snack', displayName: 'سیب‌زمینی و فیله مرغ',
-    slots: [
-      { role: 'starch', primaryFoodItemId: 'boiled_potato', dynamicUnits: true },
-      { role: 'protein', primaryFoodItemId: 'chicken_breast', dynamicUnits: true },
-    ],
-    isWorkoutDayOnly: true, isRestDayOnly: false, goalTags: [],
-  },
-  {
-    id: 'as_whey_nuts', slot: 'afternoon_snack', displayName: 'پروتئین وی و آجیل',
-    slots: [
-      { role: 'protein', primaryFoodItemId: 'whey_protein', dynamicUnits: true },
-      { role: 'fat', primaryFoodItemId: 'mixed_nuts', dynamicUnits: false, fixedUnits: 0.5 },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: true, goalTags: [],
-  },
-  {
-    id: 'as_potato_lentil', slot: 'afternoon_snack', displayName: 'سیب‌زمینی و عدسی',
-    slots: [
-      { role: 'starch', primaryFoodItemId: 'boiled_potato', dynamicUnits: true },
-      { role: 'protein', primaryFoodItemId: 'lentils_cooked', dynamicUnits: true },
-      { role: 'fat', primaryFoodItemId: 'olive_oil', dynamicUnits: false, fixedUnits: 0.25 },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-
-  {
-    id: 'as_pea_potato', slot: 'afternoon_snack', displayName: 'پروتئین نخود و سیب‌زمینی',
-    slots: [
-      { role: 'protein', primaryFoodItemId: 'pea_protein', dynamicUnits: true },
-      { role: 'starch', primaryFoodItemId: 'boiled_potato', dynamicUnits: true },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-  {
-    id: 'as_potato_dates', slot: 'afternoon_snack', displayName: 'سیب‌زمینی و خرما',
-    slots: [
-      { role: 'starch', primaryFoodItemId: 'boiled_potato', dynamicUnits: true },
-      { role: 'fruit', primaryFoodItemId: 'medjool_date', dynamicUnits: true },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-  {
-    id: 'as_banana_dates', slot: 'afternoon_snack', displayName: 'موز و خرما',
-    slots: [
-      { role: 'fruit', primaryFoodItemId: 'banana', dynamicUnits: true },
-      { role: 'fruit', primaryFoodItemId: 'medjool_date', dynamicUnits: true },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-  {
-    id: 'as_banana_dates_avocado', slot: 'afternoon_snack', displayName: 'موز، خرما و آووکادو',
-    slots: [
-      { role: 'fruit', primaryFoodItemId: 'banana', dynamicUnits: true },
-      { role: 'fruit', primaryFoodItemId: 'medjool_date', dynamicUnits: true },
-      { role: 'fat', primaryFoodItemId: 'avocado_half', dynamicUnits: true },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-  {
-    id: 'as_toast_dates', slot: 'afternoon_snack', displayName: 'نان تست سبوس‌دار و خرما',
-    slots: [
-      { role: 'starch', primaryFoodItemId: 'whole_grain_toast', dynamicUnits: true },
-      { role: 'fruit', primaryFoodItemId: 'medjool_date', dynamicUnits: true },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-
-  // Dinner
-  {
-    id: 'dn_chicken_veg', slot: 'dinner', displayName: 'سینه مرغ با سبزیجات و نان تست',
-    slots: [
-      { role: 'protein', primaryFoodItemId: 'chicken_breast', dynamicUnits: true },
-      { role: 'vegetable', primaryFoodItemId: 'steamed_vegetables', dynamicUnits: false, fixedUnits: 1 },
-      { role: 'starch', primaryFoodItemId: 'whole_grain_toast', dynamicUnits: false, fixedUnits: 1 },
-      { role: 'fat', primaryFoodItemId: 'olive_oil', dynamicUnits: false, fixedUnits: 0.5 },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-  {
-    id: 'dn_beef_cheese', slot: 'dinner', displayName: 'استیک گوشت با پنیر کم‌چرب',
-    slots: [
-      { role: 'protein', primaryFoodItemId: 'lean_beef', dynamicUnits: true },
-      { role: 'dairy', primaryFoodItemId: 'low_fat_cheese', dynamicUnits: false, fixedUnits: 1 },
-      { role: 'starch', primaryFoodItemId: 'whole_grain_toast', dynamicUnits: false, fixedUnits: 1 },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-  {
-    id: 'dn_chicken_spinach_yogurt', slot: 'dinner', displayName: 'فیله مرغ با بورانی اسفناج و ماست',
-    slots: [
-      { role: 'protein', primaryFoodItemId: 'chicken_breast', dynamicUnits: true },
-      { role: 'vegetable', primaryFoodItemId: 'spinach_borani', dynamicUnits: false, fixedUnits: 1 },
-      { role: 'dairy', primaryFoodItemId: 'low_fat_yogurt', dynamicUnits: false, fixedUnits: 1 },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-  {
-    id: 'dn_fish_potato', slot: 'dinner', displayName: 'ماهی کبابی با سیب‌زمینی',
-    slots: [
-      { role: 'protein', primaryFoodItemId: 'grilled_fish', dynamicUnits: true },
-      { role: 'starch', primaryFoodItemId: 'boiled_potato', dynamicUnits: true },
-      { role: 'fat', primaryFoodItemId: 'mixed_nuts', dynamicUnits: false, fixedUnits: 0.5 },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-  {
-    id: 'dn_lentil_rice_veg', slot: 'dinner', displayName: 'عدس و برنج با سبزیجات',
-    slots: [
-      { role: 'protein', primaryFoodItemId: 'pea_protein', dynamicUnits: true },
-      { role: 'protein', primaryFoodItemId: 'lentils_cooked', dynamicUnits: true },
-      { role: 'starch', primaryFoodItemId: 'brown_rice_cooked', dynamicUnits: true },
-      { role: 'vegetable', primaryFoodItemId: 'steamed_vegetables', dynamicUnits: false, fixedUnits: 1 },
-      { role: 'fat', primaryFoodItemId: 'olive_oil', dynamicUnits: false, fixedUnits: 0.25 },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-
-  // Night snack
-  {
-    id: 'ns_milk', slot: 'night_snack', displayName: 'شیر کم‌چرب',
-    slots: [
-      { role: 'dairy', primaryFoodItemId: 'low_fat_milk', dynamicUnits: true },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-  {
-    id: 'ns_apple', slot: 'night_snack', displayName: 'سیب',
-    slots: [
-      { role: 'fruit', primaryFoodItemId: 'apple', dynamicUnits: true },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-  {
-    id: 'ns_pea', slot: 'night_snack', displayName: 'نیم‌اسکوپ پروتئین نخود',
-    slots: [
-      { role: 'protein', primaryFoodItemId: 'pea_protein', dynamicUnits: true },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-  {
-    id: 'ns_dates', slot: 'night_snack', displayName: 'خرمای مدجول',
-    slots: [
-      { role: 'fruit', primaryFoodItemId: 'medjool_date', dynamicUnits: true },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-  {
-    id: 'ns_banana_dates', slot: 'night_snack', displayName: 'موز و خرما',
-    slots: [
-      { role: 'fruit', primaryFoodItemId: 'banana', dynamicUnits: true },
-      { role: 'fruit', primaryFoodItemId: 'medjool_date', dynamicUnits: true },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-  {
-    id: 'ns_toast_dates', slot: 'night_snack', displayName: 'نان تست سبوس‌دار و خرما',
-    slots: [
-      { role: 'starch', primaryFoodItemId: 'whole_grain_toast', dynamicUnits: true },
-      { role: 'fruit', primaryFoodItemId: 'medjool_date', dynamicUnits: true },
-    ],
-    isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [],
-  },
-];
 
 // ============================================================================
 // 4 - SLOT DISTRIBUTION
@@ -590,6 +127,15 @@ function isTemplateEligible(
 ): boolean {
   if (template.isWorkoutDayOnly && !isWorkoutDay) return false;
   if (template.isRestDayOnly && isWorkoutDay) return false;
+  if (
+    template.restrictedDietOnly &&
+    preferences.vegetarianStatus === 'none' &&
+    preferences.allergies.length === 0
+  ) return false;
+  if (
+    template.vegetarianStatusesOnly?.length &&
+    !template.vegetarianStatusesOnly.includes(preferences.vegetarianStatus)
+  ) return false;
   return template.slots.every((slotFill) => isFoodAllowed(foodById(slotFill.primaryFoodItemId), preferences));
 }
 
@@ -667,72 +213,12 @@ function range(min: number, max: number, step: number): number[] {
   return out;
 }
 
-/**
- * Portion realism rules are product guardrails, not medical prescriptions.
- * They prevent the optimizer from satisfying macros by inflating one food to
- * an obviously impractical amount. `typicalUnits` is the preferred center,
- * `softMaxUnits` starts a realism penalty, and `hardMaxUnits` is absolute.
- *
- * The food macros above make the preparation state explicit in the id/name
- * (for example `*_cooked` and `oats_dry`). These limits therefore apply to
- * the same state shown to the user.
- */
-type PortionRule = {
-  minUnits: number;
-  typicalUnits: number;
-  softMaxUnits: number;
-  hardMaxUnits: number;
-  step: number;
-};
-
-const PORTION_RULES: Partial<Record<string, PortionRule>> = {
-  egg_white:          { minUnits: 1,    typicalUnits: 4,    softMaxUnits: 7,    hardMaxUnits: 10,   step: 1 },
-  egg_whole:          { minUnits: 1,    typicalUnits: 2,    softMaxUnits: 3,    hardMaxUnits: 4,    step: 1 },
-  chicken_breast:     { minUnits: 0.5,  typicalUnits: 1.5,  softMaxUnits: 2,    hardMaxUnits: 2.5,  step: 0.25 },
-  grilled_fish:       { minUnits: 0.5,  typicalUnits: 1.5,  softMaxUnits: 2,    hardMaxUnits: 2.5,  step: 0.25 },
-  lean_beef:          { minUnits: 0.5,  typicalUnits: 1.5,  softMaxUnits: 2,    hardMaxUnits: 2.25, step: 0.25 },
-  ground_beef_lean:   { minUnits: 0.5,  typicalUnits: 1.5,  softMaxUnits: 2,    hardMaxUnits: 2.25, step: 0.25 },
-  whey_protein:       { minUnits: 0.5,  typicalUnits: 1,    softMaxUnits: 1.5,  hardMaxUnits: 2,    step: 0.5 },
-  pea_protein:        { minUnits: 0.5,  typicalUnits: 1,    softMaxUnits: 1.5,  hardMaxUnits: 2,    step: 0.5 },
-  soy_chunks:         { minUnits: 0.25, typicalUnits: 0.5,  softMaxUnits: 0.75, hardMaxUnits: 1,    step: 0.25 },
-  lentils_cooked:     { minUnits: 0.5,  typicalUnits: 1.5,  softMaxUnits: 2,    hardMaxUnits: 2.5,  step: 0.25 },
-
-  brown_rice_cooked:  { minUnits: 0.5,  typicalUnits: 1.5,  softMaxUnits: 2.25, hardMaxUnits: 3,    step: 0.25 },
-  white_rice_cooked:  { minUnits: 0.5,  typicalUnits: 1.5,  softMaxUnits: 2.25, hardMaxUnits: 3,    step: 0.25 },
-  quinoa_cooked:      { minUnits: 0.5,  typicalUnits: 1.5,  softMaxUnits: 2.25, hardMaxUnits: 3,    step: 0.25 },
-  oats_dry:           { minUnits: 0.5,  typicalUnits: 1,    softMaxUnits: 1.5,  hardMaxUnits: 2,    step: 0.25 },
-  whole_grain_toast:  { minUnits: 1,    typicalUnits: 2,    softMaxUnits: 3,    hardMaxUnits: 4,    step: 1 },
-  boiled_potato:      { minUnits: 0.5,  typicalUnits: 2,    softMaxUnits: 3,    hardMaxUnits: 3.5,  step: 0.25 },
-
-  mixed_salad:        { minUnits: 0.5,  typicalUnits: 1,    softMaxUnits: 1.5,  hardMaxUnits: 2,    step: 0.5 },
-  steamed_vegetables: { minUnits: 0.5,  typicalUnits: 1.5,  softMaxUnits: 2.5,  hardMaxUnits: 3,    step: 0.5 },
-  spinach_borani:     { minUnits: 0.5,  typicalUnits: 1,    softMaxUnits: 1.5,  hardMaxUnits: 2,    step: 0.5 },
-
-  olive_oil:          { minUnits: 0.25, typicalUnits: 0.5,  softMaxUnits: 1,    hardMaxUnits: 1.5,  step: 0.25 },
-  walnut:             { minUnits: 1,    typicalUnits: 2,    softMaxUnits: 4,    hardMaxUnits: 6,    step: 1 },
-  mixed_nuts:         { minUnits: 0.25, typicalUnits: 0.75, softMaxUnits: 1,    hardMaxUnits: 1.5,  step: 0.25 },
-  avocado_half:       { minUnits: 0.5,  typicalUnits: 1,    softMaxUnits: 1.5,  hardMaxUnits: 2,    step: 0.5 },
-
-  low_fat_cheese:     { minUnits: 0.5,  typicalUnits: 1,    softMaxUnits: 1.5,  hardMaxUnits: 2,    step: 0.5 },
-  low_fat_milk:       { minUnits: 0.5,  typicalUnits: 1,    softMaxUnits: 1,    hardMaxUnits: 1.2,  step: 0.1 },
-  low_fat_yogurt:     { minUnits: 0.5,  typicalUnits: 1.5,  softMaxUnits: 2,    hardMaxUnits: 2.5,  step: 0.5 },
-
-  apple:              { minUnits: 0.5,  typicalUnits: 1,    softMaxUnits: 1.5,  hardMaxUnits: 2,    step: 0.5 },
-  banana:             { minUnits: 0.5,  typicalUnits: 1,    softMaxUnits: 1.5,  hardMaxUnits: 2,    step: 0.5 },
-  medjool_date:       { minUnits: 1,    typicalUnits: 2,    softMaxUnits: 2,    hardMaxUnits: 3,    step: 1 },
-};
-
-function fallbackPortionRule(food: FoodItem): PortionRule {
-  if (food.role === 'protein') return { minUnits: 0.5, typicalUnits: 1.5, softMaxUnits: 2, hardMaxUnits: 2.5, step: 0.25 };
-  if (food.role === 'starch') return { minUnits: 0.5, typicalUnits: 1.5, softMaxUnits: 2.25, hardMaxUnits: 3, step: 0.25 };
-  if (food.role === 'vegetable') return { minUnits: 0.5, typicalUnits: 1, softMaxUnits: 2, hardMaxUnits: 3, step: 0.5 };
-  if (food.role === 'dairy') return { minUnits: 0.5, typicalUnits: 1, softMaxUnits: 1.5, hardMaxUnits: 2, step: 0.5 };
-  if (food.role === 'fat') return { minUnits: 0.25, typicalUnits: 0.5, softMaxUnits: 1, hardMaxUnits: 1.5, step: 0.25 };
-  return { minUnits: 0.5, typicalUnits: 1, softMaxUnits: 1.5, hardMaxUnits: 2, step: 0.5 };
-}
-
 function portionRuleFor(food: FoodItem): PortionRule {
-  return PORTION_RULES[food.id] ?? fallbackPortionRule(food);
+  const rule = requireNutritionCatalog().portionRules[food.id];
+  if (!rule) {
+    throw new Error(`[mealPlanEngine] Missing portion rule for food: ${food.id}`);
+  }
+  return rule;
 }
 
 function desiredUnitsForTarget(food: FoodItem, target: MacroVector): number {
@@ -1424,7 +910,7 @@ export function generateDailyMealPlan(
       fat: targets.fatGrams * share.fat,
     };
 
-    const eligible = MEAL_TEMPLATES.filter(
+    const eligible = requireNutritionCatalog().mealTemplates.filter(
       (template) => template.slot === slot && isTemplateEligible(template, preferences, isWorkoutDay)
     );
 
@@ -1457,56 +943,147 @@ export function getSwapCandidatesForComponent(
   return getSubstitutesFor(component.foodItem.id).filter((food) => isFoodAllowed(food, preferences));
 }
 
-export function swapComponentInMeal(
-  meal: Meal,
-  componentIndex: number,
-  replacement: FoodItem,
-  slotTargets: MacroVector
-): Meal {
-  if (componentIndex < 0 || componentIndex >= meal.components.length) return meal;
+function allRealisticPortionCandidates(food: FoodItem): number[] {
+  const rule = portionRuleFor(food);
+  return range(rule.minUnits, rule.hardMaxUnits, rule.step);
+}
 
-  const others = meal.components.filter((_, index) => index !== componentIndex);
-  const otherTotals = others.reduce<MacroVector>(
-    (acc, component) => addTotals(acc, component),
-    { kcal: 0, protein: 0, carbs: 0, fat: 0 }
-  );
+function signedDeviation(actual: number, target: number): number {
+  return (actual - target) / Math.max(1, target);
+}
 
-  let bestComponent: MealComponent | null = null;
-  let bestScore = Number.POSITIVE_INFINITY;
-  let bestOverClass = Number.POSITIVE_INFINITY;
+function swapEquivalenceScore(original: MealComponent, candidate: MealComponent): number {
+  const role = original.foodItem.role;
+  const kcalDev = Math.abs(signedDeviation(candidate.kcal, original.kcal));
+  const proteinDev = Math.abs(candidate.protein - original.protein) / Math.max(5, original.protein);
+  const carbDev = Math.abs(candidate.carbs - original.carbs) / Math.max(10, original.carbs);
+  const fatDev = Math.abs(candidate.fat - original.fat) / Math.max(5, original.fat);
 
-  for (const units of portionCandidates(replacement, slotTargets)) {
-    const component = componentFromUnits(replacement, units);
-    const totals = addTotals(otherTotals, component);
-    const overClass = totals.kcal > slotTargets.kcal * 1.05 ? 1 : 0;
-    const score = scoreTotals(totals, slotTargets);
+  if (role === 'protein') return 6 * proteinDev + 2.5 * kcalDev + 1.2 * fatDev + 0.4 * carbDev;
+  if (role === 'starch') return 6 * carbDev + 2.5 * kcalDev + 0.6 * proteinDev + 0.5 * fatDev;
+  if (role === 'fat') return 6 * fatDev + 2.5 * kcalDev + 0.5 * proteinDev + 0.5 * carbDev;
+  if (role === 'dairy') return 3.5 * proteinDev + 2.5 * kcalDev + 1.5 * carbDev + 1.2 * fatDev;
+  if (role === 'fruit') return 5 * carbDev + 2.5 * kcalDev + 0.5 * proteinDev;
+  return 3 * carbDev + 2.5 * kcalDev + proteinDev + fatDev;
+}
 
-    if (overClass < bestOverClass || (overClass === bestOverClass && score < bestScore)) {
-      bestOverClass = overClass;
-      bestScore = score;
-      bestComponent = component;
-    }
+function isMacroEquivalentSwap(original: MealComponent, candidate: MealComponent): boolean {
+  const role = original.foodItem.role;
+  const kcalDev = Math.abs(signedDeviation(candidate.kcal, original.kcal));
+  const proteinDev = Math.abs(candidate.protein - original.protein) / Math.max(5, original.protein);
+  const carbDev = Math.abs(candidate.carbs - original.carbs) / Math.max(10, original.carbs);
+  const fatDev = Math.abs(candidate.fat - original.fat) / Math.max(5, original.fat);
+  const fatDeltaGrams = Math.abs(candidate.fat - original.fat);
+
+  // The role-defining macro is the hard invariant. Calories are a second
+  // invariant so a lean protein cannot silently become a calorie/fat bomb.
+  if (role === 'protein') {
+    return proteinDev <= 0.12 && kcalDev <= 0.35 && fatDeltaGrams <= 8;
   }
+  if (role === 'starch') {
+    return carbDev <= 0.12 && kcalDev <= 0.25;
+  }
+  if (role === 'fat') {
+    return fatDev <= 0.15 && kcalDev <= 0.25;
+  }
+  if (role === 'dairy') {
+    return proteinDev <= 0.20 && kcalDev <= 0.35 && carbDev <= 0.30 && fatDeltaGrams <= 5;
+  }
+  if (role === 'fruit') {
+    return carbDev <= 0.15 && kcalDev <= 0.25;
+  }
+  return carbDev <= 0.35 && kcalDev <= 0.40;
+}
 
-  if (!bestComponent) return meal;
+function swapFailureReason(original: MealComponent, candidate: MealComponent): string {
+  const role = original.foodItem.role;
+  if (role === 'protein') {
+    const proteinDev = Math.abs(candidate.protein - original.protein) / Math.max(5, original.protein);
+    const kcalDev = Math.abs(signedDeviation(candidate.kcal, original.kcal));
+    const fatDelta = candidate.fat - original.fat;
+    if (proteinDev > 0.12) return 'با مقدار واقع‌بینانه، پروتئین معادل این ماده تأمین نمی‌شود.';
+    if (fatDelta > 8) return 'برای پروتئین مشابه، چربی این جایگزین بیش از حد افزایش می‌یابد.';
+    if (kcalDev > 0.35) return 'برای مقدار معادل، اختلاف کالری این جایگزین بیش از حد است.';
+  }
+  return 'این ماده در محدودهٔ مصرف واقع‌بینانه، معادل ماکرویی مستقیم مناسبی نیست.';
+}
 
-  const newComponents = meal.components.map((component, index) =>
-    index === componentIndex ? bestComponent! : component
+function mealWithReplacement(meal: Meal, componentIndex: number, replacement: MealComponent): Meal {
+  const components = meal.components.map((component, index) =>
+    index === componentIndex ? replacement : component
   );
-
-  const totals = newComponents.reduce<MacroVector>(
+  const totals = components.reduce<MacroVector>(
     (acc, component) => addTotals(acc, component),
     { kcal: 0, protein: 0, carbs: 0, fat: 0 }
   );
-
   return {
     ...meal,
-    components: newComponents,
+    components,
     totalKcal: Math.round(totals.kcal),
     totalProtein: round1(totals.protein),
     totalCarbs: round1(totals.carbs),
     totalFat: round1(totals.fat),
   };
+}
+
+function buildSwapOption(meal: Meal, componentIndex: number, replacement: FoodItem): FoodSwapOption {
+  const original = meal.components[componentIndex];
+  let bestComponent = componentFromUnits(replacement, portionRuleFor(replacement).minUnits);
+  let bestScore = Number.POSITIVE_INFINITY;
+
+  for (const units of allRealisticPortionCandidates(replacement)) {
+    const candidate = componentFromUnits(replacement, units);
+    const score = swapEquivalenceScore(original, candidate) + 0.05 * portionRealismPenalty(replacement, units);
+    if (score < bestScore) {
+      bestScore = score;
+      bestComponent = candidate;
+    }
+  }
+
+  const isEquivalent = isMacroEquivalentSwap(original, bestComponent);
+  return {
+    foodItem: replacement,
+    replacementComponent: bestComponent,
+    updatedMeal: mealWithReplacement(meal, componentIndex, bestComponent),
+    isEquivalent,
+    reason: isEquivalent ? undefined : swapFailureReason(original, bestComponent),
+    score: bestScore,
+    kcalDeviationPct: signedDeviation(bestComponent.kcal, original.kcal) * 100,
+    proteinDeviationPct: signedDeviation(bestComponent.protein, original.protein) * 100,
+    carbDeviationPct: signedDeviation(bestComponent.carbs, original.carbs) * 100,
+    fatDeviationPct: signedDeviation(bestComponent.fat, original.fat) * 100,
+  };
+}
+
+/**
+ * Returns pre-calculated swap options for one component. A swap is applied only
+ * when the replacement itself can preserve the original component's defining
+ * macro and calories within explicit tolerances. Other foods in the meal are
+ * intentionally NOT changed behind the user's back.
+ */
+export function getSwapOptionsForMeal(
+  meal: Meal,
+  componentIndex: number,
+  preferences: DietaryPreferencesJson
+): FoodSwapOption[] {
+  if (componentIndex < 0 || componentIndex >= meal.components.length) return [];
+  const current = meal.components[componentIndex];
+  return getSubstitutesFor(current.foodItem.id)
+    .filter((food) => isFoodAllowed(food, preferences))
+    .map((food) => buildSwapOption(meal, componentIndex, food))
+    .sort((a, b) => Number(b.isEquivalent) - Number(a.isEquivalent) || a.score - b.score);
+}
+
+/** Backwards-compatible safe wrapper used by older call sites/tests. */
+export function swapComponentInMeal(
+  meal: Meal,
+  componentIndex: number,
+  replacement: FoodItem,
+  _slotTargets: MacroVector
+): Meal {
+  if (componentIndex < 0 || componentIndex >= meal.components.length) return meal;
+  const option = buildSwapOption(meal, componentIndex, replacement);
+  return option.isEquivalent ? option.updatedMeal : meal;
 }
 
 export function getSlotTargets(slot: MealSlot, targets: MacroTargets): MacroVector {
