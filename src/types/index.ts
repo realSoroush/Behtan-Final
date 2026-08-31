@@ -21,13 +21,6 @@ export type MealSlot =
   | 'dinner'
   | 'night_snack';
 
-// Legacy food-exchange types (kept for DB compatibility)
-export type FoodCategory =
-  | 'starch' | 'meat_lean' | 'meat_medium_fat' | 'meat_high_fat'
-  | 'meat_very_lean' | 'vegetable' | 'fruit' | 'dairy_skim'
-  | 'dairy_low_fat' | 'dairy_whole' | 'fat' | 'mixed_dish' | 'legume';
-
-export type GiLevel = 'Low' | 'Medium' | 'High';
 export type SubscriptionTier = 'silver' | 'gold';
 
 // ============================================================================
@@ -88,22 +81,6 @@ export interface UserProfile {
   created_at: string;
 }
 
-// Legacy — kept for food_exchanges table reference
-export interface FoodExchange {
-  id: string;
-  category: FoodCategory;
-  name: string;
-  amount: string;
-  weightGrams: number;
-  kcal: number;
-  carbs: number;
-  protein: number;
-  fat: number;
-  fiber: number;
-  sugar: number;
-  gi_level: GiLevel;
-}
-
 // ============================================================================
 // FOOD BUILDING BLOCKS — the atomic, database-backed layer
 // ============================================================================
@@ -133,6 +110,14 @@ export interface FoodItem {
   fatPerUnit: number;
   allergyFlags: Allergy[];
   excludedForVegetarian: VegetarianStatus[];
+  /** Meal contexts where this food may be OFFERED as a direct swap.
+   * This does not limit specialist meal templates; it only keeps the swap UI
+   * culturally/logically appropriate for the current meal. */
+  swapAllowedMeals: MealSlot[];
+  /** Similar foods share a group and are preferred over cross-group swaps. */
+  swapGroup: string;
+  /** Lower values rank earlier after safety/equivalence checks. */
+  swapPriority: number;
 }
 
 /** Practical serving guardrails stored alongside each food in Supabase. */

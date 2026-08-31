@@ -14,7 +14,13 @@
       "allergyFlags": [],
       "excludedForVegetarian": [
         "vegan"
-      ]
+      ],
+      "swapAllowedMeals": [
+        "breakfast",
+        "dinner"
+      ],
+      "swapGroup": "egg",
+      "swapPriority": 20
     },
     {
       "id": "egg_whole",
@@ -30,7 +36,13 @@
       "allergyFlags": [],
       "excludedForVegetarian": [
         "vegan"
-      ]
+      ],
+      "swapAllowedMeals": [
+        "breakfast",
+        "dinner"
+      ],
+      "swapGroup": "egg",
+      "swapPriority": 10
     },
     {
       "id": "chicken_breast",
@@ -48,7 +60,14 @@
         "vegan",
         "lacto_ovo",
         "raw"
-      ]
+      ],
+      "swapAllowedMeals": [
+        "lunch",
+        "afternoon_snack",
+        "dinner"
+      ],
+      "swapGroup": "main_protein",
+      "swapPriority": 10
     },
     {
       "id": "grilled_fish",
@@ -68,7 +87,13 @@
         "vegan",
         "lacto_ovo",
         "raw"
-      ]
+      ],
+      "swapAllowedMeals": [
+        "lunch",
+        "dinner"
+      ],
+      "swapGroup": "main_protein",
+      "swapPriority": 20
     },
     {
       "id": "lean_beef",
@@ -87,7 +112,13 @@
         "lacto_ovo",
         "pescatarian",
         "raw"
-      ]
+      ],
+      "swapAllowedMeals": [
+        "lunch",
+        "dinner"
+      ],
+      "swapGroup": "main_protein",
+      "swapPriority": 30
     },
     {
       "id": "ground_beef_lean",
@@ -106,7 +137,13 @@
         "lacto_ovo",
         "pescatarian",
         "raw"
-      ]
+      ],
+      "swapAllowedMeals": [
+        "lunch",
+        "dinner"
+      ],
+      "swapGroup": "main_protein",
+      "swapPriority": 35
     },
     {
       "id": "whey_protein",
@@ -125,7 +162,14 @@
       "excludedForVegetarian": [
         "vegan",
         "raw"
-      ]
+      ],
+      "swapAllowedMeals": [
+        "morning_snack",
+        "afternoon_snack",
+        "night_snack"
+      ],
+      "swapGroup": "protein_supplement",
+      "swapPriority": 10
     },
     {
       "id": "pea_protein",
@@ -139,7 +183,14 @@
       "carbsPerUnit": 2,
       "fatPerUnit": 1.5,
       "allergyFlags": [],
-      "excludedForVegetarian": []
+      "excludedForVegetarian": [],
+      "swapAllowedMeals": [
+        "morning_snack",
+        "afternoon_snack",
+        "night_snack"
+      ],
+      "swapGroup": "protein_supplement",
+      "swapPriority": 20
     },
     {
       "id": "soy_chunks",
@@ -155,7 +206,13 @@
       "allergyFlags": [
         "soy"
       ],
-      "excludedForVegetarian": []
+      "excludedForVegetarian": [],
+      "swapAllowedMeals": [
+        "lunch",
+        "dinner"
+      ],
+      "swapGroup": "plant_protein",
+      "swapPriority": 20
     },
     {
       "id": "lentils_cooked",
@@ -169,7 +226,14 @@
       "carbsPerUnit": 20,
       "fatPerUnit": 0.4,
       "allergyFlags": [],
-      "excludedForVegetarian": []
+      "excludedForVegetarian": [],
+      "swapAllowedMeals": [
+        "breakfast",
+        "lunch",
+        "dinner"
+      ],
+      "swapGroup": "plant_protein",
+      "swapPriority": 10
     },
     {
       "id": "brown_rice_cooked",
@@ -183,7 +247,13 @@
       "carbsPerUnit": 23,
       "fatPerUnit": 0.9,
       "allergyFlags": [],
-      "excludedForVegetarian": []
+      "excludedForVegetarian": [],
+      "swapAllowedMeals": [
+        "lunch",
+        "dinner"
+      ],
+      "swapGroup": "grain_starch",
+      "swapPriority": 20
     },
     {
       "id": "white_rice_cooked",
@@ -197,7 +267,13 @@
       "carbsPerUnit": 28,
       "fatPerUnit": 0.2,
       "allergyFlags": [],
-      "excludedForVegetarian": []
+      "excludedForVegetarian": [],
+      "swapAllowedMeals": [
+        "lunch",
+        "dinner"
+      ],
+      "swapGroup": "grain_starch",
+      "swapPriority": 10
     },
     {
       "id": "quinoa_cooked",
@@ -211,7 +287,13 @@
       "carbsPerUnit": 21,
       "fatPerUnit": 1.9,
       "allergyFlags": [],
-      "excludedForVegetarian": []
+      "excludedForVegetarian": [],
+      "swapAllowedMeals": [
+        "lunch",
+        "dinner"
+      ],
+      "swapGroup": "grain_starch",
+      "swapPriority": 30
     },
     {
       "id": "oats_dry",
@@ -227,7 +309,14 @@
       "allergyFlags": [
         "gluten"
       ],
-      "excludedForVegetarian": []
+      "excludedForVegetarian": [],
+      "swapAllowedMeals": [
+        "breakfast",
+        "morning_snack",
+        "afternoon_snack"
+      ],
+      "swapGroup": "breakfast_cereal",
+      "swapPriority": 10
     },
     {
       "id": "whole_grain_toast",
@@ -243,7 +332,16 @@
       "allergyFlags": [
         "gluten"
       ],
-      "excludedForVegetarian": []
+      "excludedForVegetarian": [],
+      "swapAllowedMeals": [
+        "breakfast",
+        "morning_snack",
+        "afternoon_snack",
+        "dinner",
+        "night_snack"
+      ],
+      "swapGroup": "bread",
+      "swapPriority": 20
     },
     {
       "id": "sangak_bread",
@@ -259,7 +357,14 @@
       "allergyFlags": [
         "gluten"
       ],
-      "excludedForVegetarian": []
+      "excludedForVegetarian": [],
+      "swapAllowedMeals": [
+        "breakfast",
+        "lunch",
+        "dinner"
+      ],
+      "swapGroup": "bread",
+      "swapPriority": 10
     },
     {
       "id": "boiled_potato",
@@ -273,7 +378,14 @@
       "carbsPerUnit": 20,
       "fatPerUnit": 0.1,
       "allergyFlags": [],
-      "excludedForVegetarian": []
+      "excludedForVegetarian": [],
+      "swapAllowedMeals": [
+        "lunch",
+        "afternoon_snack",
+        "dinner"
+      ],
+      "swapGroup": "potato_starch",
+      "swapPriority": 20
     },
     {
       "id": "mixed_salad",
@@ -287,7 +399,13 @@
       "carbsPerUnit": 6,
       "fatPerUnit": 0.2,
       "allergyFlags": [],
-      "excludedForVegetarian": []
+      "excludedForVegetarian": [],
+      "swapAllowedMeals": [
+        "lunch",
+        "dinner"
+      ],
+      "swapGroup": "vegetable",
+      "swapPriority": 20
     },
     {
       "id": "fresh_cucumber_tomato",
@@ -301,7 +419,14 @@
       "carbsPerUnit": 5.6,
       "fatPerUnit": 0.2,
       "allergyFlags": [],
-      "excludedForVegetarian": []
+      "excludedForVegetarian": [],
+      "swapAllowedMeals": [
+        "breakfast",
+        "lunch",
+        "dinner"
+      ],
+      "swapGroup": "vegetable",
+      "swapPriority": 10
     },
     {
       "id": "steamed_vegetables",
@@ -315,7 +440,13 @@
       "carbsPerUnit": 6,
       "fatPerUnit": 0.2,
       "allergyFlags": [],
-      "excludedForVegetarian": []
+      "excludedForVegetarian": [],
+      "swapAllowedMeals": [
+        "lunch",
+        "dinner"
+      ],
+      "swapGroup": "vegetable",
+      "swapPriority": 20
     },
     {
       "id": "spinach_borani",
@@ -331,7 +462,13 @@
       "allergyFlags": [
         "dairy"
       ],
-      "excludedForVegetarian": []
+      "excludedForVegetarian": [],
+      "swapAllowedMeals": [
+        "lunch",
+        "dinner"
+      ],
+      "swapGroup": "vegetable",
+      "swapPriority": 30
     },
     {
       "id": "olive_oil",
@@ -345,7 +482,13 @@
       "carbsPerUnit": 0,
       "fatPerUnit": 14,
       "allergyFlags": [],
-      "excludedForVegetarian": []
+      "excludedForVegetarian": [],
+      "swapAllowedMeals": [
+        "lunch",
+        "dinner"
+      ],
+      "swapGroup": "oil",
+      "swapPriority": 10
     },
     {
       "id": "walnut",
@@ -361,7 +504,15 @@
       "allergyFlags": [
         "peanut"
       ],
-      "excludedForVegetarian": []
+      "excludedForVegetarian": [],
+      "swapAllowedMeals": [
+        "breakfast",
+        "morning_snack",
+        "afternoon_snack",
+        "night_snack"
+      ],
+      "swapGroup": "nuts",
+      "swapPriority": 10
     },
     {
       "id": "mixed_nuts",
@@ -377,7 +528,15 @@
       "allergyFlags": [
         "peanut"
       ],
-      "excludedForVegetarian": []
+      "excludedForVegetarian": [],
+      "swapAllowedMeals": [
+        "breakfast",
+        "morning_snack",
+        "afternoon_snack",
+        "night_snack"
+      ],
+      "swapGroup": "nuts",
+      "swapPriority": 20
     },
     {
       "id": "avocado_half",
@@ -391,7 +550,15 @@
       "carbsPerUnit": 6,
       "fatPerUnit": 11,
       "allergyFlags": [],
-      "excludedForVegetarian": []
+      "excludedForVegetarian": [],
+      "swapAllowedMeals": [
+        "breakfast",
+        "morning_snack",
+        "afternoon_snack",
+        "dinner"
+      ],
+      "swapGroup": "plant_fat",
+      "swapPriority": 20
     },
     {
       "id": "low_fat_cheese",
@@ -409,7 +576,14 @@
       ],
       "excludedForVegetarian": [
         "vegan"
-      ]
+      ],
+      "swapAllowedMeals": [
+        "breakfast",
+        "morning_snack",
+        "dinner"
+      ],
+      "swapGroup": "dairy",
+      "swapPriority": 10
     },
     {
       "id": "low_fat_milk",
@@ -427,7 +601,15 @@
       ],
       "excludedForVegetarian": [
         "vegan"
-      ]
+      ],
+      "swapAllowedMeals": [
+        "breakfast",
+        "morning_snack",
+        "afternoon_snack",
+        "night_snack"
+      ],
+      "swapGroup": "dairy",
+      "swapPriority": 20
     },
     {
       "id": "low_fat_yogurt",
@@ -445,7 +627,15 @@
       ],
       "excludedForVegetarian": [
         "vegan"
-      ]
+      ],
+      "swapAllowedMeals": [
+        "lunch",
+        "afternoon_snack",
+        "dinner",
+        "night_snack"
+      ],
+      "swapGroup": "dairy",
+      "swapPriority": 15
     },
     {
       "id": "apple",
@@ -459,7 +649,15 @@
       "carbsPerUnit": 21,
       "fatPerUnit": 0.3,
       "allergyFlags": [],
-      "excludedForVegetarian": []
+      "excludedForVegetarian": [],
+      "swapAllowedMeals": [
+        "breakfast",
+        "morning_snack",
+        "afternoon_snack",
+        "night_snack"
+      ],
+      "swapGroup": "fruit",
+      "swapPriority": 10
     },
     {
       "id": "banana",
@@ -473,7 +671,15 @@
       "carbsPerUnit": 27,
       "fatPerUnit": 0.4,
       "allergyFlags": [],
-      "excludedForVegetarian": []
+      "excludedForVegetarian": [],
+      "swapAllowedMeals": [
+        "breakfast",
+        "morning_snack",
+        "afternoon_snack",
+        "night_snack"
+      ],
+      "swapGroup": "fruit",
+      "swapPriority": 20
     },
     {
       "id": "medjool_date",
@@ -487,7 +693,15 @@
       "carbsPerUnit": 18,
       "fatPerUnit": 0.04,
       "allergyFlags": [],
-      "excludedForVegetarian": []
+      "excludedForVegetarian": [],
+      "swapAllowedMeals": [
+        "breakfast",
+        "morning_snack",
+        "afternoon_snack",
+        "night_snack"
+      ],
+      "swapGroup": "fruit",
+      "swapPriority": 30
     }
   ],
   "FOOD_SUBSTITUTES": [

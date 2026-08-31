@@ -146,7 +146,7 @@ export function FoodSwapModal({ isOpen, onClose, currentComponent, candidates, o
             </div>
 
             <p className="px-5 pb-4 pt-1 text-xs text-neutral-400 dark:text-neutral-500 text-center leading-5">
-              مقدار جایگزین از روی ماکروهای همان ماده محاسبه می‌شود. اگر معادل مستقیم واقع‌بینانه وجود نداشته باشد، انتخاب غیرفعال می‌ماند.
+              فقط گزینه‌های مناسب همین وعده نمایش داده می‌شوند. مقدار جایگزین بر اساس نقش غذایی، کالری و ماکروهای ماده اصلی محاسبه می‌شود.
             </p>
           </motion.div>
         </>

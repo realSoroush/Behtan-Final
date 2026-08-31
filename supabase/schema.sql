@@ -7,55 +7,6 @@
 create extension if not exists "uuid-ossp";
 
 -- ============================================================================
--- TABLE: food_exchanges
--- Reference nutrition data. Read-only for clients (public read, no write).
--- ============================================================================
-
-create table if not exists public.food_exchanges (
-  id text primary key,
-  category text not null check (
-    category in (
-      'starch',
-      'meat_lean',
-      'meat_medium_fat',
-      'meat_high_fat',
-      'meat_very_lean',
-      'vegetable',
-      'fruit',
-      'dairy_skim',
-      'dairy_low_fat',
-      'dairy_whole',
-      'fat',
-      'mixed_dish',
-      'legume'
-    )
-  ),
-  name text not null,
-  amount text not null,
-  "weightGrams" int4 not null,
-  kcal int4 not null,
-  carbs int4 not null,
-  protein int4 not null,
-  fat int4 not null,
-  fiber int4 not null default 0,
-  sugar int4 not null default 0,
-  gi_level text not null check (gi_level in ('Low', 'Medium', 'High'))
-);
-
-comment on table public.food_exchanges is
-  'Legacy exchange reference table. Retained for compatibility; the production meal engine reads food_items instead.';
-
-alter table public.food_exchanges enable row level security;
-
-create policy "food_exchanges are publicly readable"
-  on public.food_exchanges
-  for select
-  using (true);
-
--- No insert/update/delete policies for anon/authenticated roles:
--- this table is managed only via the service role (admin/CMS).
-
--- ============================================================================
 -- TABLE: user_profiles
 -- One row per authenticated user (id = auth.users.id).
 -- ============================================================================
@@ -92,28 +43,36 @@ comment on table public.user_profiles is
 
 alter table public.user_profiles enable row level security;
 
+drop policy if exists "Users can view their own profile" on public.user_profiles;
+drop policy if exists "Users can insert their own profile" on public.user_profiles;
+drop policy if exists "Users can update their own profile" on public.user_profiles;
+
 create policy "Users can view their own profile"
   on public.user_profiles
   for select
-  using (auth.uid() = id);
+  to authenticated
+  using ((select auth.uid()) = id);
 
 create policy "Users can insert their own profile"
   on public.user_profiles
   for insert
-  with check (auth.uid() = id);
+  to authenticated
+  with check ((select auth.uid()) = id);
 
 create policy "Users can update their own profile"
   on public.user_profiles
   for update
-  using (auth.uid() = id)
-  with check (auth.uid() = id);
+  to authenticated
+  using ((select auth.uid()) = id)
+  with check ((select auth.uid()) = id);
+
+revoke all on public.user_profiles from anon;
+revoke delete on public.user_profiles from authenticated;
+grant select, insert, update on public.user_profiles to authenticated;
 
 -- ============================================================================
 -- Helpful index for lookups
 -- ============================================================================
-
-create index if not exists idx_food_exchanges_category
-  on public.food_exchanges (category);
 
 create index if not exists idx_user_profiles_phone
   on public.user_profiles (phone);
@@ -139,6 +98,9 @@ create table if not exists public.food_items (
   fat_per_unit numeric(10,3) not null check (fat_per_unit >= 0),
   allergy_flags text[] not null default '{}',
   excluded_for_vegetarian text[] not null default '{}',
+  swap_allowed_meals text[] not null default array['breakfast','morning_snack','lunch','afternoon_snack','dinner','night_snack']::text[],
+  swap_group text not null default '',
+  swap_priority smallint not null default 100 check (swap_priority >= 0),
   portion_min_units numeric(10,3) not null check (portion_min_units > 0),
   portion_typical_units numeric(10,3) not null,
   portion_soft_max_units numeric(10,3) not null,
@@ -155,6 +117,10 @@ create table if not exists public.food_items (
   ),
   constraint food_items_vegetarian_flags_check check (
     excluded_for_vegetarian <@ array['none','vegan','lacto_ovo','pescatarian','raw']::text[]
+  ),
+  constraint food_items_swap_allowed_meals_check check (
+    cardinality(swap_allowed_meals) > 0
+    and swap_allowed_meals <@ array['breakfast','morning_snack','lunch','afternoon_snack','dinner','night_snack']::text[]
   ),
   constraint food_items_portion_order_check check (
     portion_min_units <= portion_typical_units
@@ -269,43 +235,66 @@ before update on public.meal_template_slots
 for each row execute function public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
--- 6) RLS: public read, no browser writes. Admin edits happen in Supabase
--- Dashboard / service-role tooling, never with the anon key.
+-- 6) RLS: authenticated read-only catalog; admin writes only.
 -- ---------------------------------------------------------------------------
 alter table public.food_items enable row level security;
 alter table public.food_substitutes enable row level security;
 alter table public.meal_templates enable row level security;
 alter table public.meal_template_slots enable row level security;
 
-drop policy if exists "Active food items are publicly readable" on public.food_items;
-create policy "Active food items are publicly readable"
-  on public.food_items for select
+drop policy if exists "Authenticated users can read active food items" on public.food_items;
+create policy "Authenticated users can read active food items"
+  on public.food_items for select to authenticated
   using (is_active = true);
 
-drop policy if exists "Active food substitutes are publicly readable" on public.food_substitutes;
-create policy "Active food substitutes are publicly readable"
-  on public.food_substitutes for select
+drop policy if exists "Authenticated users can read active food substitutes" on public.food_substitutes;
+create policy "Authenticated users can read active food substitutes"
+  on public.food_substitutes for select to authenticated
+  using (
+    is_active = true
+    and exists (
+      select 1 from public.food_items source_food
+      where source_food.id = food_substitutes.food_item_id and source_food.is_active = true
+    )
+    and exists (
+      select 1 from public.food_items target_food
+      where target_food.id = food_substitutes.substitute_food_item_id and target_food.is_active = true
+    )
+  );
+
+drop policy if exists "Authenticated users can read active meal templates" on public.meal_templates;
+create policy "Authenticated users can read active meal templates"
+  on public.meal_templates for select to authenticated
   using (is_active = true);
 
-drop policy if exists "Active meal templates are publicly readable" on public.meal_templates;
-create policy "Active meal templates are publicly readable"
-  on public.meal_templates for select
-  using (is_active = true);
+drop policy if exists "Authenticated users can read active meal template slots" on public.meal_template_slots;
+create policy "Authenticated users can read active meal template slots"
+  on public.meal_template_slots for select to authenticated
+  using (
+    exists (
+      select 1 from public.meal_templates mt
+      where mt.id = meal_template_slots.template_id and mt.is_active = true
+    )
+    and exists (
+      select 1 from public.food_items fi
+      where fi.id = meal_template_slots.primary_food_item_id and fi.is_active = true
+    )
+  );
 
-drop policy if exists "Meal template slots are publicly readable" on public.meal_template_slots;
-create policy "Meal template slots are publicly readable"
-  on public.meal_template_slots for select
-  using (true);
+revoke all on public.food_items from anon;
+revoke all on public.food_substitutes from anon;
+revoke all on public.meal_templates from anon;
+revoke all on public.meal_template_slots from anon;
 
-revoke insert, update, delete on public.food_items from anon, authenticated;
-revoke insert, update, delete on public.food_substitutes from anon, authenticated;
-revoke insert, update, delete on public.meal_templates from anon, authenticated;
-revoke insert, update, delete on public.meal_template_slots from anon, authenticated;
+revoke insert, update, delete on public.food_items from authenticated;
+revoke insert, update, delete on public.food_substitutes from authenticated;
+revoke insert, update, delete on public.meal_templates from authenticated;
+revoke insert, update, delete on public.meal_template_slots from authenticated;
 
-grant select on public.food_items to anon, authenticated;
-grant select on public.food_substitutes to anon, authenticated;
-grant select on public.meal_templates to anon, authenticated;
-grant select on public.meal_template_slots to anon, authenticated;
+grant select on public.food_items to authenticated;
+grant select on public.food_substitutes to authenticated;
+grant select on public.meal_templates to authenticated;
+grant select on public.meal_template_slots to authenticated;
 
 comment on table public.food_items is
   'Behtan production atomic nutrition catalog. Source of truth for food macros and portion guardrails.';

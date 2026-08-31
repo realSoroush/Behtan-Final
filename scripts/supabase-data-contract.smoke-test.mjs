@@ -18,6 +18,7 @@ const emptyArrayCatalog = buildNutritionCatalog({
     id: 'test_food', name: 'غذای تست', role: 'starch', emoji: null, unit_label: 'واحد',
     grams_per_unit: 50, kcal_per_unit: 100, protein_per_unit: 2, carbs_per_unit: 20, fat_per_unit: 1,
     allergy_flags: [], excluded_for_vegetarian: [],
+    swap_allowed_meals: ['breakfast'], swap_group: 'bread', swap_priority: 10,
     portion_min_units: 1, portion_typical_units: 1, portion_soft_max_units: 2, portion_hard_max_units: 3, portion_step: 1,
     is_active: true, sort_order: 0,
   }],
@@ -52,6 +53,10 @@ const migrationSource = readFileSync(
   'utf8'
 );
 const seedSource = readFileSync(resolve(projectRoot, 'supabase/seed_nutrition_catalog.sql'), 'utf8');
+const mealAwareMigrationSource = readFileSync(
+  resolve(projectRoot, 'supabase/migrations/20260831_003_meal_aware_food_swaps.sql'),
+  'utf8'
+);
 
 assert(!/const\s+FOOD_ITEMS\s*:/.test(engineSource), 'Production engine still contains hard-coded FOOD_ITEMS');
 assert(!/const\s+MEAL_TEMPLATES\s*:/.test(engineSource), 'Production engine still contains hard-coded MEAL_TEMPLATES');
@@ -63,6 +68,9 @@ for (const table of ['food_items', 'food_substitutes', 'meal_templates', 'meal_t
 }
 assert(migrationSource.includes('onboarding_completed'), 'Migration missing onboarding_completed');
 assert(appSource.includes('profile.onboarding_completed !== true'), 'App routing is not using onboarding_completed');
+assert(mealAwareMigrationSource.includes('swap_allowed_meals'), 'Meal-aware migration missing swap_allowed_meals');
+assert(mealAwareMigrationSource.includes('swap_group'), 'Meal-aware migration missing swap_group');
+assert(mealAwareMigrationSource.includes('swap_priority'), 'Meal-aware migration missing swap_priority');
 
 // The old anonymous user_profiles lookup is incompatible with the table's RLS.
 assert(

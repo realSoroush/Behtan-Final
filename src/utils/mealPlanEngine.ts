@@ -974,6 +974,7 @@ function isMacroEquivalentSwap(original: MealComponent, candidate: MealComponent
   const carbDev = Math.abs(candidate.carbs - original.carbs) / Math.max(10, original.carbs);
   const fatDev = Math.abs(candidate.fat - original.fat) / Math.max(5, original.fat);
   const fatDeltaGrams = Math.abs(candidate.fat - original.fat);
+  const sameSwapGroup = original.foodItem.swapGroup === candidate.foodItem.swapGroup;
 
   // The role-defining macro is the hard invariant. Calories are a second
   // invariant so a lean protein cannot silently become a calorie/fat bomb.
@@ -981,7 +982,12 @@ function isMacroEquivalentSwap(original: MealComponent, candidate: MealComponent
     return proteinDev <= 0.12 && kcalDev <= 0.35 && fatDeltaGrams <= 8;
   }
   if (role === 'starch') {
-    return carbDev <= 0.12 && kcalDev <= 0.25;
+    // Bread-to-bread swaps are allowed a slightly wider carb tolerance because
+    // countable slices are discrete. Example: 50 g Sangak -> 2 whole-grain
+    // toast slices keeps calories close but cannot land on an exact carb gram.
+    return sameSwapGroup
+      ? carbDev <= 0.20 && kcalDev <= 0.15
+      : carbDev <= 0.12 && kcalDev <= 0.25;
   }
   if (role === 'fat') {
     return fatDev <= 0.15 && kcalDev <= 0.25;
@@ -1026,6 +1032,16 @@ function mealWithReplacement(meal: Meal, componentIndex: number, replacement: Me
   };
 }
 
+function isSwapAllowedForMeal(food: FoodItem, slot: MealSlot): boolean {
+  return food.swapAllowedMeals.includes(slot);
+}
+
+function swapContextPenalty(original: FoodItem, replacement: FoodItem): number {
+  const groupPenalty = original.swapGroup === replacement.swapGroup ? 0 : 0.75;
+  // Priority is deliberately a small tie-breaker. Macro safety always dominates.
+  return groupPenalty + replacement.swapPriority * 0.001;
+}
+
 function buildSwapOption(meal: Meal, componentIndex: number, replacement: FoodItem): FoodSwapOption {
   const original = meal.components[componentIndex];
   let bestComponent = componentFromUnits(replacement, portionRuleFor(replacement).minUnits);
@@ -1033,7 +1049,10 @@ function buildSwapOption(meal: Meal, componentIndex: number, replacement: FoodIt
 
   for (const units of allRealisticPortionCandidates(replacement)) {
     const candidate = componentFromUnits(replacement, units);
-    const score = swapEquivalenceScore(original, candidate) + 0.05 * portionRealismPenalty(replacement, units);
+    const score =
+      swapEquivalenceScore(original, candidate) +
+      0.05 * portionRealismPenalty(replacement, units) +
+      swapContextPenalty(original.foodItem, replacement);
     if (score < bestScore) {
       bestScore = score;
       bestComponent = candidate;
@@ -1057,9 +1076,10 @@ function buildSwapOption(meal: Meal, componentIndex: number, replacement: FoodIt
 
 /**
  * Returns pre-calculated swap options for one component. A swap is applied only
- * when the replacement itself can preserve the original component's defining
- * macro and calories within explicit tolerances. Other foods in the meal are
- * intentionally NOT changed behind the user's back.
+ * when the replacement is appropriate for the current meal context AND can
+ * preserve the original component's defining macro/calories within explicit
+ * tolerances. Other foods in the meal are intentionally NOT changed behind
+ * the user's back.
  */
 export function getSwapOptionsForMeal(
   meal: Meal,
@@ -1069,7 +1089,9 @@ export function getSwapOptionsForMeal(
   if (componentIndex < 0 || componentIndex >= meal.components.length) return [];
   const current = meal.components[componentIndex];
   return getSubstitutesFor(current.foodItem.id)
+    .filter((food) => food.role === current.foodItem.role)
     .filter((food) => isFoodAllowed(food, preferences))
+    .filter((food) => isSwapAllowedForMeal(food, meal.slot))
     .map((food) => buildSwapOption(meal, componentIndex, food))
     .sort((a, b) => Number(b.isEquivalent) - Number(a.isEquivalent) || a.score - b.score);
 }

@@ -86,3 +86,36 @@ assert(Math.abs(riceOption.kcalDeviationPct) <= 25.01, `Rice kcal drift too larg
 console.log('✅ Behtan food-swap equivalence smoke test passed');
 console.log(`   9 egg whites -> whole egg: safely blocked (${eggOption.replacementComponent.units} eggs was closest realistic option)`);
 console.log(`   200g brown rice -> ${riceOption.replacementComponent.grams}g white rice: macro-equivalent`);
+
+
+// ---------------------------------------------------------------------------
+// Meal-aware swap regression: breakfast Sangak should offer toast, NOT rice
+// or potato. Two toast slices are acceptable for 50 g Sangak because bread
+// swaps prioritize kcal + carbs and discrete slices cannot hit an exact gram.
+// ---------------------------------------------------------------------------
+const sangak = getSubstitutesFor('whole_grain_toast').find((f) => f.id === 'sangak_bread');
+assert(sangak, 'Sangak is missing from the bread swap graph');
+
+const breakfastBreadMeal = mealFrom([component(sangak, 1)], 'breakfast'); // 50 g Sangak
+const breakfastBreadOptions = getSwapOptionsForMeal(breakfastBreadMeal, 0, prefs);
+const breakfastIds = breakfastBreadOptions.map((o) => o.foodItem.id);
+
+assert(breakfastIds.includes('whole_grain_toast'), 'Whole-grain toast should be offered for Sangak at breakfast');
+assert(!breakfastIds.includes('white_rice_cooked'), 'White rice must not be offered as a breakfast bread swap');
+assert(!breakfastIds.includes('boiled_potato'), 'Boiled potato must not be offered as a normal breakfast bread swap');
+
+const toastOption = breakfastBreadOptions.find((o) => o.foodItem.id === 'whole_grain_toast');
+assert(toastOption?.isEquivalent, '50 g Sangak -> whole-grain toast should be accepted as a practical bread-equivalent swap');
+assert(toastOption.replacementComponent.units === 2, `Expected 2 toast slices, got ${toastOption.replacementComponent.units}`);
+assert(Math.abs(toastOption.kcalDeviationPct) <= 15.01, `Toast kcal drift too large: ${toastOption.kcalDeviationPct}%`);
+assert(Math.abs(toastOption.carbDeviationPct) <= 20.01, `Toast carb drift too large: ${toastOption.carbDeviationPct}%`);
+
+// At lunch, rice-family foods remain available and same-group grain swaps rank
+// ahead of culturally weaker cross-group starch alternatives.
+const lunchBrownRiceOptions = getSwapOptionsForMeal(riceMeal, 0, prefs);
+assert(lunchBrownRiceOptions.some((o) => o.foodItem.id === 'white_rice_cooked'), 'White rice disappeared from lunch swaps');
+assert(!lunchBrownRiceOptions.some((o) => o.foodItem.id === 'whole_grain_toast'), 'Toast is not connected as a brown-rice substitute and should not be invented');
+
+console.log('✅ Behtan meal-aware swap context passed');
+console.log('   Breakfast 50g Sangak -> 2 whole-grain toast slices: allowed');
+console.log('   Breakfast rice/potato suggestions: filtered out');

@@ -24,6 +24,9 @@ export interface FoodItemRow {
   fat_per_unit: number | string;
   allergy_flags: Allergy[] | null;
   excluded_for_vegetarian: VegetarianStatus[] | null;
+  swap_allowed_meals: MealSlot[] | null;
+  swap_group: string | null;
+  swap_priority: number | string | null;
   portion_min_units: number | string;
   portion_typical_units: number | string;
   portion_soft_max_units: number | string;
@@ -92,6 +95,9 @@ export function buildNutritionCatalog(input: {
       fatPerUnit: toNumber(row.fat_per_unit, `${row.id}.fat_per_unit`),
       allergyFlags: row.allergy_flags ?? [],
       excludedForVegetarian: row.excluded_for_vegetarian ?? [],
+      swapAllowedMeals: row.swap_allowed_meals ?? [],
+      swapGroup: (row.swap_group ?? '').trim() || row.role,
+      swapPriority: row.swap_priority == null ? 100 : toNumber(row.swap_priority, `${row.id}.swap_priority`),
     }));
 
   const portionRules: Record<string, PortionRule> = {};
@@ -177,6 +183,15 @@ export function assertValidNutritionCatalog(catalog: NutritionCatalog): void {
 
     if (food.gramsPerUnit <= 0 || food.kcalPerUnit < 0 || food.proteinPerUnit < 0 || food.carbsPerUnit < 0 || food.fatPerUnit < 0) {
       throw new Error(`[nutritionCatalog] Invalid macros/units for food: ${food.id}`);
+    }
+    if (food.swapAllowedMeals.length === 0) {
+      throw new Error(`[nutritionCatalog] Food has no swap meal contexts: ${food.id}`);
+    }
+    if (!food.swapGroup.trim()) {
+      throw new Error(`[nutritionCatalog] Food has no swap group: ${food.id}`);
+    }
+    if (!Number.isFinite(food.swapPriority) || food.swapPriority < 0) {
+      throw new Error(`[nutritionCatalog] Invalid swap priority for food: ${food.id}`);
     }
 
     const rule = catalog.portionRules[food.id];
