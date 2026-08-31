@@ -1,45 +1,88 @@
-/**
- * PhoneAuth.tsx — Single-screen phone login/registration (no OTP)
- * ─────────────────────────────────────────────────────────
- * New number:      account created silently → onboarding
- * Existing number:  signed back in silently → dashboard
- * Returning user with an active session: App.tsx skips this screen entirely
- */
-
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/hooks/useAuth';
 import { APP_LOGO_PATH, APP_NAME_FA } from '@/constants/brand';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 interface PhoneAuthProps {
   onAuthenticated: () => void;
 }
 
-export function PhoneAuth({ onAuthenticated }: PhoneAuthProps) {
-  const { loginOrRegisterPhone, loading, error, clearError } = useAuth();
-  const [phone, setPhone] = useState('');
+type AuthStep = 'phone' | 'otp';
 
-  const handleSubmit = async () => {
-    clearError();
-    try {
-      await loginOrRegisterPhone(phone);
-      onAuthenticated();
-    } catch {
-      // Error is set inside useAuth and displayed below
-    }
-  };
+export function PhoneAuth({ onAuthenticated }: PhoneAuthProps) {
+  const { sendPhoneOtp, verifyPhoneOtp, loading, error, clearError } = useAuth();
+  const [step, setStep] = useState<AuthStep>('phone');
+  const [phone, setPhone] = useState('');
+  const [normalizedPhone, setNormalizedPhone] = useState('');
+  const [otp, setOtp] = useState('');
+  const [resendSeconds, setResendSeconds] = useState(0);
+
+  useEffect(() => {
+    if (resendSeconds <= 0) return;
+    const timer = window.setInterval(() => {
+      setResendSeconds((value) => Math.max(0, value - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [resendSeconds]);
 
   const handlePhoneChange = (value: string) => {
-    // Accept only digits, spaces, dashes, and leading +
     setPhone(value.replace(/[^\d\s\-+]/g, ''));
     if (error) clearError();
   };
 
-  return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 flex flex-col">
+  const handleOtpChange = (value: string) => {
+    setOtp(value.replace(/\D/g, '').slice(0, 6));
+    if (error) clearError();
+  };
 
-      {/* ── Hero ────────────────────────────────────────────── */}
+  const handleSendOtp = async () => {
+    clearError();
+    try {
+      const normalized = await sendPhoneOtp(phone);
+      setNormalizedPhone(normalized);
+      setOtp('');
+      setStep('otp');
+      setResendSeconds(60);
+    } catch {
+      // useAuth owns the user-facing error message.
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    clearError();
+    try {
+      await verifyPhoneOtp(normalizedPhone || phone, otp);
+      onAuthenticated();
+    } catch {
+      // useAuth owns the user-facing error message.
+    }
+  };
+
+  const handleResend = async () => {
+    if (resendSeconds > 0 || loading) return;
+    clearError();
+    try {
+      const normalized = await sendPhoneOtp(normalizedPhone || phone);
+      setNormalizedPhone(normalized);
+      setResendSeconds(60);
+    } catch {
+      // useAuth owns the user-facing error message.
+    }
+  };
+
+  const handleChangePhone = () => {
+    clearError();
+    setStep('phone');
+    setOtp('');
+    setNormalizedPhone('');
+    setResendSeconds(0);
+  };
+
+  return (
+    <div className="relative min-h-screen bg-neutral-50 dark:bg-neutral-950 flex flex-col">
+      <ThemeToggle className="fixed right-4 top-4 z-50" />
       <div className="flex-1 flex flex-col items-center justify-center px-6 text-center pb-8">
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
@@ -47,7 +90,11 @@ export function PhoneAuth({ onAuthenticated }: PhoneAuthProps) {
           transition={{ type: 'spring', stiffness: 260, damping: 20 }}
           className="w-24 h-24 rounded-3xl flex items-center justify-center mb-6 shadow-xl shadow-primary-200 dark:shadow-primary-900/40 overflow-hidden"
         >
-          <img src={APP_LOGO_PATH} alt={`لوگوی ${APP_NAME_FA}`} className="w-full h-full object-contain" />
+          <img
+            src={APP_LOGO_PATH}
+            alt={`لوگوی ${APP_NAME_FA}`}
+            className="w-full h-full object-contain"
+          />
         </motion.div>
 
         <motion.div
@@ -63,25 +110,23 @@ export function PhoneAuth({ onAuthenticated }: PhoneAuthProps) {
           </p>
         </motion.div>
 
-        {/* Feature pills */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
           className="flex flex-wrap justify-center gap-2 mt-6"
         >
-          {['🔥 محاسبه کالری دقیق', '🍽️ ۶ وعده روزانه', '🔄 جایگزینی غذا'].map((f) => (
+          {['🔥 محاسبه کالری دقیق', '🍽️ ۶ وعده روزانه', '🔄 جایگزینی غذا'].map((feature) => (
             <span
-              key={f}
+              key={feature}
               className="text-xs bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border border-primary-100 dark:border-primary-800 rounded-full px-3 py-1"
             >
-              {f}
+              {feature}
             </span>
           ))}
         </motion.div>
       </div>
 
-      {/* ── Auth card ───────────────────────────────────────── */}
       <motion.div
         initial={{ y: 40, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -89,33 +134,69 @@ export function PhoneAuth({ onAuthenticated }: PhoneAuthProps) {
         className="bg-white dark:bg-neutral-900 rounded-t-3xl px-6 pt-8 pb-10 border-t border-neutral-100 dark:border-neutral-800 shadow-2xl shadow-black/5"
       >
         <h2 className="text-xl font-bold text-neutral-900 dark:text-neutral-100 mb-1">
-          ورود به برنامه
+          {step === 'phone' ? 'ورود به برنامه' : 'تأیید شماره موبایل'}
         </h2>
+
         <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-6 leading-relaxed">
-          شماره موبایل خود را وارد کنید. اگر قبلاً ثبت‌نام کرده باشید مستقیم وارد می‌شوید،
-          در غیر این صورت حساب جدید برایتان ساخته می‌شود.
+          {step === 'phone'
+            ? 'شماره موبایل خود را وارد کنید تا کد تأیید یک‌بارمصرف برایتان ارسال شود.'
+            : `کد ۶ رقمی ارسال‌شده به ${normalizedPhone || phone} را وارد کنید.`}
         </p>
 
-        {/* Phone input */}
-        <div className="flex flex-col gap-1.5 mb-4">
-          <label className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
-            شماره موبایل
-          </label>
-          <div className="relative flex items-center">
-            <span className="absolute right-4 text-lg select-none pointer-events-none">📱</span>
+        {step === 'phone' ? (
+          <div className="flex flex-col gap-1.5 mb-4">
+            <label className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+              شماره موبایل
+            </label>
+            <div className="relative flex items-center">
+              <span className="absolute right-4 text-lg select-none pointer-events-none">📱</span>
+              <input
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel"
+                dir="ltr"
+                placeholder="09123456789"
+                value={phone}
+                onChange={(event) => handlePhoneChange(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !loading && phone.trim()) void handleSendOtp();
+                }}
+                className={`
+                  w-full bg-neutral-50 dark:bg-neutral-800
+                  border rounded-2xl py-4 pr-12 pl-4
+                  text-left text-lg tracking-widest
+                  outline-none transition-all
+                  placeholder:text-neutral-300 dark:placeholder:text-neutral-600
+                  ${
+                    error
+                      ? 'border-red-400 focus:ring-2 focus:ring-red-300'
+                      : 'border-neutral-200 dark:border-neutral-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent'
+                  }
+                `}
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1.5 mb-4">
+            <label className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+              کد تأیید
+            </label>
             <input
-              type="tel"
+              type="text"
               inputMode="numeric"
+              autoComplete="one-time-code"
               dir="ltr"
-              placeholder="09123456789"
-              value={phone}
-              onChange={(e) => handlePhoneChange(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && !loading && handleSubmit()}
+              maxLength={6}
+              placeholder="123456"
+              value={otp}
+              onChange={(event) => handleOtpChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !loading && otp.length === 6) void handleVerifyOtp();
+              }}
+              autoFocus
               className={`
-                w-full bg-neutral-50 dark:bg-neutral-800
-                border rounded-2xl py-4 pr-12 pl-4
-                text-left text-lg tracking-widest
-                outline-none transition-all
+                w-full bg-neutral-50 dark:bg-neutral-800 border rounded-2xl py-4 px-4
+                text-center text-2xl tracking-[0.45em] outline-none transition-all
                 placeholder:text-neutral-300 dark:placeholder:text-neutral-600
                 ${
                   error
@@ -125,9 +206,8 @@ export function PhoneAuth({ onAuthenticated }: PhoneAuthProps) {
               `}
             />
           </div>
-        </div>
+        )}
 
-        {/* Error message */}
         {error && (
           <motion.div
             initial={{ opacity: 0, y: -4 }}
@@ -139,16 +219,39 @@ export function PhoneAuth({ onAuthenticated }: PhoneAuthProps) {
           </motion.div>
         )}
 
-        {/* Submit */}
-        <Button onClick={handleSubmit} loading={loading} disabled={!phone.trim()}>
-          {loading ? 'در حال بررسی...' : 'ورود به برنامه ←'}
-        </Button>
+        {step === 'phone' ? (
+          <Button onClick={handleSendOtp} loading={loading} disabled={!phone.trim()}>
+            {loading ? 'در حال ارسال...' : 'ارسال کد تأیید ←'}
+          </Button>
+        ) : (
+          <>
+            <Button onClick={handleVerifyOtp} loading={loading} disabled={otp.length !== 6}>
+              {loading ? 'در حال تأیید...' : 'تأیید و ورود ←'}
+            </Button>
 
-        {/* Fine print */}
-        <p className="text-xs text-center text-neutral-400 dark:text-neutral-600 mt-4 leading-relaxed">
-          با ورود، شماره موبایل شما به عنوان شناسه ثبت می‌شود.
-          <br />
-          نیازی به رمز عبور یا کد تأیید نیست.
+            <div className="flex items-center justify-between gap-3 mt-4 text-sm">
+              <button
+                type="button"
+                onClick={handleChangePhone}
+                disabled={loading}
+                className="text-neutral-500 dark:text-neutral-400 disabled:opacity-40"
+              >
+                تغییر شماره
+              </button>
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={loading || resendSeconds > 0}
+                className="text-primary-600 dark:text-primary-400 disabled:text-neutral-400 dark:disabled:text-neutral-600"
+              >
+                {resendSeconds > 0 ? `ارسال مجدد (${resendSeconds})` : 'ارسال مجدد کد'}
+              </button>
+            </div>
+          </>
+        )}
+
+        <p className="text-xs text-center text-neutral-400 dark:text-neutral-600 mt-5 leading-relaxed">
+          ورود به حساب فقط پس از تأیید مالکیت شماره موبایل انجام می‌شود.
         </p>
       </motion.div>
     </div>

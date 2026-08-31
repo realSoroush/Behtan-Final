@@ -14,6 +14,7 @@ import {
 } from '@/utils/mealPlanEngine';
 import type { DailyMealPlan, FoodSwapOption, MacroTargets, MealComponent } from '@/types';
 import { APP_LOGO_PATH, APP_NAME_FA } from '@/constants/brand';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 // ============================================================================
 // Helper: compute consumed macros from meal checkboxes
@@ -209,9 +210,18 @@ export function DashboardPage() {
       {/* Sticky header */}
       <header className="sticky top-0 z-30 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md border-b border-neutral-100 dark:border-neutral-800">
         <div className="max-w-md mx-auto flex items-center justify-between px-5 py-3">
-          <button onClick={signOut} className="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors p-1">
-            <LogOut size={20} />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <ThemeToggle />
+            <button
+              type="button"
+              onClick={signOut}
+              aria-label="خروج از حساب"
+              title="خروج از حساب"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+            >
+              <LogOut size={19} />
+            </button>
+          </div>
           <div className="text-right">
             <p className="text-xs text-neutral-500 dark:text-neutral-400">{today}</p>
             <p className="font-bold text-neutral-900 dark:text-neutral-100 text-sm">برنامه غذایی امروز</p>

@@ -17,6 +17,7 @@ import { Step9BodyScan } from './Step9BodyScan';
 import { Step10Analysis } from './Step10Analysis';
 import { Step11Paywall } from './Step11Paywall';
 import type { UserProfile } from '@/types';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 interface OnboardingWizardProps {
   onComplete: () => void;
@@ -181,7 +182,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 flex flex-col">
+    <div className="relative min-h-screen bg-neutral-50 dark:bg-neutral-950 flex flex-col">
+      <ThemeToggle className="fixed right-4 top-4 z-50" />
       <div className="text-center py-6 border-b border-neutral-100 dark:border-neutral-800">
         <img src={APP_LOGO_PATH} alt={`لوگوی ${APP_NAME_FA}`} className="inline-block h-8 w-8 object-contain align-middle" />
         <span className="mr-2 font-bold text-lg text-neutral-800 dark:text-neutral-200">{APP_NAME_FA}</span>

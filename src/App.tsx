@@ -12,16 +12,6 @@ export default function App() {
   const { profile, loading: profileLoading } = useUserProfile(user?.id);
   const [view, setView] = useState<AppView>('loading');
 
-  // Dark mode: check system preference
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    if (mq.matches) document.documentElement.classList.add('dark');
-    const handler = (e: MediaQueryListEvent) =>
-      document.documentElement.classList.toggle('dark', e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
-
   useEffect(() => {
     if (authLoading || profileLoading) {
       setView('loading');
