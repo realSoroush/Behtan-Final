@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { LogOut, RefreshCw, AlertCircle } from 'lucide-react';
 import { MacroSummary } from './MacroSummary';
 import { WorkoutDayToggle } from './WorkoutDayToggle';
@@ -7,7 +7,7 @@ import { FoodSwapModal } from './FoodSwapModal';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useNutritionCatalog } from '@/hooks/useNutritionCatalog';
-import { calculateFullNutritionPlan, toPersianDigits } from '@/utils/nutritionHelpers';
+import { calculateFullNutritionPlanWithTrace, toPersianDigits } from '@/utils/nutritionHelpers';
 import {
   generateDailyMealPlan,
   getSwapOptionsForMeal,
@@ -15,6 +15,7 @@ import {
 import type { DailyMealPlan, FoodSwapOption, MacroTargets, MealComponent } from '@/types';
 import { APP_LOGO_PATH, APP_NAME_FA } from '@/constants/brand';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { NUTRITION_DEBUG_CONFIG } from '@/config/nutritionConfig';
 
 // ============================================================================
 // Helper: compute consumed macros from meal checkboxes
@@ -59,12 +60,12 @@ export function DashboardPage() {
   // Plan state (regeneratable via date-seed rotation)
   const [planVersion, setPlanVersion] = useState(0);
 
-  // ---- Compute nutrition targets (dynamic per user: weight/goal/gender/etc.) ----
-  const targets = useMemo<MacroTargets | null>(() => {
+  // ---- Compute nutrition targets + a permanent diagnostic trace ----
+  const nutritionResult = useMemo(() => {
     if (!profile?.weight || !profile?.height || !profile?.birth_date || !profile?.gender || !profile?.activity_level || !profile?.goal) {
       return null;
     }
-    return calculateFullNutritionPlan({
+    return calculateFullNutritionPlanWithTrace({
       weightKg: profile.weight,
       heightCm: profile.height,
       birthDateISO: profile.birth_date,
@@ -73,9 +74,20 @@ export function DashboardPage() {
       goal: profile.goal,
       weightLossSpeed: profile.weight_loss_speed ?? undefined,
       bodyFatPercentage: profile.body_fat_pct ?? undefined,
+      bodyFatSource: profile.body_fat_source,
       isWorkoutDay,
     });
   }, [profile, isWorkoutDay]);
+
+  const targets: MacroTargets | null = nutritionResult?.targets ?? null;
+
+  useEffect(() => {
+    if (!NUTRITION_DEBUG_CONFIG.isActive || !nutritionResult) return;
+    console.groupCollapsed('[Behtan Nutrition Trace]');
+    console.table(nutritionResult.trace);
+    console.log('Targets', nutritionResult.targets);
+    console.groupEnd();
+  }, [nutritionResult]);
 
   // ---- Generate meal plan after the live Supabase nutrition catalog loads ----
   // Generation can intentionally fail when nutrition targets cannot be met

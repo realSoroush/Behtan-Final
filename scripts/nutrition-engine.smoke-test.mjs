@@ -59,13 +59,14 @@ for (const kcal of [1200, 1371, 1640, 1800, 2200, 3000, 4000, 5800]) {
   }
 }
 
-// Body-fat estimate must NOT silently change BMR unless explicitly opted in.
-const mifflinDefault = calculateBMR({
+// Formula selection is automatic from body-fat provenance.
+const mifflinAiVisual = calculateBMR({
   weightKg: 100,
   heightCm: 180,
   age: 35,
   gender: 'male',
   bodyFatPercentage: 30,
+  bodyFatSource: 'ai_visual',
 });
 const mifflinNoBodyFat = calculateBMR({
   weightKg: 100,
@@ -73,16 +74,16 @@ const mifflinNoBodyFat = calculateBMR({
   age: 35,
   gender: 'male',
 });
-const katchOptIn = calculateBMR({
+const katchMeasured = calculateBMR({
   weightKg: 100,
   heightCm: 180,
   age: 35,
   gender: 'male',
   bodyFatPercentage: 30,
-  useBodyFatFormula: true,
+  bodyFatSource: 'measured',
 });
-assert(mifflinDefault === mifflinNoBodyFat, 'Unverified body fat changed default BMR');
-assert(katchOptIn !== mifflinNoBodyFat, 'Explicit Katch-McArdle opt-in did not change BMR');
+assert(mifflinAiVisual === mifflinNoBodyFat, 'AI visual body fat changed default BMR');
+assert(katchMeasured !== mifflinNoBodyFat, 'Measured body fat did not select Katch-McArdle');
 
 
 // Weight-loss speed UI and engine share one policy object. Verify both the

@@ -19,7 +19,8 @@
     "test:security": "node scripts/security-auth-rls.smoke-test.mjs",
     "test:auth": "node --experimental-strip-types scripts/phone-auth-abstraction.smoke-test.mjs",
     "cleanup:legacy": "node scripts/cleanup-legacy.mjs",
-    "test:theme": "node scripts/theme.smoke-test.mjs"
+    "test:theme": "node scripts/theme.smoke-test.mjs",
+    "test:diagnostics": "node --experimental-strip-types scripts/nutrition-diagnostics.smoke-test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

@@ -58,6 +58,11 @@ const mealAwareMigrationSource = readFileSync(
   'utf8'
 );
 
+const diagnosticsMigrationSource = readFileSync(
+  resolve(projectRoot, 'supabase/migrations/20260901_004_nutrition_diagnostics_bodyfat_policy.sql'),
+  'utf8'
+);
+
 assert(!/const\s+FOOD_ITEMS\s*:/.test(engineSource), 'Production engine still contains hard-coded FOOD_ITEMS');
 assert(!/const\s+MEAL_TEMPLATES\s*:/.test(engineSource), 'Production engine still contains hard-coded MEAL_TEMPLATES');
 assert(!/const\s+PORTION_RULES\s*:/.test(engineSource), 'Production engine still contains hard-coded PORTION_RULES');
@@ -71,6 +76,8 @@ assert(appSource.includes('profile.onboarding_completed !== true'), 'App routing
 assert(mealAwareMigrationSource.includes('swap_allowed_meals'), 'Meal-aware migration missing swap_allowed_meals');
 assert(mealAwareMigrationSource.includes('swap_group'), 'Meal-aware migration missing swap_group');
 assert(mealAwareMigrationSource.includes('swap_priority'), 'Meal-aware migration missing swap_priority');
+assert(diagnosticsMigrationSource.includes('body_fat_source'), 'Diagnostics migration missing body_fat_source');
+assert(diagnosticsMigrationSource.includes('ai_visual'), 'Diagnostics migration missing AI-visual provenance');
 
 // The old anonymous user_profiles lookup is incompatible with the table's RLS.
 assert(

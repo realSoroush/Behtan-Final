@@ -51,6 +51,8 @@ export interface DietaryPreferencesJson {
 // DATABASE MODELS
 // ============================================================================
 
+export type BodyFatSource = 'ai_visual' | 'measured';
+
 export interface UserProfile {
   id: string;
   phone: string;
@@ -70,6 +72,8 @@ export interface UserProfile {
   dietary_preferences_json: DietaryPreferencesJson | null;
   weight_loss_speed: WeightLossSpeed | null;
   body_fat_pct: number | null;
+  /** Provenance matters: AI visual estimates are informational; measured values may drive Katch-McArdle automatically. */
+  body_fat_source: BodyFatSource | null;
   body_type: BodyType | null;
   subscription_tier: SubscriptionTier | null;
   /** Next onboarding wizard step (1-11) to show when the user resumes. */

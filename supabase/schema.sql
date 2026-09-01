@@ -30,6 +30,7 @@ create table if not exists public.user_profiles (
   dietary_preferences_json jsonb,
   weight_loss_speed text check (weight_loss_speed in ('mild', 'standard', 'fast')),
   body_fat_pct numeric,
+  body_fat_source text check (body_fat_source in ('ai_visual', 'measured')),
   body_type text check (body_type in ('ectomorph', 'mesomorph', 'endomorph')),
   subscription_tier text check (subscription_tier in ('silver', 'gold')),
   onboarding_step int2 not null default 1 check (onboarding_step between 1 and 11),

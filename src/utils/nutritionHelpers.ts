@@ -17,6 +17,7 @@ import type {
   Goal,
   MacroTargets,
   WeightLossSpeed,
+  BodyFatSource,
 } from '@/types';
 
 // ============================================================================
@@ -121,44 +122,49 @@ export function tryCalculateAge(
 // BMR — Basal Metabolic Rate
 // ============================================================================
 
+export type BmrFormula = 'mifflin_st_jeor' | 'katch_mcardle';
+
 export interface BmrInput {
   weightKg: number;
   heightCm: number;
   age: number;
   gender: Gender;
   bodyFatPercentage?: number | null;
-  /**
-   * Opt-in only. A visual/AI body-fat estimate should not silently change the
-   * calorie prescription. Set this to true only when the caller has a body-fat
-   * value it intentionally considers suitable for Katch-McArdle.
-   */
-  useBodyFatFormula?: boolean;
+  bodyFatSource?: BodyFatSource | null;
+}
+
+function isValidBodyFatPercentage(value: number | null | undefined): value is number {
+  return value != null && Number.isFinite(value) && value > 2 && value < 70;
 }
 
 /**
- * Calculates BMR (kcal/day).
- * - Default: Mifflin-St Jeor.
- * - Optional: Katch-McArdle only when useBodyFatFormula=true and body fat is valid.
+ * Formula selection is automatic and source-based; there is no user toggle.
+ * - AI/photo estimate -> Mifflin-St Jeor (body fat remains informational).
+ * - Measured body fat -> Katch-McArdle when the value is valid.
  */
-export function calculateBMR({
-  weightKg,
-  heightCm,
-  age,
-  gender,
-  bodyFatPercentage,
-  useBodyFatFormula = false,
-}: BmrInput): number {
+export function resolveBmrFormula(input: Pick<BmrInput, 'bodyFatPercentage' | 'bodyFatSource'>): BmrFormula {
+  if (input.bodyFatSource === 'measured' && isValidBodyFatPercentage(input.bodyFatPercentage)) {
+    return 'katch_mcardle';
+  }
+  return 'mifflin_st_jeor';
+}
+
+/** Calculates BMR (kcal/day) using the automatically resolved formula. */
+export function calculateBMR(input: BmrInput): number {
+  const {
+    weightKg,
+    heightCm,
+    age,
+    gender,
+    bodyFatPercentage,
+  } = input;
+
   assertFinitePositive(weightKg, 'weightKg');
   assertFinitePositive(heightCm, 'heightCm');
   assertFinitePositive(age, 'age');
 
-  if (
-    useBodyFatFormula &&
-    bodyFatPercentage != null &&
-    Number.isFinite(bodyFatPercentage) &&
-    bodyFatPercentage > 2 &&
-    bodyFatPercentage < 70
-  ) {
+  const formula = resolveBmrFormula(input);
+  if (formula === 'katch_mcardle' && isValidBodyFatPercentage(bodyFatPercentage)) {
     const leanBodyMass = weightKg * (1 - bodyFatPercentage / 100);
     return Math.round(370 + 21.6 * leanBodyMass);
   }
@@ -359,13 +365,48 @@ export interface FullNutritionCalcInput {
   goal: Goal;
   weightLossSpeed?: WeightLossSpeed;
   bodyFatPercentage?: number | null;
-  /** See calculateBMR. Defaults to false. */
-  useBodyFatFormula?: boolean;
+  bodyFatSource?: BodyFatSource | null;
   isWorkoutDay?: boolean;
+  /** Test/diagnostic override only. Production callers normally omit this. */
+  referenceDate?: Date;
 }
 
-export function calculateFullNutritionPlan(input: FullNutritionCalcInput): MacroTargets {
-  const age = calculateAge(input.birthDateISO);
+export interface NutritionCalculationTrace {
+  chronologicalAgeUsed: number;
+  bmrFormula: BmrFormula;
+  bodyFatPercentage: number | null;
+  bodyFatSource: BodyFatSource | null;
+  bodyFatUsedInBmr: boolean;
+  biologicalAgeUsedInNutrition: false;
+  bmr: number;
+  activityLevel: ActivityLevel;
+  activityMultiplier: number;
+  tdee: number;
+  goal: Goal;
+  weightLossSpeed: WeightLossSpeed | null;
+  calorieAdjustmentKcal: number;
+  workoutBonusKcal: number;
+  targetCalories: number;
+}
+
+export interface FullNutritionPlanWithTrace {
+  targets: MacroTargets;
+  trace: NutritionCalculationTrace;
+}
+
+/**
+ * Creates a transparent trace of every value that can change calorie targets.
+ * Biological age is intentionally absent from the inputs and can never affect
+ * the prescription.
+ */
+export function calculateFullNutritionPlanWithTrace(
+  input: FullNutritionCalcInput
+): FullNutritionPlanWithTrace {
+  const age = calculateAge(input.birthDateISO, input.referenceDate ?? new Date());
+  const bmrFormula = resolveBmrFormula({
+    bodyFatPercentage: input.bodyFatPercentage,
+    bodyFatSource: input.bodyFatSource,
+  });
 
   const bmr = calculateBMR({
     weightKg: input.weightKg,
@@ -373,17 +414,47 @@ export function calculateFullNutritionPlan(input: FullNutritionCalcInput): Macro
     age,
     gender: input.gender,
     bodyFatPercentage: input.bodyFatPercentage,
-    useBodyFatFormula: input.useBodyFatFormula ?? false,
+    bodyFatSource: input.bodyFatSource,
   });
 
-  const tdee = calculateTDEE(bmr, input.activityLevel);
-  let targetCalories = calculateTargetCalories(tdee, input.goal, input.weightLossSpeed);
-
-  if (input.isWorkoutDay) {
-    targetCalories += WORKOUT_DAY_CALORIE_BONUS;
+  const activityMultiplier = ACTIVITY_MULTIPLIERS[input.activityLevel];
+  if (!activityMultiplier) {
+    throw new Error(`[nutritionHelpers] Unsupported activity level: ${String(input.activityLevel)}`);
   }
 
-  return calculateMacros(targetCalories, input.weightKg, input.goal, input.heightCm);
+  const tdee = calculateTDEE(bmr, input.activityLevel);
+  const baseTargetCalories = calculateTargetCalories(tdee, input.goal, input.weightLossSpeed);
+  // Derive the displayed adjustment from the actual rounded/floored target so
+  // the trace always reconciles exactly: TDEE + adjustment + workout = target.
+  const calorieAdjustmentKcal = baseTargetCalories - tdee;
+  const workoutBonusKcal = input.isWorkoutDay ? WORKOUT_DAY_CALORIE_BONUS : 0;
+  const targetCalories = baseTargetCalories + workoutBonusKcal;
+
+  const targets = calculateMacros(targetCalories, input.weightKg, input.goal, input.heightCm);
+  return {
+    targets,
+    trace: {
+      chronologicalAgeUsed: age,
+      bmrFormula,
+      bodyFatPercentage: input.bodyFatPercentage ?? null,
+      bodyFatSource: input.bodyFatSource ?? null,
+      bodyFatUsedInBmr: bmrFormula === 'katch_mcardle',
+      biologicalAgeUsedInNutrition: false,
+      bmr,
+      activityLevel: input.activityLevel,
+      activityMultiplier,
+      tdee,
+      goal: input.goal,
+      weightLossSpeed: input.goal === 'weight_loss' ? (input.weightLossSpeed ?? 'standard') : null,
+      calorieAdjustmentKcal,
+      workoutBonusKcal,
+      targetCalories,
+    },
+  };
+}
+
+export function calculateFullNutritionPlan(input: FullNutritionCalcInput): MacroTargets {
+  return calculateFullNutritionPlanWithTrace(input).targets;
 }
 
 // ============================================================================

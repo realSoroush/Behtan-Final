@@ -193,8 +193,9 @@ export function Step10Analysis() {
               />
               <StatCard
                 emoji="🎂"
-                label="سن بیولوژیک"
+                label="سن بیولوژیک تخمینی"
                 value={displayResult.biologicalAge == null ? 'محاسبه نشده' : `${toPersianDigits(displayResult.biologicalAge)} سال`}
+                sub={displayResult.source === 'ai' ? 'نمایشی؛ در فرمول کالری استفاده نمی‌شود' : undefined}
               />
               <StatCard emoji="🏗️" label="نوع بدن" value={BODY_TYPE_LABELS[displayResult.bodyType]} />
               <StatCard emoji="💪" label="توده عضلانی تخمینی" value={muscleLabel(displayResult.estimatedMuscleMass)} />

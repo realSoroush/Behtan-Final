@@ -130,6 +130,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       },
       weight_loss_speed: data.weightLossSpeed,
       body_fat_pct: data.bodyScanResult?.bodyFatPct ?? null,
+      body_fat_source: data.bodyScanResult ? 'ai_visual' : null,
       body_type: data.bodyScanResult?.bodyType ?? data.manualBodyType ?? null,
       subscription_tier: data.selectedTier,
       // Completion is committed atomically with clearing the resume draft.
