@@ -1,6 +1,11 @@
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabaseClient';
-import { AuthServiceError, type AuthAdapter, type AuthSession } from './types';
+import {
+  AuthServiceError,
+  type AuthAdapter,
+  type AuthSession,
+  type PhoneAuthStartResult,
+} from './types';
 
 function mapSession(session: Session | null): AuthSession | null {
   if (!session?.user) return null;
@@ -52,7 +57,7 @@ export class SupabaseAuthAdapter implements AuthAdapter {
     return () => data.subscription.unsubscribe();
   }
 
-  async requestPhoneOtp(phone: string): Promise<void> {
+  async startPhoneAuth(phone: string): Promise<PhoneAuthStartResult> {
     const { error } = await supabase.auth.signInWithOtp({
       phone,
       options: {
@@ -61,6 +66,7 @@ export class SupabaseAuthAdapter implements AuthAdapter {
     });
 
     if (error) throw mapSupabaseAuthError(error);
+    return { status: 'otp_required' };
   }
 
   async verifyPhoneOtp(phone: string, token: string): Promise<AuthSession> {

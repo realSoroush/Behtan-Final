@@ -11,7 +11,10 @@ const root = resolve(here, '..');
 const read = (path) => readFileSync(resolve(root, path), 'utf8');
 
 const authHook = read('src/hooks/useAuth.ts');
-const authAdapter = read('src/services/auth/supabaseAuthAdapter.ts');
+const otpAdapter = read('src/services/auth/supabaseAuthAdapter.ts');
+const testBridge = read('src/services/auth/supabaseTestBridgeAuthAdapter.ts');
+const authIndex = read('src/services/auth/index.ts');
+const authConfig = read('src/config/authConfig.ts');
 const phoneAuth = read('src/components/PhoneAuth.tsx');
 const schema = read('supabase/schema.sql');
 const migration = read('supabase/migrations/20260825_002_security_auth_cleanup.sql');
@@ -19,11 +22,14 @@ const types = read('src/types/index.ts');
 
 assert(authHook.includes('authAdapter'), 'UI auth hook must use the AuthAdapter abstraction');
 assert(!authHook.includes('supabase.auth'), 'UI auth hook still depends directly on Supabase Auth');
-assert(authAdapter.includes('signInWithOtp'), 'Supabase adapter must send phone OTP');
-assert(authAdapter.includes('verifyOtp'), 'Supabase adapter must verify phone OTP');
-assert(!authAdapter.includes('signInWithPassword'), 'Legacy password sign-in still exists');
-assert(!authAdapter.includes('toDerivedPassword'), 'Predictable derived password helper still exists');
-assert(!authAdapter.includes('toSyntheticEmail'), 'Synthetic email auth helper still exists');
+assert(otpAdapter.includes('signInWithOtp'), 'Production Supabase adapter must send phone OTP');
+assert(otpAdapter.includes('verifyOtp'), 'Production Supabase adapter must verify phone OTP');
+assert(!otpAdapter.includes('signInWithPassword'), 'Production OTP adapter contains password sign-in');
+assert(!otpAdapter.includes('toDerivedPassword'), 'Production OTP adapter contains derived password logic');
+assert(testBridge.includes('signInWithPassword'), 'Explicit test bridge is missing');
+assert(testBridge.includes('_slmt'), 'Test bridge is not compatible with pre-OTP test accounts');
+assert(authIndex.includes("PHONE_AUTH_MODE === 'test_bridge'"), 'Test bridge must be explicitly gated by auth mode');
+assert(authConfig.includes('NEVER launch publicly with OTP disabled'), 'Auth config lacks public-launch security warning');
 assert(phoneAuth.includes("type AuthStep = 'phone' | 'otp'"), 'PhoneAuth is missing the OTP step');
 assert(phoneAuth.includes('autoComplete="one-time-code"'), 'OTP input is not configured for one-time codes');
 
@@ -40,8 +46,8 @@ assert(schema.includes('grant select, insert, update on public.user_profiles to 
 assert(schema.includes('grant select on public.food_items to authenticated'), 'Authenticated catalog select grant missing');
 
 console.log('✅ Behtan Auth/RLS security smoke test passed');
-console.log('   Auth UI: adapter-based phone OTP');
-console.log('   Predictable password bridge: removed');
+console.log('   Production auth path: phone OTP only');
+console.log('   Test bridge: isolated behind explicit feature switch');
+console.log('   PUBLIC LAUNCH REQUIREMENT: otp.isActive must be true');
 console.log('   user_profiles: own-row authenticated RLS');
 console.log('   Nutrition catalog: authenticated read-only');
-console.log('   Legacy food_exchanges code/table: cleanup migration ready');

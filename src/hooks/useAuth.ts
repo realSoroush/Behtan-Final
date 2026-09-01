@@ -1,19 +1,21 @@
 /**
  * UI-facing authentication state.
  *
- * This hook deliberately knows nothing about Supabase APIs. The active auth
- * backend is selected behind `authAdapter`, so a domestic backend can be
- * introduced later without rewriting PhoneAuth or the rest of the app.
+ * This hook knows nothing about concrete Supabase auth calls. The active mode
+ * is selected behind authAdapter. OTP can be temporarily disabled for testing
+ * without removing the OTP infrastructure.
  */
 
 import { useEffect, useState } from 'react';
 import {
   AuthServiceError,
+  PHONE_AUTH_MODE,
   authAdapter,
   isValidIranPhone,
   normalizeIranPhone,
   type AuthSession,
   type AuthUser,
+  type PhoneAuthMode,
 } from '@/services/auth';
 
 interface AuthState {
@@ -23,8 +25,14 @@ interface AuthState {
   error: string | null;
 }
 
+export interface BeginPhoneAuthResult {
+  normalizedPhone: string;
+  status: 'otp_required' | 'authenticated';
+}
+
 interface UseAuthReturn extends AuthState {
-  sendPhoneOtp: (phone: string) => Promise<string>;
+  phoneAuthMode: PhoneAuthMode;
+  beginPhoneAuth: (phone: string) => Promise<BeginPhoneAuthResult>;
   verifyPhoneOtp: (phone: string, token: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
@@ -40,7 +48,9 @@ function userMessageForAuthError(error: unknown, fallback: string): string {
       case 'sms_delivery_failed':
         return 'ارسال پیامک تأیید انجام نشد. چند لحظه دیگر دوباره تلاش کنید.';
       case 'profile_bootstrap_failed':
-        return 'شماره تأیید شد اما ساخت پروفایل با خطا مواجه شد. دوباره تلاش کنید.';
+        return 'ورود انجام شد اما ساخت پروفایل با خطا مواجه شد. دوباره تلاش کنید.';
+      case 'test_bridge_failed':
+        return error.message || 'ورود آزمایشی انجام نشد. دوباره تلاش کنید.';
       case 'network_error':
         return 'ارتباط با سرویس ورود برقرار نشد. اتصال اینترنت را بررسی کنید.';
       default:
@@ -102,7 +112,7 @@ export function useAuth(): UseAuthReturn {
     };
   }, []);
 
-  const sendPhoneOtp = async (phone: string): Promise<string> => {
+  const beginPhoneAuth = async (phone: string): Promise<BeginPhoneAuthResult> => {
     setState((current) => ({ ...current, loading: true, error: null }));
 
     if (!isValidIranPhone(phone)) {
@@ -114,14 +124,30 @@ export function useAuth(): UseAuthReturn {
     const normalized = normalizeIranPhone(phone);
 
     try {
-      await authAdapter.requestPhoneOtp(normalized);
-      setState((current) => ({ ...current, loading: false }));
-      return normalized;
+      const result = await authAdapter.startPhoneAuth(normalized);
+
+      if (result.status === 'authenticated') {
+        setState((current) => ({
+          ...current,
+          session: result.session,
+          user: result.session.user,
+          loading: false,
+          error: null,
+        }));
+      } else {
+        setState((current) => ({ ...current, loading: false }));
+      }
+
+      return {
+        normalizedPhone: normalized,
+        status: result.status,
+      };
     } catch (error) {
-      const message = userMessageForAuthError(
-        error,
-        'ارسال کد تأیید انجام نشد. اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.'
-      );
+      const fallback =
+        PHONE_AUTH_MODE === 'otp'
+          ? 'ارسال کد تأیید انجام نشد. اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.'
+          : 'ورود آزمایشی انجام نشد. اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.';
+      const message = userMessageForAuthError(error, fallback);
       setState((current) => ({ ...current, loading: false, error: message }));
       throw new Error(message);
     }
@@ -129,6 +155,12 @@ export function useAuth(): UseAuthReturn {
 
   const verifyPhoneOtp = async (phone: string, token: string): Promise<void> => {
     setState((current) => ({ ...current, loading: true, error: null }));
+
+    if (PHONE_AUTH_MODE !== 'otp') {
+      const message = 'OTP در حالت تست غیرفعال است.';
+      setState((current) => ({ ...current, loading: false, error: message }));
+      throw new Error(message);
+    }
 
     const normalized = normalizeIranPhone(phone);
     const cleanToken = token.replace(/\D/g, '');
@@ -172,7 +204,8 @@ export function useAuth(): UseAuthReturn {
 
   return {
     ...state,
-    sendPhoneOtp,
+    phoneAuthMode: PHONE_AUTH_MODE,
+    beginPhoneAuth,
     verifyPhoneOtp,
     signOut,
     clearError,

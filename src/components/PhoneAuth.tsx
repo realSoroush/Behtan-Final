@@ -12,7 +12,7 @@ interface PhoneAuthProps {
 type AuthStep = 'phone' | 'otp';
 
 export function PhoneAuth({ onAuthenticated }: PhoneAuthProps) {
-  const { sendPhoneOtp, verifyPhoneOtp, loading, error, clearError } = useAuth();
+  const { beginPhoneAuth, verifyPhoneOtp, phoneAuthMode, loading, error, clearError } = useAuth();
   const [step, setStep] = useState<AuthStep>('phone');
   const [phone, setPhone] = useState('');
   const [normalizedPhone, setNormalizedPhone] = useState('');
@@ -37,11 +37,17 @@ export function PhoneAuth({ onAuthenticated }: PhoneAuthProps) {
     if (error) clearError();
   };
 
-  const handleSendOtp = async () => {
+  const handleStartAuth = async () => {
     clearError();
     try {
-      const normalized = await sendPhoneOtp(phone);
-      setNormalizedPhone(normalized);
+      const result = await beginPhoneAuth(phone);
+      setNormalizedPhone(result.normalizedPhone);
+
+      if (result.status === 'authenticated') {
+        onAuthenticated();
+        return;
+      }
+
       setOtp('');
       setStep('otp');
       setResendSeconds(60);
@@ -64,8 +70,8 @@ export function PhoneAuth({ onAuthenticated }: PhoneAuthProps) {
     if (resendSeconds > 0 || loading) return;
     clearError();
     try {
-      const normalized = await sendPhoneOtp(normalizedPhone || phone);
-      setNormalizedPhone(normalized);
+      const result = await beginPhoneAuth(normalizedPhone || phone);
+      setNormalizedPhone(result.normalizedPhone);
       setResendSeconds(60);
     } catch {
       // useAuth owns the user-facing error message.
@@ -139,7 +145,9 @@ export function PhoneAuth({ onAuthenticated }: PhoneAuthProps) {
 
         <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-6 leading-relaxed">
           {step === 'phone'
-            ? 'شماره موبایل خود را وارد کنید تا کد تأیید یک‌بارمصرف برایتان ارسال شود.'
+            ? phoneAuthMode === 'otp'
+              ? 'شماره موبایل خود را وارد کنید تا کد تأیید یک‌بارمصرف برایتان ارسال شود.'
+              : 'شماره موبایل خود را برای ورود آزمایشی وارد کنید.'
             : `کد ۶ رقمی ارسال‌شده به ${normalizedPhone || phone} را وارد کنید.`}
         </p>
 
@@ -159,7 +167,7 @@ export function PhoneAuth({ onAuthenticated }: PhoneAuthProps) {
                 value={phone}
                 onChange={(event) => handlePhoneChange(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === 'Enter' && !loading && phone.trim()) void handleSendOtp();
+                  if (event.key === 'Enter' && !loading && phone.trim()) void handleStartAuth();
                 }}
                 className={`
                   w-full bg-neutral-50 dark:bg-neutral-800
@@ -220,8 +228,14 @@ export function PhoneAuth({ onAuthenticated }: PhoneAuthProps) {
         )}
 
         {step === 'phone' ? (
-          <Button onClick={handleSendOtp} loading={loading} disabled={!phone.trim()}>
-            {loading ? 'در حال ارسال...' : 'ارسال کد تأیید ←'}
+          <Button onClick={handleStartAuth} loading={loading} disabled={!phone.trim()}>
+            {loading
+              ? phoneAuthMode === 'otp'
+                ? 'در حال ارسال...'
+                : 'در حال ورود...'
+              : phoneAuthMode === 'otp'
+                ? 'ارسال کد تأیید ←'
+                : 'ورود ←'}
           </Button>
         ) : (
           <>
@@ -251,7 +265,9 @@ export function PhoneAuth({ onAuthenticated }: PhoneAuthProps) {
         )}
 
         <p className="text-xs text-center text-neutral-400 dark:text-neutral-600 mt-5 leading-relaxed">
-          ورود به حساب فقط پس از تأیید مالکیت شماره موبایل انجام می‌شود.
+          {phoneAuthMode === 'otp'
+            ? 'ورود به حساب فقط پس از تأیید مالکیت شماره موبایل انجام می‌شود.'
+            : 'حالت تست فعال است؛ ارسال پیامک و تأیید OTP موقتاً غیرفعال است.'}
         </p>
       </motion.div>
     </div>

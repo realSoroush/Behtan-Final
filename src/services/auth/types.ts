@@ -15,6 +15,7 @@ export type AuthErrorCode =
   | 'sms_delivery_failed'
   | 'profile_bootstrap_failed'
   | 'network_error'
+  | 'test_bridge_failed'
   | 'unknown';
 
 export class AuthServiceError extends Error {
@@ -27,10 +28,14 @@ export class AuthServiceError extends Error {
   }
 }
 
+export type PhoneAuthStartResult =
+  | { status: 'otp_required' }
+  | { status: 'authenticated'; session: AuthSession };
+
 export interface AuthAdapter {
   getSession(): Promise<AuthSession | null>;
   subscribe(listener: (session: AuthSession | null) => void): () => void;
-  requestPhoneOtp(phone: string): Promise<void>;
+  startPhoneAuth(phone: string): Promise<PhoneAuthStartResult>;
   verifyPhoneOtp(phone: string, token: string): Promise<AuthSession>;
   signOut(): Promise<void>;
 }

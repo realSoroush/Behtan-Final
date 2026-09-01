@@ -13,15 +13,25 @@ const root = resolve(here, '..');
 const read = (path) => readFileSync(resolve(root, path), 'utf8');
 
 const useAuth = read('src/hooks/useAuth.ts');
-const adapter = read('src/services/auth/supabaseAuthAdapter.ts');
+const otpAdapter = read('src/services/auth/supabaseAuthAdapter.ts');
+const testAdapter = read('src/services/auth/supabaseTestBridgeAuthAdapter.ts');
 const authIndex = read('src/services/auth/index.ts');
+const authConfig = read('src/config/authConfig.ts');
+const phoneAuth = read('src/components/PhoneAuth.tsx');
 const hook = read('supabase/functions/send-sms/index.ts');
 
 assert(!useAuth.includes('supabase.auth'), 'useAuth must not depend directly on Supabase Auth');
 assert(useAuth.includes('authAdapter'), 'useAuth must call the auth abstraction');
-assert(adapter.includes('signInWithOtp'), 'Supabase adapter must request OTP');
-assert(adapter.includes('verifyOtp'), 'Supabase adapter must verify OTP');
-assert(authIndex.includes('VITE_AUTH_DRIVER'), 'Auth driver must be environment-selectable');
+assert(useAuth.includes('beginPhoneAuth'), 'useAuth must expose the mode-independent phone entry point');
+assert(otpAdapter.includes('signInWithOtp'), 'OTP adapter must request OTP');
+assert(otpAdapter.includes('verifyOtp'), 'OTP adapter must verify OTP');
+assert(testAdapter.includes('signInWithPassword'), 'Test bridge must support direct returning-user login');
+assert(testAdapter.includes('signUp'), 'Test bridge must support direct test-account registration');
+assert(testAdapter.includes("_slmt"), 'Test bridge must remain compatible with pre-OTP test accounts');
+assert(authIndex.includes('VITE_AUTH_DRIVER'), 'Auth driver must remain backend-selectable');
+assert(authIndex.includes('PHONE_AUTH_MODE'), 'Auth adapter selection must respect the OTP feature switch');
+assert(authConfig.includes('isActive: false'), 'Current test build must have OTP disabled');
+assert(phoneAuth.includes("phoneAuthMode === 'otp'"), 'Phone UI must adapt to OTP/test mode');
 assert(hook.includes('standardwebhooks'), 'Send SMS hook must verify the Supabase hook signature');
 assert(hook.includes('createSmsProvider'), 'Send SMS hook must resolve an SMS provider through the registry');
 
@@ -72,8 +82,8 @@ try {
   globalThis.fetch = originalFetch;
 }
 
-console.log('✅ Behtan phone-auth abstraction smoke test passed');
-console.log('   UI auth: provider-independent');
-console.log('   Current auth driver: Supabase adapter');
-console.log('   SMS delivery: configurable Generic HTTP provider');
-console.log('   Supabase Send SMS Hook signature verification: present');
+console.log('✅ Behtan phone-auth mode/abstraction smoke test passed');
+console.log('   Current mode: test bridge (OTP disabled)');
+console.log('   Toggle point: src/config/authConfig.ts -> otp.isActive');
+console.log('   OTP infrastructure: retained and ready');
+console.log('   SMS delivery: provider-independent Generic HTTP adapter');
