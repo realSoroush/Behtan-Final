@@ -21,7 +21,8 @@
     "cleanup:legacy": "node scripts/cleanup-legacy.mjs",
     "test:theme": "node scripts/theme.smoke-test.mjs",
     "test:diagnostics": "node --experimental-strip-types scripts/nutrition-diagnostics.smoke-test.mjs",
-    "test:quality": "node --experimental-strip-types scripts/nutrition-quality.smoke-test.mjs"
+    "test:quality": "node --experimental-strip-types scripts/nutrition-quality.smoke-test.mjs",
+    "test:carousel": "node scripts/dashboard-carousel.smoke-test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { LogOut, RefreshCw, AlertCircle } from 'lucide-react';
 import { MacroSummary } from './MacroSummary';
 import { NutritionQualitySummary } from './NutritionQualitySummary';
+import { DailyOverviewCarousel } from './DailyOverviewCarousel';
 import { WorkoutDayToggle } from './WorkoutDayToggle';
 import { MealCard } from './MealCard';
 import { FoodSwapModal } from './FoodSwapModal';
@@ -251,12 +252,29 @@ export function DashboardPage() {
       </header>
 
       <div className="max-w-md mx-auto px-4 py-5 space-y-4">
-        {/* Macro summary */}
-        {targets && consumed && (
-          <MacroSummary targets={targets} consumed={consumed} isWorkoutDay={isWorkoutDay} />
-        )}
-
-        {foodQuality && <NutritionQualitySummary quality={foodQuality} />}
+        {/* Daily overview carousel */}
+        {(targets && consumed) || foodQuality ? (
+          <DailyOverviewCarousel
+            slides={[
+              ...(targets && consumed ? [{
+                id: 'macro-summary',
+                label: 'خلاصه امروز',
+                content: (
+                  <MacroSummary
+                    targets={targets}
+                    consumed={consumed}
+                    isWorkoutDay={isWorkoutDay}
+                  />
+                ),
+              }] : []),
+              ...(foodQuality ? [{
+                id: 'nutrition-quality',
+                label: 'کیفیت برنامه امروز',
+                content: <NutritionQualitySummary quality={foodQuality} />,
+              }] : []),
+            ]}
+          />
+        ) : null}
 
         {/* Workout day toggle */}
         <WorkoutDayToggle isWorkoutDay={isWorkoutDay} onChange={(v) => { setIsWorkoutDay(v); resetSwapped(); }} />
