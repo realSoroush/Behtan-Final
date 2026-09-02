@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
-import { AnimatePresence, motion, type PanInfo } from 'framer-motion';
+import { useCallback, useState, type ReactNode } from 'react';
+import { motion, type PanInfo } from 'framer-motion';
 import { ChevronLeft, ChevronRight, MoveHorizontal } from 'lucide-react';
 
 export interface DailyOverviewSlide {
@@ -42,56 +42,33 @@ export function DailyOverviewCarousel({ slides }: DailyOverviewCarouselProps) {
     }
   }, [paginate]);
 
-  const edgeHints = useMemo(() => {
-    if (slides.length < 2) return null;
-    return (
-      <>
-        <motion.div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-y-8 -left-1 z-0 w-3 rounded-r-2xl border border-primary-100/80 bg-primary-50/90 shadow-sm dark:border-primary-900/50 dark:bg-primary-950/50"
-          animate={{ x: [-1, 1, -1], opacity: [0.55, 0.9, 0.55] }}
-          transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-        />
-        <motion.div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-y-8 -right-1 z-0 w-3 rounded-l-2xl border border-primary-100/80 bg-primary-50/90 shadow-sm dark:border-primary-900/50 dark:bg-primary-950/50"
-          animate={{ x: [1, -1, 1], opacity: [0.55, 0.9, 0.55] }}
-          transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-        />
-      </>
-    );
-  }, [slides.length]);
+
 
   if (!activeSlide) return null;
 
   return (
     <section aria-label="کارت‌های خلاصه روزانه" className="space-y-2.5">
       <div className="relative -mx-1 px-1">
-        {edgeHints}
         <div className="relative z-10 overflow-hidden rounded-[1.6rem] touch-pan-y">
-          <AnimatePresence initial={false} custom={direction} mode="popLayout">
-            <motion.div
-              key={page}
-              custom={direction}
-              variants={{
-                enter: (dir: number) => ({ x: dir > 0 ? 64 : -64, opacity: 0.55, scale: 0.985 }),
-                center: { x: 0, opacity: 1, scale: 1 },
-                exit: (dir: number) => ({ x: dir > 0 ? -64 : 64, opacity: 0.25, scale: 0.985 }),
-              }}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ type: 'spring', stiffness: 360, damping: 34, mass: 0.75 }}
-              drag={slides.length > 1 ? 'x' : false}
-              dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={0.16}
-              onDragEnd={handleDragEnd}
-              whileDrag={{ scale: 0.992, cursor: 'grabbing' }}
-              className={slides.length > 1 ? 'cursor-grab select-none' : undefined}
-            >
-              {activeSlide.content}
-            </motion.div>
-          </AnimatePresence>
+          <motion.div
+            key={page}
+            custom={direction}
+            variants={{
+              enter: (dir: number) => ({ x: dir > 0 ? 64 : -64, opacity: 0.55, scale: 0.985 }),
+              center: { x: 0, opacity: 1, scale: 1 },
+            }}
+            initial="enter"
+            animate="center"
+            transition={{ type: 'spring', stiffness: 360, damping: 34, mass: 0.75 }}
+            drag={slides.length > 1 ? 'x' : false}
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.16}
+            onDragEnd={handleDragEnd}
+            whileDrag={{ scale: 0.992, cursor: 'grabbing' }}
+            className={slides.length > 1 ? 'cursor-grab select-none' : undefined}
+          >
+            {activeSlide.content}
+          </motion.div>
         </div>
       </div>
 
