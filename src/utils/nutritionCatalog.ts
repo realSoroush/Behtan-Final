@@ -2,6 +2,7 @@ import type {
   Allergy,
   FoodItem,
   FoodRole,
+  FoodQualityTag,
   FoodSubstituteGroup,
   Goal,
   MealSlot,
@@ -22,6 +23,9 @@ export interface FoodItemRow {
   protein_per_unit: number | string;
   carbs_per_unit: number | string;
   fat_per_unit: number | string;
+  fiber_g_per_unit: number | string;
+  quality_tags: FoodQualityTag[] | null;
+  fruit_veg_grams_per_unit: number | string;
   allergy_flags: Allergy[] | null;
   excluded_for_vegetarian: VegetarianStatus[] | null;
   swap_allowed_meals: MealSlot[] | null;
@@ -93,6 +97,9 @@ export function buildNutritionCatalog(input: {
       proteinPerUnit: toNumber(row.protein_per_unit, `${row.id}.protein_per_unit`),
       carbsPerUnit: toNumber(row.carbs_per_unit, `${row.id}.carbs_per_unit`),
       fatPerUnit: toNumber(row.fat_per_unit, `${row.id}.fat_per_unit`),
+      fiberPerUnit: toNumber(row.fiber_g_per_unit, `${row.id}.fiber_g_per_unit`),
+      qualityTags: row.quality_tags ?? [],
+      fruitVegGramsPerUnit: toNumber(row.fruit_veg_grams_per_unit, `${row.id}.fruit_veg_grams_per_unit`),
       allergyFlags: row.allergy_flags ?? [],
       excludedForVegetarian: row.excluded_for_vegetarian ?? [],
       swapAllowedMeals: row.swap_allowed_meals ?? [],
@@ -181,8 +188,11 @@ export function assertValidNutritionCatalog(catalog: NutritionCatalog): void {
     }
     foodIds.add(food.id);
 
-    if (food.gramsPerUnit <= 0 || food.kcalPerUnit < 0 || food.proteinPerUnit < 0 || food.carbsPerUnit < 0 || food.fatPerUnit < 0) {
+    if (food.gramsPerUnit <= 0 || food.kcalPerUnit < 0 || food.proteinPerUnit < 0 || food.carbsPerUnit < 0 || food.fatPerUnit < 0 || food.fiberPerUnit < 0 || food.fruitVegGramsPerUnit < 0) {
       throw new Error(`[nutritionCatalog] Invalid macros/units for food: ${food.id}`);
+    }
+    if (food.fruitVegGramsPerUnit > food.gramsPerUnit + 1e-9) {
+      throw new Error(`[nutritionCatalog] Fruit/veg contribution exceeds serving weight: ${food.id}`);
     }
     if (food.swapAllowedMeals.length === 0) {
       throw new Error(`[nutritionCatalog] Food has no swap meal contexts: ${food.id}`);

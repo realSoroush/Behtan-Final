@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { LogOut, RefreshCw, AlertCircle } from 'lucide-react';
 import { MacroSummary } from './MacroSummary';
+import { NutritionQualitySummary } from './NutritionQualitySummary';
 import { WorkoutDayToggle } from './WorkoutDayToggle';
 import { MealCard } from './MealCard';
 import { FoodSwapModal } from './FoodSwapModal';
@@ -16,6 +17,7 @@ import type { DailyMealPlan, FoodSwapOption, MacroTargets, MealComponent } from 
 import { APP_LOGO_PATH, APP_NAME_FA } from '@/constants/brand';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { NUTRITION_DEBUG_CONFIG } from '@/config/nutritionConfig';
+import { evaluateDailyFoodQuality } from '@/utils/nutritionQuality';
 
 // ============================================================================
 // Helper: compute consumed macros from meal checkboxes
@@ -171,6 +173,12 @@ export function DashboardPage() {
   }, [catalog, swapCurrentComponent, profile, activePlan, swapMealIndex, swapComponentIndex]);
 
   const consumed = activePlan ? computeConsumedMacros(activePlan) : null;
+  const foodQuality = useMemo(
+    () => activePlan && targets
+      ? evaluateDailyFoodQuality(activePlan.meals, targets.targetCalories)
+      : null,
+    [activePlan, targets]
+  );
 
   // ---- Loading / error states ----
   if (profileLoading || catalogLoading) {
@@ -247,6 +255,8 @@ export function DashboardPage() {
         {targets && consumed && (
           <MacroSummary targets={targets} consumed={consumed} isWorkoutDay={isWorkoutDay} />
         )}
+
+        {foodQuality && <NutritionQualitySummary quality={foodQuality} />}
 
         {/* Workout day toggle */}
         <WorkoutDayToggle isWorkoutDay={isWorkoutDay} onChange={(v) => { setIsWorkoutDay(v); resetSwapped(); }} />

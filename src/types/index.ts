@@ -92,6 +92,18 @@ export interface UserProfile {
 /** What role a food item plays inside a meal template. */
 export type FoodRole = 'protein' | 'starch' | 'vegetable' | 'fat' | 'dairy' | 'fruit';
 
+export type FoodQualityTag =
+  | 'whole_grain'
+  | 'refined_grain'
+  | 'legume'
+  | 'whole_fruit'
+  | 'non_starchy_vegetable'
+  | 'starchy_vegetable'
+  | 'nuts_seeds'
+  | 'unsaturated_fat'
+  | 'protein_supplement'
+  | 'whole_food';
+
 /**
  * A single atomic food item with macros per declared unit.
  * This is the row shape for a future `food_items` Supabase table.
@@ -112,6 +124,12 @@ export interface FoodItem {
   proteinPerUnit: number;
   carbsPerUnit: number;
   fatPerUnit: number;
+  /** Dietary fiber is tracked separately from total carbohydrate. */
+  fiberPerUnit: number;
+  /** Transparent food-quality metadata used only by the secondary quality layer. */
+  qualityTags: FoodQualityTag[];
+  /** Contribution toward the daily fruit+vegetable target for one food unit. */
+  fruitVegGramsPerUnit: number;
   allergyFlags: Allergy[];
   excludedForVegetarian: VegetarianStatus[];
   /** Meal contexts where this food may be OFFERED as a direct swap.
@@ -207,6 +225,7 @@ export interface MealComponent {
   protein: number;
   carbs: number;
   fat: number;
+  fiber: number;
 }
 
 export interface Meal {
@@ -219,6 +238,7 @@ export interface Meal {
   totalProtein: number;
   totalCarbs: number;
   totalFat: number;
+  totalFiber: number;
   consumed: boolean;
 }
 
@@ -251,6 +271,20 @@ export interface DailyMealPlan {
 // ============================================================================
 // COMPUTED / DERIVED MODELS
 // ============================================================================
+
+
+export interface FoodQualitySummary {
+  fiberTargetGrams: number;
+  fiberGrams: number;
+  fiberAdequacyPct: number;
+  fiberStatus: 'good' | 'needs_improvement' | 'poor';
+  fruitVegTargetGrams: number;
+  fruitVegGrams: number;
+  fruitVegAdequacyPct: number;
+  wholeGrainGrams: number;
+  refinedGrainGrams: number;
+  legumeGrams: number;
+}
 
 export interface MacroTargets {
   targetCalories: number;

@@ -97,6 +97,11 @@ create table if not exists public.food_items (
   protein_per_unit numeric(10,3) not null check (protein_per_unit >= 0),
   carbs_per_unit numeric(10,3) not null check (carbs_per_unit >= 0),
   fat_per_unit numeric(10,3) not null check (fat_per_unit >= 0),
+  fiber_g_per_unit numeric(10,3) not null default 0 check (fiber_g_per_unit >= 0),
+  quality_tags text[] not null default '{}',
+  fruit_veg_grams_per_unit numeric(10,3) not null default 0 check (fruit_veg_grams_per_unit >= 0),
+  fiber_source_name text,
+  fiber_source_url text,
   allergy_flags text[] not null default '{}',
   excluded_for_vegetarian text[] not null default '{}',
   swap_allowed_meals text[] not null default array['breakfast','morning_snack','lunch','afternoon_snack','dinner','night_snack']::text[],
@@ -122,6 +127,10 @@ create table if not exists public.food_items (
   constraint food_items_swap_allowed_meals_check check (
     cardinality(swap_allowed_meals) > 0
     and swap_allowed_meals <@ array['breakfast','morning_snack','lunch','afternoon_snack','dinner','night_snack']::text[]
+  ),
+  constraint food_items_fruit_veg_contribution_check check (fruit_veg_grams_per_unit <= grams_per_unit),
+  constraint food_items_quality_tags_check check (
+    quality_tags <@ array['whole_grain','refined_grain','legume','whole_fruit','non_starchy_vegetable','starchy_vegetable','nuts_seeds','unsaturated_fat','protein_supplement','whole_food']::text[]
   ),
   constraint food_items_portion_order_check check (
     portion_min_units <= portion_typical_units

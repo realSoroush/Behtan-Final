@@ -17,6 +17,7 @@ const emptyArrayCatalog = buildNutritionCatalog({
   foodRows: [{
     id: 'test_food', name: 'غذای تست', role: 'starch', emoji: null, unit_label: 'واحد',
     grams_per_unit: 50, kcal_per_unit: 100, protein_per_unit: 2, carbs_per_unit: 20, fat_per_unit: 1,
+    fiber_g_per_unit: 2, quality_tags: ['whole_grain'], fruit_veg_grams_per_unit: 0,
     allergy_flags: [], excluded_for_vegetarian: [],
     swap_allowed_meals: ['breakfast'], swap_group: 'bread', swap_priority: 10,
     portion_min_units: 1, portion_typical_units: 1, portion_soft_max_units: 2, portion_hard_max_units: 3, portion_step: 1,
@@ -42,6 +43,11 @@ assert(
 assert(TEST_NUTRITION_CATALOG.foods.length === 31, 'Expected 31 seeded foods');
 assert(TEST_NUTRITION_CATALOG.mealTemplates.length === 43, 'Expected 43 seeded meal templates');
 assert(Object.keys(TEST_NUTRITION_CATALOG.portionRules).length === 31, 'Every food must have a portion rule');
+for (const food of TEST_NUTRITION_CATALOG.foods) {
+  assert(Number.isFinite(food.fiberPerUnit) && food.fiberPerUnit >= 0, `Fiber missing for ${food.id}`);
+  assert(Array.isArray(food.qualityTags), `Quality tags missing for ${food.id}`);
+  assert(food.fruitVegGramsPerUnit >= 0 && food.fruitVegGramsPerUnit <= food.gramsPerUnit, `Invalid fruit/veg contribution for ${food.id}`);
+}
 
 const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(here, '..');
@@ -63,6 +69,11 @@ const diagnosticsMigrationSource = readFileSync(
   'utf8'
 );
 
+const qualityMigrationSource = readFileSync(
+  resolve(projectRoot, 'supabase/migrations/20260902_005_fiber_food_quality_layer.sql'),
+  'utf8'
+);
+
 assert(!/const\s+FOOD_ITEMS\s*:/.test(engineSource), 'Production engine still contains hard-coded FOOD_ITEMS');
 assert(!/const\s+MEAL_TEMPLATES\s*:/.test(engineSource), 'Production engine still contains hard-coded MEAL_TEMPLATES');
 assert(!/const\s+PORTION_RULES\s*:/.test(engineSource), 'Production engine still contains hard-coded PORTION_RULES');
@@ -78,6 +89,9 @@ assert(mealAwareMigrationSource.includes('swap_group'), 'Meal-aware migration mi
 assert(mealAwareMigrationSource.includes('swap_priority'), 'Meal-aware migration missing swap_priority');
 assert(diagnosticsMigrationSource.includes('body_fat_source'), 'Diagnostics migration missing body_fat_source');
 assert(diagnosticsMigrationSource.includes('ai_visual'), 'Diagnostics migration missing AI-visual provenance');
+assert(qualityMigrationSource.includes('fiber_g_per_unit'), 'Quality migration missing fiber_g_per_unit');
+assert(qualityMigrationSource.includes('quality_tags'), 'Quality migration missing quality_tags');
+assert(qualityMigrationSource.includes('fruit_veg_grams_per_unit'), 'Quality migration missing fruit/veg contribution');
 
 // The old anonymous user_profiles lookup is incompatible with the table's RLS.
 assert(

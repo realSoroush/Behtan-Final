@@ -20,7 +20,10 @@
         "dinner"
       ],
       "swapGroup": "egg",
-      "swapPriority": 20
+      "swapPriority": 20,
+      "fiberPerUnit": 0,
+      "qualityTags": [],
+      "fruitVegGramsPerUnit": 0
     },
     {
       "id": "egg_whole",
@@ -42,7 +45,12 @@
         "dinner"
       ],
       "swapGroup": "egg",
-      "swapPriority": 10
+      "swapPriority": 10,
+      "fiberPerUnit": 0,
+      "qualityTags": [
+        "whole_food"
+      ],
+      "fruitVegGramsPerUnit": 0
     },
     {
       "id": "chicken_breast",
@@ -67,7 +75,12 @@
         "dinner"
       ],
       "swapGroup": "main_protein",
-      "swapPriority": 10
+      "swapPriority": 10,
+      "fiberPerUnit": 0,
+      "qualityTags": [
+        "whole_food"
+      ],
+      "fruitVegGramsPerUnit": 0
     },
     {
       "id": "grilled_fish",
@@ -93,7 +106,12 @@
         "dinner"
       ],
       "swapGroup": "main_protein",
-      "swapPriority": 20
+      "swapPriority": 20,
+      "fiberPerUnit": 0,
+      "qualityTags": [
+        "whole_food"
+      ],
+      "fruitVegGramsPerUnit": 0
     },
     {
       "id": "lean_beef",
@@ -118,7 +136,12 @@
         "dinner"
       ],
       "swapGroup": "main_protein",
-      "swapPriority": 30
+      "swapPriority": 30,
+      "fiberPerUnit": 0,
+      "qualityTags": [
+        "whole_food"
+      ],
+      "fruitVegGramsPerUnit": 0
     },
     {
       "id": "ground_beef_lean",
@@ -143,7 +166,12 @@
         "dinner"
       ],
       "swapGroup": "main_protein",
-      "swapPriority": 35
+      "swapPriority": 35,
+      "fiberPerUnit": 0,
+      "qualityTags": [
+        "whole_food"
+      ],
+      "fruitVegGramsPerUnit": 0
     },
     {
       "id": "whey_protein",
@@ -169,7 +197,12 @@
         "night_snack"
       ],
       "swapGroup": "protein_supplement",
-      "swapPriority": 10
+      "swapPriority": 10,
+      "fiberPerUnit": 0,
+      "qualityTags": [
+        "protein_supplement"
+      ],
+      "fruitVegGramsPerUnit": 0
     },
     {
       "id": "pea_protein",
@@ -190,7 +223,12 @@
         "night_snack"
       ],
       "swapGroup": "protein_supplement",
-      "swapPriority": 20
+      "swapPriority": 20,
+      "fiberPerUnit": 0.5,
+      "qualityTags": [
+        "protein_supplement"
+      ],
+      "fruitVegGramsPerUnit": 0
     },
     {
       "id": "soy_chunks",
@@ -212,7 +250,12 @@
         "dinner"
       ],
       "swapGroup": "plant_protein",
-      "swapPriority": 20
+      "swapPriority": 20,
+      "fiberPerUnit": 13,
+      "qualityTags": [
+        "legume"
+      ],
+      "fruitVegGramsPerUnit": 0
     },
     {
       "id": "lentils_cooked",
@@ -233,7 +276,13 @@
         "dinner"
       ],
       "swapGroup": "plant_protein",
-      "swapPriority": 10
+      "swapPriority": 10,
+      "fiberPerUnit": 7.9,
+      "qualityTags": [
+        "legume",
+        "whole_food"
+      ],
+      "fruitVegGramsPerUnit": 0
     },
     {
       "id": "brown_rice_cooked",
@@ -253,7 +302,13 @@
         "dinner"
       ],
       "swapGroup": "grain_starch",
-      "swapPriority": 20
+      "swapPriority": 20,
+      "fiberPerUnit": 1.8,
+      "qualityTags": [
+        "whole_grain",
+        "whole_food"
+      ],
+      "fruitVegGramsPerUnit": 0
     },
     {
       "id": "white_rice_cooked",
@@ -273,7 +328,12 @@
         "dinner"
       ],
       "swapGroup": "grain_starch",
-      "swapPriority": 10
+      "swapPriority": 10,
+      "fiberPerUnit": 0.4,
+      "qualityTags": [
+        "refined_grain"
+      ],
+      "fruitVegGramsPerUnit": 0
     },
     {
       "id": "quinoa_cooked",
@@ -293,7 +353,13 @@
         "dinner"
       ],
       "swapGroup": "grain_starch",
-      "swapPriority": 30
+      "swapPriority": 30,
+      "fiberPerUnit": 2.8,
+      "qualityTags": [
+        "whole_grain",
+        "whole_food"
+      ],
+      "fruitVegGramsPerUnit": 0
     },
     {
       "id": "oats_dry",
@@ -316,7 +382,13 @@
         "afternoon_snack"
       ],
       "swapGroup": "breakfast_cereal",
-      "swapPriority": 10
+      "swapPriority": 10,
+      "fiberPerUnit": 5.3,
+      "qualityTags": [
+        "whole_grain",
+        "whole_food"
+      ],
+      "fruitVegGramsPerUnit": 0
     },
     {
       "id": "whole_grain_toast",
@@ -341,7 +413,12 @@
         "night_snack"
       ],
       "swapGroup": "bread",
-      "swapPriority": 20
+      "swapPriority": 20,
+      "fiberPerUnit": 2.0,
+      "qualityTags": [
+        "whole_grain"
+      ],
+      "fruitVegGramsPerUnit": 0
     },
     {
       "id": "sangak_bread",
@@ -364,7 +441,12 @@
         "dinner"
       ],
       "swapGroup": "bread",
-      "swapPriority": 10
+      "swapPriority": 10,
+      "fiberPerUnit": 2.05,
+      "qualityTags": [
+        "whole_grain"
+      ],
+      "fruitVegGramsPerUnit": 0
     },
     {
       "id": "boiled_potato",
@@ -385,7 +467,13 @@
         "dinner"
       ],
       "swapGroup": "potato_starch",
-      "swapPriority": 20
+      "swapPriority": 20,
+      "fiberPerUnit": 1.8,
+      "qualityTags": [
+        "starchy_vegetable",
+        "whole_food"
+      ],
+      "fruitVegGramsPerUnit": 0
     },
     {
       "id": "mixed_salad",
@@ -405,7 +493,13 @@
         "dinner"
       ],
       "swapGroup": "vegetable",
-      "swapPriority": 20
+      "swapPriority": 20,
+      "fiberPerUnit": 3.0,
+      "qualityTags": [
+        "non_starchy_vegetable",
+        "whole_food"
+      ],
+      "fruitVegGramsPerUnit": 150
     },
     {
       "id": "fresh_cucumber_tomato",
@@ -426,7 +520,13 @@
         "dinner"
       ],
       "swapGroup": "vegetable",
-      "swapPriority": 10
+      "swapPriority": 10,
+      "fiberPerUnit": 1.7,
+      "qualityTags": [
+        "non_starchy_vegetable",
+        "whole_food"
+      ],
+      "fruitVegGramsPerUnit": 150
     },
     {
       "id": "steamed_vegetables",
@@ -446,7 +546,13 @@
         "dinner"
       ],
       "swapGroup": "vegetable",
-      "swapPriority": 20
+      "swapPriority": 20,
+      "fiberPerUnit": 3.0,
+      "qualityTags": [
+        "non_starchy_vegetable",
+        "whole_food"
+      ],
+      "fruitVegGramsPerUnit": 100
     },
     {
       "id": "spinach_borani",
@@ -468,7 +574,12 @@
         "dinner"
       ],
       "swapGroup": "vegetable",
-      "swapPriority": 30
+      "swapPriority": 30,
+      "fiberPerUnit": 2.0,
+      "qualityTags": [
+        "non_starchy_vegetable"
+      ],
+      "fruitVegGramsPerUnit": 70
     },
     {
       "id": "olive_oil",
@@ -488,7 +599,12 @@
         "dinner"
       ],
       "swapGroup": "oil",
-      "swapPriority": 10
+      "swapPriority": 10,
+      "fiberPerUnit": 0,
+      "qualityTags": [
+        "unsaturated_fat"
+      ],
+      "fruitVegGramsPerUnit": 0
     },
     {
       "id": "walnut",
@@ -512,7 +628,14 @@
         "night_snack"
       ],
       "swapGroup": "nuts",
-      "swapPriority": 10
+      "swapPriority": 10,
+      "fiberPerUnit": 0.4,
+      "qualityTags": [
+        "nuts_seeds",
+        "unsaturated_fat",
+        "whole_food"
+      ],
+      "fruitVegGramsPerUnit": 0
     },
     {
       "id": "mixed_nuts",
@@ -536,7 +659,14 @@
         "night_snack"
       ],
       "swapGroup": "nuts",
-      "swapPriority": 20
+      "swapPriority": 20,
+      "fiberPerUnit": 2.2,
+      "qualityTags": [
+        "nuts_seeds",
+        "unsaturated_fat",
+        "whole_food"
+      ],
+      "fruitVegGramsPerUnit": 0
     },
     {
       "id": "avocado_half",
@@ -558,7 +688,14 @@
         "dinner"
       ],
       "swapGroup": "plant_fat",
-      "swapPriority": 20
+      "swapPriority": 20,
+      "fiberPerUnit": 5.0,
+      "qualityTags": [
+        "whole_fruit",
+        "unsaturated_fat",
+        "whole_food"
+      ],
+      "fruitVegGramsPerUnit": 75
     },
     {
       "id": "low_fat_cheese",
@@ -583,7 +720,10 @@
         "dinner"
       ],
       "swapGroup": "dairy",
-      "swapPriority": 10
+      "swapPriority": 10,
+      "fiberPerUnit": 0,
+      "qualityTags": [],
+      "fruitVegGramsPerUnit": 0
     },
     {
       "id": "low_fat_milk",
@@ -609,7 +749,10 @@
         "night_snack"
       ],
       "swapGroup": "dairy",
-      "swapPriority": 20
+      "swapPriority": 20,
+      "fiberPerUnit": 0,
+      "qualityTags": [],
+      "fruitVegGramsPerUnit": 0
     },
     {
       "id": "low_fat_yogurt",
@@ -635,7 +778,10 @@
         "night_snack"
       ],
       "swapGroup": "dairy",
-      "swapPriority": 15
+      "swapPriority": 15,
+      "fiberPerUnit": 0,
+      "qualityTags": [],
+      "fruitVegGramsPerUnit": 0
     },
     {
       "id": "apple",
@@ -657,7 +803,13 @@
         "night_snack"
       ],
       "swapGroup": "fruit",
-      "swapPriority": 10
+      "swapPriority": 10,
+      "fiberPerUnit": 3.6,
+      "qualityTags": [
+        "whole_fruit",
+        "whole_food"
+      ],
+      "fruitVegGramsPerUnit": 150
     },
     {
       "id": "banana",
@@ -679,7 +831,13 @@
         "night_snack"
       ],
       "swapGroup": "fruit",
-      "swapPriority": 20
+      "swapPriority": 20,
+      "fiberPerUnit": 3.1,
+      "qualityTags": [
+        "whole_fruit",
+        "whole_food"
+      ],
+      "fruitVegGramsPerUnit": 120
     },
     {
       "id": "medjool_date",
@@ -701,7 +859,13 @@
         "night_snack"
       ],
       "swapGroup": "fruit",
-      "swapPriority": 30
+      "swapPriority": 30,
+      "fiberPerUnit": 1.6,
+      "qualityTags": [
+        "whole_fruit",
+        "whole_food"
+      ],
+      "fruitVegGramsPerUnit": 24
     }
   ],
   "FOOD_SUBSTITUTES": [

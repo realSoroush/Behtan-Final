@@ -32,6 +32,10 @@ import type {
   NutritionCatalog,
   PortionRule,
 } from '@/types';
+import {
+  evaluateFoodQualityFromComponents,
+  foodQualityPenalty,
+} from './nutritionQuality.ts';
 // ============================================================================
 // RUNTIME NUTRITION CATALOG
 // ============================================================================
@@ -193,6 +197,7 @@ function componentFromUnits(food: FoodItem, units: number): MealComponent {
     protein: round1(units * food.proteinPerUnit),
     carbs: round1(units * food.carbsPerUnit),
     fat: round1(units * food.fatPerUnit),
+    fiber: round1(units * food.fiberPerUnit),
   };
 }
 
@@ -505,6 +510,7 @@ function buildMeal(option: ResolvedOption): Meal {
     totalProtein: resolved.totals.protein,
     totalCarbs: resolved.totals.carbs,
     totalFat: resolved.totals.fat,
+    totalFiber: round1(resolved.components.reduce((sum, component) => sum + component.fiber, 0)),
     consumed: false,
   };
 }
@@ -855,7 +861,115 @@ function refineDailyTemplates(
   return best;
 }
 
+
+function resolvedComponents(options: ResolvedOption[]): MealComponent[] {
+  return options.flatMap((option) => option.resolved.components);
+}
+
+function qualityPenaltyForResolvedDay(options: ResolvedOption[], targets: MacroTargets): number {
+  return foodQualityPenalty(
+    evaluateFoodQualityFromComponents(resolvedComponents(options), targets.targetCalories)
+  );
+}
+
+function dailyDeviationSummary(options: ResolvedOption[], targets: MacroTargets) {
+  const actual = totalResolvedOptions(options);
+  return {
+    actual,
+    kcalSigned: (actual.kcal - targets.targetCalories) / Math.max(1, targets.targetCalories),
+    protein: normalizedDeviation(actual.protein, targets.proteinGrams),
+    carbs: normalizedDeviation(actual.carbs, targets.carbGrams),
+    fat: normalizedDeviation(actual.fat, targets.fatGrams),
+  };
+}
+
+function isDailyPlanFeasible(options: ResolvedOption[], targets: MacroTargets): boolean {
+  const deviation = dailyDeviationSummary(options, targets);
+  const macrosVeryClose =
+    deviation.protein <= 0.03 &&
+    deviation.carbs <= 0.03 &&
+    deviation.fat <= 0.03;
+  const minimumCalorieDeviation = macrosVeryClose ? -0.06 : -0.05;
+
+  return (
+    deviation.kcalSigned <= 0.03 &&
+    deviation.kcalSigned >= minimumCalorieDeviation &&
+    deviation.protein <= 0.10 &&
+    deviation.carbs <= 0.10 &&
+    deviation.fat <= 0.10
+  );
+}
+
+/**
+ * Secondary food-quality repair pass.
+ *
+ * Nutrition v2 remains authoritative. We only accept a higher-fiber / higher-
+ * quality template choice when the existing calorie/macro feasibility gates
+ * still pass and the nutrition score does not materially deteriorate.
+ */
+function repairDailyQuality(
+  initial: ResolvedOption[],
+  optionsBySlot: ResolvedOption[][],
+  targets: MacroTargets
+): ResolvedOption[] {
+  const dailyTarget: MacroVector = {
+    kcal: targets.targetCalories,
+    protein: targets.proteinGrams,
+    carbs: targets.carbGrams,
+    fat: targets.fatGrams,
+  };
+
+  let best = initial;
+  let bestQualityPenalty = qualityPenaltyForResolvedDay(best, targets);
+  let bestNutritionScore = scoreDailyTotals(totalResolvedOptions(best), dailyTarget);
+
+  for (let pass = 0; pass < 2; pass++) {
+    let changed = false;
+
+    for (let slotIndex = 0; slotIndex < optionsBySlot.length; slotIndex++) {
+      let slotBest = best;
+      let slotBestQuality = bestQualityPenalty;
+      let slotBestNutrition = bestNutritionScore;
+
+      for (const replacement of optionsBySlot[slotIndex]) {
+        if (replacement.template.id === best[slotIndex].template.id) continue;
+
+        const candidateBase = best.map((option, index) =>
+          index === slotIndex ? replacement : option
+        );
+        const candidate = refineDailyPortions(candidateBase, targets);
+        if (!isDailyPlanFeasible(candidate, targets)) continue;
+
+        const candidateQuality = qualityPenaltyForResolvedDay(candidate, targets);
+        if (candidateQuality >= slotBestQuality - 0.015) continue;
+
+        const candidateNutrition = scoreDailyTotals(totalResolvedOptions(candidate), dailyTarget);
+        // Quality is secondary: do not trade a meaningfully better macro fit
+        // for a cosmetic quality gain. Small rounding-level changes are fine.
+        const allowedNutritionScore = Math.max(slotBestNutrition + 0.08, slotBestNutrition * 1.20);
+        if (candidateNutrition > allowedNutritionScore) continue;
+
+        slotBest = candidate;
+        slotBestQuality = candidateQuality;
+        slotBestNutrition = candidateNutrition;
+      }
+
+      if (slotBest !== best) {
+        best = slotBest;
+        bestQualityPenalty = slotBestQuality;
+        bestNutritionScore = slotBestNutrition;
+        changed = true;
+      }
+    }
+
+    if (!changed) break;
+  }
+
+  return best;
+}
+
 function assertDailyPlanFeasible(options: ResolvedOption[], targets: MacroTargets): void {
+  if (isDailyPlanFeasible(options, targets)) return;
   const actual = totalResolvedOptions(options);
   const target: MacroVector = {
     kcal: targets.targetCalories,
@@ -863,29 +977,7 @@ function assertDailyPlanFeasible(options: ResolvedOption[], targets: MacroTarget
     carbs: targets.carbGrams,
     fat: targets.fatGrams,
   };
-
-  const kcalDeviation = (actual.kcal - target.kcal) / Math.max(1, target.kcal);
-  const proteinDeviation = normalizedDeviation(actual.protein, target.protein);
-  const carbDeviation = normalizedDeviation(actual.carbs, target.carbs);
-  const fatDeviation = normalizedDeviation(actual.fat, target.fat);
-
-  // Accuracy gates from Nutrition v2. Realism constraints are never relaxed
-  // to make an infeasible day look successful; the caller gets an explicit
-  // error instead of a misleading plan.
-  const macrosVeryClose =
-    proteinDeviation <= 0.03 &&
-    carbDeviation <= 0.03 &&
-    fatDeviation <= 0.03;
-  const minimumCalorieDeviation = macrosVeryClose ? -0.06 : -0.05;
-
-  const feasible =
-    kcalDeviation <= 0.03 &&
-    kcalDeviation >= minimumCalorieDeviation &&
-    proteinDeviation <= 0.10 &&
-    carbDeviation <= 0.10 &&
-    fatDeviation <= 0.10;
-
-  if (!feasible) throw new MealPlanFeasibilityError(target, actual);
+  throw new MealPlanFeasibilityError(target, actual);
 }
 
 // ============================================================================
@@ -925,7 +1017,8 @@ export function generateDailyMealPlan(
   });
 
   const chosen = chooseDailyCombination(optionsBySlot, targets, seed);
-  const refined = refineDailyTemplates(chosen, optionsBySlot, targets);
+  const macroRefined = refineDailyTemplates(chosen, optionsBySlot, targets);
+  const refined = repairDailyQuality(macroRefined, optionsBySlot, targets);
   assertDailyPlanFeasible(refined, targets);
   const meals = refined.map(buildMeal);
 
@@ -1029,6 +1122,7 @@ function mealWithReplacement(meal: Meal, componentIndex: number, replacement: Me
     totalProtein: round1(totals.protein),
     totalCarbs: round1(totals.carbs),
     totalFat: round1(totals.fat),
+    totalFiber: round1(components.reduce((sum, component) => sum + component.fiber, 0)),
   };
 }
 
