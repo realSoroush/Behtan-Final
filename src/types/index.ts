@@ -5,6 +5,10 @@
 export type Gender = 'male' | 'female';
 export type Goal = 'weight_loss' | 'weight_gain' | 'maintenance';
 export type ActivityLevel = 'sedentary' | 'lightly_active' | 'moderate' | 'active';
+export type DailyMovementPattern = 'mostly_seated' | 'mixed' | 'mostly_on_feet' | 'physical_job';
+export type DailyStepsRange = 'under_4000' | '4000_7000' | '7000_10000' | 'over_10000' | 'unknown';
+export type WorkoutDurationRange = 'under_30' | '30_60' | 'over_60';
+export type WorkoutIntensity = 'light' | 'moderate' | 'vigorous';
 export type WorkoutLocation = 'home' | 'gym' | 'none';
 export type Motivation = 'health' | 'appearance' | 'confidence' | 'medical' | 'performance' | 'event';
 export type WeightLossSpeed = 'mild' | 'standard' | 'fast';
@@ -36,6 +40,17 @@ export interface ScheduleJson {
   mealTimes: Record<MealSlot, string>;
 }
 
+
+export interface ActivityProfileJson {
+  version: 1;
+  dailyMovement: DailyMovementPattern;
+  dailySteps: DailyStepsRange;
+  workoutDuration: WorkoutDurationRange | null;
+  workoutIntensity: WorkoutIntensity | null;
+  derivedLevel: ActivityLevel;
+  derivedScore: number;
+}
+
 export interface MedicalConditionsJson {
   conditions: MedicalCondition[];
   injuries: string;
@@ -64,6 +79,7 @@ export interface UserProfile {
   weight: number | null;
   goal: Goal | null;
   activity_level: ActivityLevel | null;
+  activity_profile_json: ActivityProfileJson | null;
   workout_location: WorkoutLocation | null;
   workout_days: number | null;
   motivation: Motivation | null;
@@ -322,6 +338,10 @@ export interface OnboardingData {
   weight: number | null;
   goal: Goal | null;
   activityLevel: ActivityLevel | null;
+  dailyMovement: DailyMovementPattern | null;
+  dailySteps: DailyStepsRange | null;
+  workoutDuration: WorkoutDurationRange | null;
+  workoutIntensity: WorkoutIntensity | null;
   workoutLocation: WorkoutLocation | null;
   workoutDays: number;
   motivation: Motivation | null;
@@ -348,6 +368,10 @@ export const createEmptyOnboardingData = (): OnboardingData => ({
   weight: null,
   goal: null,
   activityLevel: null,
+  dailyMovement: null,
+  dailySteps: null,
+  workoutDuration: null,
+  workoutIntensity: null,
   workoutLocation: null,
   workoutDays: 3,
   motivation: null,

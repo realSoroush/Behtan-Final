@@ -18,6 +18,7 @@ import { Step10Analysis } from './Step10Analysis';
 import { Step11Paywall } from './Step11Paywall';
 import type { UserProfile } from '@/types';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { estimateActivityLevel } from '@/utils/activityLevel';
 
 interface OnboardingWizardProps {
   onComplete: () => void;
@@ -115,6 +116,25 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       weight: data.weight,
       goal: data.goal,
       activity_level: data.activityLevel,
+      activity_profile_json:
+        data.activityLevel && data.dailyMovement && data.dailySteps
+          ? {
+              version: 1,
+              dailyMovement: data.dailyMovement,
+              dailySteps: data.dailySteps,
+              workoutDuration: data.workoutLocation === 'none' ? null : data.workoutDuration,
+              workoutIntensity: data.workoutLocation === 'none' ? null : data.workoutIntensity,
+              derivedLevel: data.activityLevel,
+              derivedScore: estimateActivityLevel({
+                dailyMovement: data.dailyMovement,
+                dailySteps: data.dailySteps,
+                workoutDays: data.workoutDays,
+                workoutDuration: data.workoutLocation === 'none' ? null : data.workoutDuration,
+                workoutIntensity: data.workoutLocation === 'none' ? null : data.workoutIntensity,
+                doesWorkout: data.workoutLocation !== 'none',
+              }).score,
+            }
+          : null,
       workout_location: data.workoutLocation,
       workout_days: data.workoutDays,
       motivation: data.motivation,

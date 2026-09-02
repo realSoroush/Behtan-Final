@@ -74,6 +74,11 @@ const qualityMigrationSource = readFileSync(
   'utf8'
 );
 
+const activityProfileMigrationSource = readFileSync(
+  resolve(projectRoot, 'supabase/migrations/20260902_006_activity_profile_ux.sql'),
+  'utf8'
+);
+
 assert(!/const\s+FOOD_ITEMS\s*:/.test(engineSource), 'Production engine still contains hard-coded FOOD_ITEMS');
 assert(!/const\s+MEAL_TEMPLATES\s*:/.test(engineSource), 'Production engine still contains hard-coded MEAL_TEMPLATES');
 assert(!/const\s+PORTION_RULES\s*:/.test(engineSource), 'Production engine still contains hard-coded PORTION_RULES');
@@ -92,6 +97,7 @@ assert(diagnosticsMigrationSource.includes('ai_visual'), 'Diagnostics migration 
 assert(qualityMigrationSource.includes('fiber_g_per_unit'), 'Quality migration missing fiber_g_per_unit');
 assert(qualityMigrationSource.includes('quality_tags'), 'Quality migration missing quality_tags');
 assert(qualityMigrationSource.includes('fruit_veg_grams_per_unit'), 'Quality migration missing fruit/veg contribution');
+assert(activityProfileMigrationSource.includes('activity_profile_json'), 'Activity UX migration missing activity_profile_json');
 
 // The old anonymous user_profiles lookup is incompatible with the table's RLS.
 assert(

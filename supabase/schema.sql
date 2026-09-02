@@ -22,6 +22,7 @@ create table if not exists public.user_profiles (
   weight numeric,
   goal text check (goal in ('weight_loss', 'weight_gain', 'maintenance')),
   activity_level text check (activity_level in ('sedentary', 'lightly_active', 'moderate', 'active')),
+  activity_profile_json jsonb,
   workout_location text check (workout_location in ('home', 'gym', 'none')),
   workout_days int2,
   motivation text,
