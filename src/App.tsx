@@ -1,36 +1,27 @@
-import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { PhoneAuth } from '@/components/PhoneAuth';
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 import { DashboardPage } from '@/components/dashboard/DashboardPage';
 
-type AppView = 'loading' | 'auth' | 'onboarding' | 'dashboard';
-
+/**
+ * App routing is intentionally derived from authoritative auth/profile state.
+ *
+ * Do not keep a second, imperative `view` state here. In the past the child
+ * auth/onboarding screens could force a route while App still held a stale
+ * profile snapshot. A later Supabase auth event (token refresh, tab visibility,
+ * session recovery, ...) would then re-evaluate that stale snapshot and briefly
+ * send a completed user back into onboarding.
+ */
 export default function App() {
   const { user, loading: authLoading } = useAuth();
-  const { profile, loading: profileLoading } = useUserProfile(user?.id);
-  const [view, setView] = useState<AppView>('loading');
+  const {
+    profile,
+    loading: profileLoading,
+    refetch: refetchProfile,
+  } = useUserProfile(user?.id);
 
-  useEffect(() => {
-    if (authLoading || profileLoading) {
-      setView('loading');
-      return;
-    }
-    if (!user) {
-      setView('auth');
-      return;
-    }
-    // Only the final onboarding commit marks a profile complete. A user who
-    // finished Step 3 (goal) but left later must still resume onboarding.
-    if (!profile || profile.onboarding_completed !== true) {
-      setView('onboarding');
-      return;
-    }
-    setView('dashboard');
-  }, [authLoading, profileLoading, user, profile]);
-
-  if (view === 'loading') {
+  if (authLoading || (user && profileLoading)) {
     return (
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 flex items-center justify-center">
         <div className="text-center space-y-3">
@@ -41,14 +32,16 @@ export default function App() {
     );
   }
 
-  if (view === 'auth') {
-    return <PhoneAuth onAuthenticated={() => setView('onboarding')} />;
+  if (!user) {
+    return <PhoneAuth />;
   }
 
-  if (view === 'onboarding') {
+  if (!profile || profile.onboarding_completed !== true) {
     return (
       <OnboardingWizard
-        onComplete={() => setView('dashboard')}
+        onComplete={async () => {
+          await refetchProfile();
+        }}
       />
     );
   }

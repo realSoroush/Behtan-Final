@@ -5,13 +5,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { APP_LOGO_PATH, APP_NAME_FA } from '@/constants/brand';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
-interface PhoneAuthProps {
-  onAuthenticated: () => void;
-}
-
 type AuthStep = 'phone' | 'otp';
 
-export function PhoneAuth({ onAuthenticated }: PhoneAuthProps) {
+export function PhoneAuth() {
   const { beginPhoneAuth, verifyPhoneOtp, phoneAuthMode, loading, error, clearError } = useAuth();
   const [step, setStep] = useState<AuthStep>('phone');
   const [phone, setPhone] = useState('');
@@ -44,7 +40,8 @@ export function PhoneAuth({ onAuthenticated }: PhoneAuthProps) {
       setNormalizedPhone(result.normalizedPhone);
 
       if (result.status === 'authenticated') {
-        onAuthenticated();
+        // Root App observes the shared Supabase session and decides whether
+        // this user belongs in onboarding or Dashboard after profile hydration.
         return;
       }
 
@@ -60,7 +57,7 @@ export function PhoneAuth({ onAuthenticated }: PhoneAuthProps) {
     clearError();
     try {
       await verifyPhoneOtp(normalizedPhone || phone, otp);
-      onAuthenticated();
+      // Root App observes the resulting session; this child does not force a route.
     } catch {
       // useAuth owns the user-facing error message.
     }

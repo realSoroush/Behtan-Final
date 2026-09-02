@@ -21,7 +21,7 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { estimateActivityLevel } from '@/utils/activityLevel';
 
 interface OnboardingWizardProps {
-  onComplete: () => void;
+  onComplete: () => void | Promise<void>;
 }
 
 const SLIDE_VARIANTS = {
@@ -161,8 +161,10 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
     try {
       await upsertProfile(profilePayload);
+      // Keep completion locked until the root App has refreshed its own
+      // authoritative profile snapshot.
+      await onComplete();
       setSubmitting(false);
-      onComplete();
     } catch (error) {
       console.error('Failed to complete onboarding:', error);
       setSubmitting(false);
