@@ -24,6 +24,7 @@ const component = (food, units) => ({
   protein: Math.round(units * food.proteinPerUnit * 10) / 10,
   carbs: Math.round(units * food.carbsPerUnit * 10) / 10,
   fat: Math.round(units * food.fatPerUnit * 10) / 10,
+  fiber: Math.round(units * (food.fiberPerUnit ?? 0) * 10) / 10,
 });
 
 const mealFrom = (components, slot = 'breakfast') => {
@@ -119,3 +120,54 @@ assert(!lunchBrownRiceOptions.some((o) => o.foodItem.id === 'whole_grain_toast')
 console.log('✅ Behtan meal-aware swap context passed');
 console.log('   Breakfast 50g Sangak -> 2 whole-grain toast slices: allowed');
 console.log('   Breakfast rice/potato suggestions: filtered out');
+
+
+// ---------------------------------------------------------------------------
+// Stable repeated-swap regression: after A -> B, the original A must remain
+// available and restore the exact original portion. Candidate equivalence must
+// continue to use A as the baseline instead of drifting from B.
+// ---------------------------------------------------------------------------
+const originalRiceComponent = riceMeal.components[0];
+const whiteRiceAppliedMeal = riceOption.updatedMeal;
+const secondPassOptions = getSwapOptionsForMeal(
+  whiteRiceAppliedMeal,
+  0,
+  prefs,
+  originalRiceComponent
+);
+const restoreBrownRice = secondPassOptions.find((o) => o.foodItem.id === 'brown_rice_cooked');
+assert(restoreBrownRice, 'Original brown rice disappeared after swapping to white rice');
+assert(restoreBrownRice.isEquivalent, 'Restoring the original food must always be allowed');
+assert(restoreBrownRice.isOriginal === true, 'Original food should be explicitly marked as the restore option');
+assert(
+  restoreBrownRice.replacementComponent.grams === originalRiceComponent.grams,
+  'Restore option must use the exact original portion instead of re-solving it'
+);
+assert(restoreBrownRice.kcalDeviationPct === 0, 'Original restore should have zero calorie deviation');
+assert(restoreBrownRice.carbDeviationPct === 0, 'Original restore should have zero carb deviation');
+
+const secondPassQuinoa = secondPassOptions.find((o) => o.foodItem.id === 'quinoa_cooked');
+assert(secondPassQuinoa, 'Equivalent-set candidate disappeared after the first swap');
+assert(
+  Math.abs(secondPassQuinoa.carbDeviationPct) <= 12.01,
+  `Repeated-swap quinoa was not evaluated against the original baseline: ${secondPassQuinoa.carbDeviationPct}%`
+);
+
+// ---------------------------------------------------------------------------
+// Catalog-gap regression: foods in the same explicit swap group should still
+// discover each other even when no pairwise food_substitutes rows exist.
+// Vegetables intentionally exercise this case in the current catalog.
+// ---------------------------------------------------------------------------
+const saladNeighborIds = getSubstitutesFor('mixed_salad').map((food) => food.id);
+assert(
+  saladNeighborIds.includes('steamed_vegetables'),
+  'Same-group vegetable fallback failed: steamed vegetables are missing for salad'
+);
+assert(
+  saladNeighborIds.includes('fresh_cucumber_tomato'),
+  'Same-group vegetable fallback failed: cucumber/tomato are missing for salad'
+);
+
+console.log('✅ Behtan swap stability regression passed');
+console.log('   Repeated swaps preserve the original food and original macro baseline');
+console.log('   Same-group foods fill safe gaps in the explicit substitute graph');

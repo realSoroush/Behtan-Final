@@ -70,10 +70,56 @@ const foodById = (id: string): FoodItem => {
   return f;
 };
 
+/**
+ * Returns the stable substitution universe for one food.
+ *
+ * The database stores approved directed edges, but the UI concept is an
+ * equivalence set: if A can replace B, the user must be able to navigate back
+ * from B to A, and repeated swaps must not make options disappear. We therefore
+ * treat active edges as undirected at runtime, include the full connected
+ * component, and also include same-role foods in the same explicit swap group.
+ * Meal-context, allergy and macro-equivalence gates are applied later.
+ */
 export function getSubstitutesFor(foodItemId: string): FoodItem[] {
-  const group = requireNutritionCatalog().substitutes.find((g) => g.foodItemId === foodItemId);
-  if (!group) return [];
-  return group.substituteIds.map(foodById);
+  const catalog = requireNutritionCatalog();
+  const source = foodById(foodItemId);
+  const visited = new Set<string>([foodItemId]);
+  const queue = [foodItemId];
+
+  while (queue.length > 0) {
+    const currentId = queue.shift()!;
+    for (const group of catalog.substitutes) {
+      if (group.foodItemId === currentId) {
+        for (const substituteId of group.substituteIds) {
+          if (!visited.has(substituteId)) {
+            visited.add(substituteId);
+            queue.push(substituteId);
+          }
+        }
+      }
+      if (group.substituteIds.includes(currentId) && !visited.has(group.foodItemId)) {
+        visited.add(group.foodItemId);
+        queue.push(group.foodItemId);
+      }
+    }
+  }
+
+  // Same-group foods are an intentional fallback for catalog gaps. This is
+  // especially useful for vegetables, dairy and plant proteins where explicit
+  // pairwise edges can be incomplete. The role check prevents unsafe category
+  // jumps even if metadata is misconfigured.
+  for (const food of catalog.foods) {
+    if (
+      food.id !== foodItemId &&
+      food.role === source.role &&
+      food.swapGroup === source.swapGroup
+    ) {
+      visited.add(food.id);
+    }
+  }
+
+  visited.delete(foodItemId);
+  return [...visited].map(foodById);
 }
 
 // ============================================================================
@@ -1127,7 +1173,17 @@ function mealWithReplacement(meal: Meal, componentIndex: number, replacement: Me
 }
 
 function isSwapAllowedForMeal(food: FoodItem, slot: MealSlot): boolean {
-  return food.swapAllowedMeals.includes(slot);
+  if (food.swapAllowedMeals.includes(slot)) return true;
+
+  // Defensive metadata fallback: if a food is already used by a normal active
+  // template in this exact slot, it is contextually valid even if an older DB
+  // row forgot to list the slot in swap_allowed_meals. Restricted-diet-only
+  // templates do not widen the normal swap UI.
+  return requireNutritionCatalog().mealTemplates.some((template) =>
+    template.slot === slot &&
+    !template.restrictedDietOnly &&
+    template.slots.some((templateSlot) => templateSlot.primaryFoodItemId === food.id)
+  );
 }
 
 function swapContextPenalty(original: FoodItem, replacement: FoodItem): number {
@@ -1136,8 +1192,13 @@ function swapContextPenalty(original: FoodItem, replacement: FoodItem): number {
   return groupPenalty + replacement.swapPriority * 0.001;
 }
 
-function buildSwapOption(meal: Meal, componentIndex: number, replacement: FoodItem): FoodSwapOption {
-  const original = meal.components[componentIndex];
+function buildSwapOption(
+  meal: Meal,
+  componentIndex: number,
+  replacement: FoodItem,
+  referenceComponent: MealComponent = meal.components[componentIndex]
+): FoodSwapOption {
+  const original = referenceComponent;
   let bestComponent = componentFromUnits(replacement, portionRuleFor(replacement).minUnits);
   let bestScore = Number.POSITIVE_INFINITY;
 
@@ -1168,6 +1229,25 @@ function buildSwapOption(meal: Meal, componentIndex: number, replacement: FoodIt
   };
 }
 
+function buildRestoreOption(
+  meal: Meal,
+  componentIndex: number,
+  referenceComponent: MealComponent
+): FoodSwapOption {
+  return {
+    foodItem: referenceComponent.foodItem,
+    replacementComponent: referenceComponent,
+    updatedMeal: mealWithReplacement(meal, componentIndex, referenceComponent),
+    isEquivalent: true,
+    isOriginal: true,
+    score: -1,
+    kcalDeviationPct: 0,
+    proteinDeviationPct: 0,
+    carbDeviationPct: 0,
+    fatDeviationPct: 0,
+  };
+}
+
 /**
  * Returns pre-calculated swap options for one component. A swap is applied only
  * when the replacement is appropriate for the current meal context AND can
@@ -1178,16 +1258,46 @@ function buildSwapOption(meal: Meal, componentIndex: number, replacement: FoodIt
 export function getSwapOptionsForMeal(
   meal: Meal,
   componentIndex: number,
-  preferences: DietaryPreferencesJson
+  preferences: DietaryPreferencesJson,
+  referenceComponent?: MealComponent
 ): FoodSwapOption[] {
   if (componentIndex < 0 || componentIndex >= meal.components.length) return [];
   const current = meal.components[componentIndex];
-  return getSubstitutesFor(current.foodItem.id)
-    .filter((food) => food.role === current.foodItem.role)
+  const reference = referenceComponent ?? current;
+
+  // Candidate identity is anchored to the ORIGINAL generated component, not to
+  // whatever food happens to be selected after one or more swaps. This keeps
+  // the list stable and prevents macro drift across A -> B -> C transitions.
+  const candidateFoods = getSubstitutesFor(reference.foodItem.id)
+    .filter((food) => food.id !== current.foodItem.id)
+    .filter((food) => food.role === reference.foodItem.role)
     .filter((food) => isFoodAllowed(food, preferences))
-    .filter((food) => isSwapAllowedForMeal(food, meal.slot))
-    .map((food) => buildSwapOption(meal, componentIndex, food))
-    .sort((a, b) => Number(b.isEquivalent) - Number(a.isEquivalent) || a.score - b.score);
+    .filter((food) => isSwapAllowedForMeal(food, meal.slot));
+
+  const options = candidateFoods.map((food) =>
+    buildSwapOption(meal, componentIndex, food, reference)
+  );
+
+  // After any swap, always expose an exact one-tap restore to the original
+  // generated component. Re-solving its portion is intentionally avoided so
+  // the user's plan can be restored byte-for-byte at this component.
+  if (
+    current.foodItem.id !== reference.foodItem.id &&
+    isFoodAllowed(reference.foodItem, preferences) &&
+    isSwapAllowedForMeal(reference.foodItem, meal.slot)
+  ) {
+    options.push(buildRestoreOption(meal, componentIndex, reference));
+  }
+
+  return options
+    .filter((option, index, all) =>
+      all.findIndex((candidate) => candidate.foodItem.id === option.foodItem.id) === index
+    )
+    .sort((a, b) =>
+      Number(Boolean(b.isOriginal)) - Number(Boolean(a.isOriginal)) ||
+      Number(b.isEquivalent) - Number(a.isEquivalent) ||
+      a.score - b.score
+    );
 }
 
 /** Backwards-compatible safe wrapper used by older call sites/tests. */

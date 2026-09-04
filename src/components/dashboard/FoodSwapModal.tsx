@@ -113,7 +113,14 @@ export function FoodSwapModal({ isOpen, onClose, currentComponent, candidates, o
                         <span className="text-xl flex-shrink-0">{option.foodItem.emoji}</span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-3">
-                            <p className="font-semibold text-neutral-800 dark:text-neutral-200 text-sm">{option.foodItem.name}</p>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <p className="font-semibold text-neutral-800 dark:text-neutral-200 text-sm">{option.foodItem.name}</p>
+                              {option.isOriginal && (
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 whitespace-nowrap">
+                                  انتخاب اصلی
+                                </span>
+                              )}
+                            </div>
                             <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 whitespace-nowrap">
                               {componentAmount(replacement)}
                             </span>

@@ -269,6 +269,8 @@ export interface FoodSwapOption {
   replacementComponent: MealComponent;
   updatedMeal: Meal;
   isEquivalent: boolean;
+  /** True when this option restores the exact component from the generated plan. */
+  isOriginal?: boolean;
   reason?: string;
   score: number;
   kcalDeviationPct: number;
