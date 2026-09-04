@@ -120,7 +120,7 @@ create table if not exists public.food_items (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint food_items_allergy_flags_check check (
-    allergy_flags <@ array['dairy','gluten','peanut','soy','seafood']::text[]
+    allergy_flags <@ array['dairy','gluten','peanut','tree_nut','soy','seafood']::text[]
   ),
   constraint food_items_vegetarian_flags_check check (
     excluded_for_vegetarian <@ array['none','vegan','lacto_ovo','pescatarian','raw']::text[]

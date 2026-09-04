@@ -108,7 +108,7 @@ const preferenceSets = [
     name: 'vegan-multi-allergy',
     value: {
       vegetarianStatus: 'vegan',
-      allergies: ['dairy', 'gluten', 'peanut', 'soy', 'seafood'],
+      allergies: ['dairy', 'gluten', 'peanut', 'tree_nut', 'soy', 'seafood'],
     },
   },
 ];

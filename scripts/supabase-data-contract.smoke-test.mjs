@@ -79,6 +79,11 @@ const activityProfileMigrationSource = readFileSync(
   'utf8'
 );
 
+const allergySeparationMigrationSource = readFileSync(
+  resolve(projectRoot, 'supabase/migrations/20260904_007_split_peanut_tree_nut_allergy.sql'),
+  'utf8'
+);
+
 assert(!/const\s+FOOD_ITEMS\s*:/.test(engineSource), 'Production engine still contains hard-coded FOOD_ITEMS');
 assert(!/const\s+MEAL_TEMPLATES\s*:/.test(engineSource), 'Production engine still contains hard-coded MEAL_TEMPLATES');
 assert(!/const\s+PORTION_RULES\s*:/.test(engineSource), 'Production engine still contains hard-coded PORTION_RULES');
@@ -98,6 +103,8 @@ assert(qualityMigrationSource.includes('fiber_g_per_unit'), 'Quality migration m
 assert(qualityMigrationSource.includes('quality_tags'), 'Quality migration missing quality_tags');
 assert(qualityMigrationSource.includes('fruit_veg_grams_per_unit'), 'Quality migration missing fruit/veg contribution');
 assert(activityProfileMigrationSource.includes('activity_profile_json'), 'Activity UX migration missing activity_profile_json');
+assert(allergySeparationMigrationSource.includes("'peanut','tree_nut'"), 'Allergy migration must separate peanut and tree_nut');
+assert(allergySeparationMigrationSource.includes("id in ('walnut', 'mixed_nuts')"), 'Allergy migration must re-tag known tree nuts');
 
 // The old anonymous user_profiles lookup is incompatible with the table's RLS.
 assert(

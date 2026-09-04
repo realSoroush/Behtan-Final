@@ -24,6 +24,7 @@
     "test:quality": "node --experimental-strip-types scripts/nutrition-quality.smoke-test.mjs",
     "test:carousel": "node scripts/dashboard-carousel.smoke-test.mjs",
     "test:activity": "node --experimental-strip-types scripts/activity-level.smoke-test.mjs",
+    "test:allergies": "node --experimental-strip-types scripts/allergy-separation.smoke-test.mjs",
     "test:routing": "node scripts/routing-stability.smoke-test.mjs"
   },
   "dependencies": {

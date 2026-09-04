@@ -14,7 +14,7 @@ export type Motivation = 'health' | 'appearance' | 'confidence' | 'medical' | 'p
 export type WeightLossSpeed = 'mild' | 'standard' | 'fast';
 export type BodyType = 'ectomorph' | 'mesomorph' | 'endomorph';
 export type VegetarianStatus = 'none' | 'vegan' | 'lacto_ovo' | 'pescatarian' | 'raw';
-export type Allergy = 'dairy' | 'gluten' | 'peanut' | 'soy' | 'seafood';
+export type Allergy = 'dairy' | 'gluten' | 'peanut' | 'tree_nut' | 'soy' | 'seafood';
 export type MedicalCondition = 'diabetes' | 'fatty_liver' | 'pcos' | 'thyroid';
 
 export type MealSlot =

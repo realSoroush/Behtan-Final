@@ -618,7 +618,7 @@
       "carbsPerUnit": 0.8,
       "fatPerUnit": 3.9,
       "allergyFlags": [
-        "peanut"
+        "tree_nut"
       ],
       "excludedForVegetarian": [],
       "swapAllowedMeals": [
@@ -639,7 +639,7 @@
     },
     {
       "id": "mixed_nuts",
-      "name": "آجیل خام",
+      "name": "آجیل خام بدون بادام‌زمینی",
       "role": "fat",
       "emoji": "🥜",
       "unitLabel": "گرم",
@@ -649,7 +649,7 @@
       "carbsPerUnit": 5,
       "fatPerUnit": 13,
       "allergyFlags": [
-        "peanut"
+        "tree_nut"
       ],
       "excludedForVegetarian": [],
       "swapAllowedMeals": [

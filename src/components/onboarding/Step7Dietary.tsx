@@ -16,6 +16,7 @@ const ALLERGIES: { value: Allergy; icon: string; label: string }[] = [
   { value: 'dairy', icon: '🥛', label: 'لبنیات' },
   { value: 'gluten', icon: '🌾', label: 'گلوتن' },
   { value: 'peanut', icon: '🥜', label: 'بادام زمینی' },
+  { value: 'tree_nut', icon: '🌰', label: 'گردو، بادام و پسته' },
   { value: 'soy', icon: '🌱', label: 'سویا' },
   { value: 'seafood', icon: '🦐', label: 'غذاهای دریایی' },
 ];

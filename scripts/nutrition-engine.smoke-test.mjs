@@ -123,7 +123,7 @@ const preferenceSets = [
     name: 'vegan-multi-allergy',
     value: {
       vegetarianStatus: 'vegan',
-      allergies: ['dairy', 'gluten', 'peanut', 'soy', 'seafood'],
+      allergies: ['dairy', 'gluten', 'peanut', 'tree_nut', 'soy', 'seafood'],
     },
   },
 ];
@@ -244,6 +244,7 @@ for (const weightKg of weights) {
 for (const [name, preferences] of [
   ['dairy-free', { vegetarianStatus: 'none', allergies: ['dairy'] }],
   ['gluten-free', { vegetarianStatus: 'none', allergies: ['gluten'] }],
+  ['tree-nut-free', { vegetarianStatus: 'none', allergies: ['tree_nut'] }],
 ]) {
   for (const isWorkoutDay of [false, true]) {
     const targets = calculateFullNutritionPlan({
