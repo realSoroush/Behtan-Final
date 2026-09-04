@@ -25,7 +25,8 @@
     "test:carousel": "node scripts/dashboard-carousel.smoke-test.mjs",
     "test:activity": "node --experimental-strip-types scripts/activity-level.smoke-test.mjs",
     "test:allergies": "node --experimental-strip-types scripts/allergy-separation.smoke-test.mjs",
-    "test:routing": "node scripts/routing-stability.smoke-test.mjs"
+    "test:routing": "node scripts/routing-stability.smoke-test.mjs",
+    "test:protein": "node --experimental-strip-types scripts/protein-engine-v3.smoke-test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

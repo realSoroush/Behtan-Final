@@ -9,6 +9,7 @@ export type DailyMovementPattern = 'mostly_seated' | 'mixed' | 'mostly_on_feet' 
 export type DailyStepsRange = 'under_4000' | '4000_7000' | '7000_10000' | 'over_10000' | 'unknown';
 export type WorkoutDurationRange = 'under_30' | '30_60' | 'over_60';
 export type WorkoutIntensity = 'light' | 'moderate' | 'vigorous';
+export type TrainingType = 'cardio' | 'resistance' | 'mixed';
 export type WorkoutLocation = 'home' | 'gym' | 'none';
 export type Motivation = 'health' | 'appearance' | 'confidence' | 'medical' | 'performance' | 'event';
 export type WeightLossSpeed = 'mild' | 'standard' | 'fast';
@@ -42,11 +43,13 @@ export interface ScheduleJson {
 
 
 export interface ActivityProfileJson {
-  version: 1;
+  version: 1 | 2;
   dailyMovement: DailyMovementPattern;
   dailySteps: DailyStepsRange;
   workoutDuration: WorkoutDurationRange | null;
   workoutIntensity: WorkoutIntensity | null;
+  /** Added in v2. Old v1 profiles intentionally remain valid and are treated as unknown/no-RT for protein targeting. */
+  trainingType?: TrainingType | null;
   derivedLevel: ActivityLevel;
   derivedScore: number;
 }
@@ -344,6 +347,7 @@ export interface OnboardingData {
   dailySteps: DailyStepsRange | null;
   workoutDuration: WorkoutDurationRange | null;
   workoutIntensity: WorkoutIntensity | null;
+  trainingType: TrainingType | null;
   workoutLocation: WorkoutLocation | null;
   workoutDays: number;
   motivation: Motivation | null;
@@ -374,6 +378,7 @@ export const createEmptyOnboardingData = (): OnboardingData => ({
   dailySteps: null,
   workoutDuration: null,
   workoutIntensity: null,
+  trainingType: null,
   workoutLocation: null,
   workoutDays: 3,
   motivation: null,

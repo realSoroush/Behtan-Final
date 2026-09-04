@@ -119,11 +119,12 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       activity_profile_json:
         data.activityLevel && data.dailyMovement && data.dailySteps
           ? {
-              version: 1,
+              version: 2,
               dailyMovement: data.dailyMovement,
               dailySteps: data.dailySteps,
               workoutDuration: data.workoutLocation === 'none' ? null : data.workoutDuration,
               workoutIntensity: data.workoutLocation === 'none' ? null : data.workoutIntensity,
+              trainingType: data.workoutLocation === 'none' ? null : data.trainingType,
               derivedLevel: data.activityLevel,
               derivedScore: estimateActivityLevel({
                 dailyMovement: data.dailyMovement,

@@ -79,6 +79,7 @@ export function DashboardPage() {
       bodyFatPercentage: profile.body_fat_pct ?? undefined,
       bodyFatSource: profile.body_fat_source,
       isWorkoutDay,
+      trainingType: profile.activity_profile_json?.trainingType ?? null,
     });
   }, [profile, isWorkoutDay]);
 

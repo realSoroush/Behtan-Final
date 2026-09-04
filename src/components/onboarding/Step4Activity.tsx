@@ -1,4 +1,4 @@
-import { Activity, Footprints, Timer, Zap } from 'lucide-react';
+import { Activity, Dumbbell, Footprints, Timer, Zap } from 'lucide-react';
 import { StepHeader } from '@/components/ui/StepHeader';
 import { Button } from '@/components/ui/Button';
 import { OptionCard } from '@/components/ui/Card';
@@ -7,6 +7,7 @@ import type {
   DailyMovementPattern,
   DailyStepsRange,
   Motivation,
+  TrainingType,
   WorkoutDurationRange,
   WorkoutIntensity,
   WorkoutLocation,
@@ -33,6 +34,12 @@ const LOCATIONS: { value: WorkoutLocation; icon: string; label: string }[] = [
   { value: 'home', icon: '🏠', label: 'در خانه' },
   { value: 'gym', icon: '🏋️', label: 'باشگاه' },
   { value: 'none', icon: '🚫', label: 'ورزش نمی‌کنم' },
+];
+
+const TRAINING_TYPE_OPTIONS: { value: TrainingType; icon: string; label: string; description: string }[] = [
+  { value: 'resistance', icon: '🏋️', label: 'قدرتی / مقاومتی', description: 'وزنه، دستگاه، تمرین با مقاومت یا تمرین قدرتی با وزن بدن' },
+  { value: 'cardio', icon: '🏃', label: 'هوازی', description: 'دویدن، دوچرخه، شنا یا تمرینی که محور اصلی آن استقامت قلبی‌تنفسی است' },
+  { value: 'mixed', icon: '⚡', label: 'ترکیبی', description: 'در هفته هم تمرین مقاومتی دارید و هم تمرین هوازی' },
 ];
 
 const DURATION_OPTIONS: { value: WorkoutDurationRange; label: string; description: string }[] = [
@@ -125,7 +132,11 @@ export function Step4Activity() {
 
   const handleLocation = (loc: WorkoutLocation) => {
     const nextDays = loc === 'none' ? 0 : (data.workoutDays || 3);
-    updateData({ workoutLocation: loc, workoutDays: nextDays });
+    updateData({
+      workoutLocation: loc,
+      workoutDays: nextDays,
+      trainingType: loc === 'none' ? null : data.trainingType,
+    });
     persistDerivedActivity({
       workoutDays: nextDays,
       doesWorkout: loc !== 'none',
@@ -140,7 +151,7 @@ export function Step4Activity() {
     data.activityLevel &&
     data.workoutLocation &&
     data.motivation &&
-    (!doesWorkout || (workoutDuration && workoutIntensity))
+    (!doesWorkout || (data.trainingType && workoutDuration && workoutIntensity))
   );
 
   const activityMeta = data.activityLevel ? ACTIVITY_LEVEL_META[data.activityLevel] : null;
@@ -210,6 +221,38 @@ export function Step4Activity() {
 
       {doesWorkout && (
         <div className="space-y-5 rounded-3xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
+          <div className="space-y-2.5">
+            <div className="flex items-center gap-2 text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+              <Dumbbell size={16} />
+              <span>نوع اصلی تمرین شما</span>
+            </div>
+            <p className="text-xs leading-5 text-neutral-400">
+              این مورد برای برآورد پروتئین استفاده می‌شود و ضریب فعالیت روزانه را تغییر نمی‌دهد.
+            </p>
+            <div className="space-y-2">
+              {TRAINING_TYPE_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => updateData({ trainingType: option.value })}
+                  className={`w-full rounded-2xl border p-3 text-right transition-all ${
+                    data.trainingType === option.value
+                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                      : 'border-neutral-200 bg-white hover:border-primary-300 dark:border-neutral-700 dark:bg-neutral-950'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-xl">{option.icon}</span>
+                    <div>
+                      <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">{option.label}</p>
+                      <p className="mt-0.5 text-xs leading-5 text-neutral-500 dark:text-neutral-400">{option.description}</p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div>
             <p className="mb-3 text-sm font-semibold text-neutral-700 dark:text-neutral-300">
               تعداد جلسات در هفته: <span className="text-primary-600 dark:text-primary-400">{toPersianDigits(data.workoutDays)} روز</span>
