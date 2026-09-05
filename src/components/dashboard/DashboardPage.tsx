@@ -9,6 +9,7 @@ import { FoodSwapModal } from './FoodSwapModal';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useNutritionCatalog } from '@/hooks/useNutritionCatalog';
+import { useProteinEnginePolicy } from '@/hooks/useProteinEnginePolicy';
 import { calculateFullNutritionPlanWithTrace, toPersianDigits } from '@/utils/nutritionHelpers';
 import {
   generateDailyMealPlan,
@@ -53,6 +54,12 @@ export function DashboardPage() {
     error: catalogError,
     refetch: refetchCatalog,
   } = useNutritionCatalog();
+  const {
+    policy: proteinPolicy,
+    loading: proteinPolicyLoading,
+    error: proteinPolicyError,
+    refetch: refetchProteinPolicy,
+  } = useProteinEnginePolicy();
 
   const [isWorkoutDay, setIsWorkoutDay] = useState(false);
 
@@ -65,7 +72,7 @@ export function DashboardPage() {
 
   // ---- Compute nutrition targets + a permanent diagnostic trace ----
   const nutritionResult = useMemo(() => {
-    if (!profile?.weight || !profile?.height || !profile?.birth_date || !profile?.gender || !profile?.activity_level || !profile?.goal) {
+    if (!proteinPolicy || !profile?.weight || !profile?.height || !profile?.birth_date || !profile?.gender || !profile?.activity_level || !profile?.goal) {
       return null;
     }
     return calculateFullNutritionPlanWithTrace({
@@ -80,8 +87,9 @@ export function DashboardPage() {
       bodyFatSource: profile.body_fat_source,
       isWorkoutDay,
       trainingType: profile.activity_profile_json?.trainingType ?? null,
+      proteinPolicy,
     });
-  }, [profile, isWorkoutDay]);
+  }, [profile, isWorkoutDay, proteinPolicy]);
 
   const targets: MacroTargets | null = nutritionResult?.targets ?? null;
 
@@ -199,12 +207,12 @@ export function DashboardPage() {
   );
 
   // ---- Loading / error states ----
-  if (profileLoading || catalogLoading) {
+  if (profileLoading || catalogLoading || proteinPolicyLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-3">
           <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-neutral-500 dark:text-neutral-400">در حال بارگذاری برنامه و دیتابیس غذایی...</p>
+          <p className="text-neutral-500 dark:text-neutral-400">در حال بارگذاری برنامه و تنظیمات موتور تغذیه...</p>
         </div>
       </div>
     );
@@ -219,6 +227,25 @@ export function DashboardPage() {
           <button
             type="button"
             onClick={() => void refetchCatalog()}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-sm font-semibold"
+          >
+            <RefreshCw size={14} />
+            تلاش دوباره
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (proteinPolicyError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-5">
+        <div className="max-w-sm text-center space-y-4">
+          <AlertCircle size={40} className="text-red-500 mx-auto" />
+          <p className="font-semibold text-neutral-700 dark:text-neutral-300">{proteinPolicyError}</p>
+          <button
+            type="button"
+            onClick={() => void refetchProteinPolicy()}
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-sm font-semibold"
           >
             <RefreshCw size={14} />

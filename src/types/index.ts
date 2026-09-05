@@ -317,6 +317,32 @@ export interface MacroTargets {
   carbCal: number;
 }
 
+/** Runtime-editable Protein Engine v3 policy loaded from Supabase in production. */
+export interface ProteinEnginePolicy {
+  id: string;
+  /** Behtan practical floor. This is not the physiological RDA/minimum. */
+  maintenanceNoResistanceTrainingMinimum: number;
+  maintenanceResistanceTrainingMinimum: number;
+  weightLossNoResistanceTrainingMinimum: number;
+  weightLossResistanceTrainingMinimum: number;
+  weightGainNoResistanceTrainingMinimum: number;
+  weightGainResistanceTrainingMinimum: number;
+  /** Preferred targets. Phase 2A keeps these as the active prescription. */
+  maintenanceNoResistanceTraining: number;
+  maintenanceResistanceTraining: number;
+  weightLossNoResistanceTraining: number;
+  weightLossResistanceTraining: number;
+  weightGainNoResistanceTraining: number;
+  weightGainResistanceTraining: number;
+  obesityBmiThreshold: number;
+  referenceBmi: number;
+  excessWeightFraction: number;
+  maxProteinGramsPerDay: number;
+  maxProteinCalorieFraction: number;
+  fatCalorieFraction: number;
+  updatedAt: string | null;
+}
+
 // ============================================================================
 // AI BODY SCAN
 // ============================================================================

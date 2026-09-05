@@ -84,6 +84,15 @@ const allergySeparationMigrationSource = readFileSync(
   'utf8'
 );
 
+const proteinPolicyMigrationSource = readFileSync(
+  resolve(projectRoot, 'supabase/migrations/20260905_008_protein_engine_runtime_policy.sql'),
+  'utf8'
+);
+const proteinPolicyHookSource = readFileSync(
+  resolve(projectRoot, 'src/hooks/useProteinEnginePolicy.ts'),
+  'utf8'
+);
+
 assert(!/const\s+FOOD_ITEMS\s*:/.test(engineSource), 'Production engine still contains hard-coded FOOD_ITEMS');
 assert(!/const\s+MEAL_TEMPLATES\s*:/.test(engineSource), 'Production engine still contains hard-coded MEAL_TEMPLATES');
 assert(!/const\s+PORTION_RULES\s*:/.test(engineSource), 'Production engine still contains hard-coded PORTION_RULES');
@@ -105,6 +114,10 @@ assert(qualityMigrationSource.includes('fruit_veg_grams_per_unit'), 'Quality mig
 assert(activityProfileMigrationSource.includes('activity_profile_json'), 'Activity UX migration missing activity_profile_json');
 assert(allergySeparationMigrationSource.includes("'peanut','tree_nut'"), 'Allergy migration must separate peanut and tree_nut');
 assert(allergySeparationMigrationSource.includes("id in ('walnut', 'mixed_nuts')"), 'Allergy migration must re-tag known tree nuts');
+assert(proteinPolicyMigrationSource.includes('public.nutrition_protein_policy'), 'Protein runtime-policy migration missing');
+assert(proteinPolicyMigrationSource.includes('weight_loss_rt'), 'Protein runtime policy missing weight_loss_rt');
+assert(proteinPolicyMigrationSource.includes('max_protein_calorie_fraction'), 'Protein runtime policy missing calorie guardrail');
+assert(proteinPolicyHookSource.includes(".from('nutrition_protein_policy')"), 'App is not loading protein policy from Supabase');
 
 // The old anonymous user_profiles lookup is incompatible with the table's RLS.
 assert(

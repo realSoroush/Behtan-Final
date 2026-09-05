@@ -5,6 +5,7 @@ import {
   calculateProteinReferenceWeightKg,
   PROTEIN_G_PER_KG_POLICY,
   resolveProteinFactorGPerKg,
+  resolveProteinFactorRangeGPerKg,
 } from '../src/utils/nutritionHelpers.ts';
 import { generateDailyMealPlan, MealPlanFeasibilityError } from '../src/utils/mealPlanEngine.ts';
 
@@ -27,6 +28,12 @@ assert(PROTEIN_G_PER_KG_POLICY.weight_gain.resistanceTraining === 1.7, 'Gain RT 
 assert(resolveProteinFactorGPerKg('weight_loss', 'cardio') === 1.6, 'Cardio must not enter RT protein branch');
 assert(resolveProteinFactorGPerKg('weight_loss', 'resistance') === 2.0, 'Resistance branch mismatch');
 assert(resolveProteinFactorGPerKg('weight_loss', 'mixed') === 2.0, 'Mixed training must enter RT branch');
+const lossRtRange = resolveProteinFactorRangeGPerKg('weight_loss', 'resistance');
+assert(lossRtRange.minimum === 1.6, 'Loss+RT practical minimum drifted');
+assert(lossRtRange.preferred === 2.0, 'Loss+RT preferred target drifted');
+const maintenanceNoRtRange = resolveProteinFactorRangeGPerKg('maintenance', 'cardio');
+assert(maintenanceNoRtRange.minimum === 1.2, 'Maintenance no-RT practical minimum drifted');
+assert(maintenanceNoRtRange.preferred === 1.4, 'Maintenance no-RT preferred target drifted');
 
 // ---------------------------------------------------------------------------
 // 2) Protein reference-weight curve audit
@@ -77,7 +84,11 @@ const traced = calculateFullNutritionPlanWithTrace({
   referenceDate: new Date('2026-09-04T12:00:00Z'),
 });
 assert(traced.trace.resistanceTrainingUsedForProtein === true, 'Trace lost RT flag');
-assert(traced.trace.proteinFactorGPerKg === 2.0, 'Trace protein factor mismatch');
+assert(traced.trace.proteinMinimumFactorGPerKg === 1.6, 'Trace minimum protein factor mismatch');
+assert(traced.trace.proteinPreferredFactorGPerKg === 2.0, 'Trace preferred protein factor mismatch');
+assert(traced.trace.proteinFactorGPerKg === 2.0, 'Active protein factor must remain preferred in Phase 2A');
+assert(Math.abs(traced.trace.proteinMinimumTargetGrams - 156) <= 1, 'Trace minimum protein target mismatch');
+assert(Math.abs(traced.trace.proteinPreferredTargetGrams - 195) <= 1, 'Trace preferred protein target mismatch');
 assert(Math.abs(traced.trace.proteinReferenceWeightKg - 97.5) <= 0.2, 'Trace reference weight mismatch');
 assert(traced.trace.finalProteinTargetGrams === traced.targets.proteinGrams, 'Trace final protein mismatch');
 
@@ -145,9 +156,9 @@ for (const weightKg of auditWeights) {
 }
 assert(feasible >= 56, `Protein v3 template audit regressed: feasible=${feasible}/${attempted}`);
 
-console.log('✅ Behtan Protein Engine v3 phase-1 smoke test passed');
+console.log('✅ Behtan Protein Engine v3 Phase 2A range smoke test passed');
 console.log(`   Reference weight @125kg/178cm: ${ref125.toFixed(1)} kg`);
-console.log(`   Loss + RT @125kg/178cm: ${lossRt125.proteinGrams} g protein`);
+console.log(`   Loss + RT range @125kg/178cm: ~156–195 g; active=${lossRt125.proteinGrams} g`);
 console.log(`   Loss + cardio/no-RT @125kg/178cm: ${lossNoRt125.proteinGrams} g protein`);
 console.log(`   RT meal-template audit: ${feasible}/${attempted} feasible; ${rejected} safely rejected`);
 console.log(`   Max feasible protein deviation: ${(maxProteinDeviation * 100).toFixed(2)}%`);

@@ -19,7 +19,9 @@ import type {
   WeightLossSpeed,
   BodyFatSource,
   TrainingType,
+  ProteinEnginePolicy,
 } from '@/types';
+import { DEFAULT_PROTEIN_ENGINE_POLICY } from './proteinPolicy.ts';
 
 // ============================================================================
 // CONSTANTS
@@ -29,14 +31,6 @@ const KCAL_PER_GRAM_PROTEIN = 4;
 const KCAL_PER_GRAM_FAT = 9;
 const KCAL_PER_GRAM_CARB = 4;
 
-/**
- * Upper product guardrail for protein. The 35% calorie cap below is the primary
- * constraint; this absolute cap prevents very-high-calorie / very-high-weight
- * profiles from producing impractical consumer meal plans.
- */
-const MAX_PROTEIN_GRAMS_PER_DAY = 220;
-const MAX_PROTEIN_CALORIE_FRACTION = 0.35;
-const FAT_CALORIE_FRACTION = 0.25;
 const WORKOUT_DAY_CALORIE_BONUS = 150;
 
 function assertFinitePositive(value: number, name: string): void {
@@ -278,23 +272,60 @@ export const PROTEIN_G_PER_KG_POLICY: Readonly<Record<Goal, {
   noResistanceTraining: number;
   resistanceTraining: number;
 }>> = {
-  maintenance: { noResistanceTraining: 1.4, resistanceTraining: 1.6 },
-  weight_loss: { noResistanceTraining: 1.6, resistanceTraining: 2.0 },
-  weight_gain: { noResistanceTraining: 1.6, resistanceTraining: 1.7 },
+  maintenance: {
+    noResistanceTraining: DEFAULT_PROTEIN_ENGINE_POLICY.maintenanceNoResistanceTraining,
+    resistanceTraining: DEFAULT_PROTEIN_ENGINE_POLICY.maintenanceResistanceTraining,
+  },
+  weight_loss: {
+    noResistanceTraining: DEFAULT_PROTEIN_ENGINE_POLICY.weightLossNoResistanceTraining,
+    resistanceTraining: DEFAULT_PROTEIN_ENGINE_POLICY.weightLossResistanceTraining,
+  },
+  weight_gain: {
+    noResistanceTraining: DEFAULT_PROTEIN_ENGINE_POLICY.weightGainNoResistanceTraining,
+    resistanceTraining: DEFAULT_PROTEIN_ENGINE_POLICY.weightGainResistanceTraining,
+  },
 };
 
 export function isResistanceTraining(trainingType?: TrainingType | null): boolean {
   return trainingType === 'resistance' || trainingType === 'mixed';
 }
 
+export interface ProteinFactorRange {
+  /** Behtan practical floor, not the physiological minimum/RDA. */
+  minimum: number;
+  preferred: number;
+}
+
+export function resolveProteinFactorRangeGPerKg(
+  goal: Goal,
+  trainingType?: TrainingType | null,
+  policy: ProteinEnginePolicy = DEFAULT_PROTEIN_ENGINE_POLICY
+): ProteinFactorRange {
+  const resistance = isResistanceTraining(trainingType);
+  switch (goal) {
+    case 'maintenance':
+      return resistance
+        ? { minimum: policy.maintenanceResistanceTrainingMinimum, preferred: policy.maintenanceResistanceTraining }
+        : { minimum: policy.maintenanceNoResistanceTrainingMinimum, preferred: policy.maintenanceNoResistanceTraining };
+    case 'weight_loss':
+      return resistance
+        ? { minimum: policy.weightLossResistanceTrainingMinimum, preferred: policy.weightLossResistanceTraining }
+        : { minimum: policy.weightLossNoResistanceTrainingMinimum, preferred: policy.weightLossNoResistanceTraining };
+    case 'weight_gain':
+      return resistance
+        ? { minimum: policy.weightGainResistanceTrainingMinimum, preferred: policy.weightGainResistanceTraining }
+        : { minimum: policy.weightGainNoResistanceTrainingMinimum, preferred: policy.weightGainNoResistanceTraining };
+  }
+}
+
 export function resolveProteinFactorGPerKg(
   goal: Goal,
-  trainingType?: TrainingType | null
+  trainingType?: TrainingType | null,
+  policy: ProteinEnginePolicy = DEFAULT_PROTEIN_ENGINE_POLICY
 ): number {
-  const policy = PROTEIN_G_PER_KG_POLICY[goal];
-  return isResistanceTraining(trainingType)
-    ? policy.resistanceTraining
-    : policy.noResistanceTraining;
+  // Phase 2A introduces a range but intentionally keeps the preferred endpoint
+  // as the active prescription. Budget Preference will select/interpolate later.
+  return resolveProteinFactorRangeGPerKg(goal, trainingType, policy).preferred;
 }
 
 /**
@@ -312,19 +343,23 @@ export function resolveProteinFactorGPerKg(
  * The returned macro calorie fields are always derived from the returned grams,
  * eliminating the old rounding mismatch between fatGrams and fatCal.
  */
-export function calculateProteinReferenceWeightKg(weightKg: number, heightCm?: number): number {
+export function calculateProteinReferenceWeightKg(
+  weightKg: number,
+  heightCm?: number,
+  policy: ProteinEnginePolicy = DEFAULT_PROTEIN_ENGINE_POLICY
+): number {
   if (!heightCm || !Number.isFinite(heightCm) || heightCm <= 0) return weightKg;
 
   const heightM = heightCm / 100;
   const bmi = weightKg / (heightM * heightM);
-  if (bmi < 30) return weightKg;
+  if (bmi < policy.obesityBmiThreshold) return weightKg;
 
-  // Product heuristic for obesity-range BMI: do not let protein scale 1:1
-  // with total body weight. Use BMI-25 reference weight plus 40% of the excess.
-  // The absolute and calorie-share caps below remain the final guardrails.
-  const bmi25Weight = 25 * heightM * heightM;
-  const adjustedWeight = bmi25Weight + 0.4 * (weightKg - bmi25Weight);
-  return clamp(adjustedWeight, bmi25Weight, weightKg);
+  // Runtime-configurable obesity curve: reference-BMI weight plus a fraction
+  // of weight above that reference. Supabase is the production source of truth.
+  const referenceWeight = policy.referenceBmi * heightM * heightM;
+  const adjustedWeight = referenceWeight
+    + policy.excessWeightFraction * (weightKg - referenceWeight);
+  return clamp(adjustedWeight, referenceWeight, weightKg);
 }
 
 export function calculateMacros(
@@ -332,21 +367,22 @@ export function calculateMacros(
   weightKg: number,
   goal: Goal,
   heightCm?: number,
-  trainingType?: TrainingType | null
+  trainingType?: TrainingType | null,
+  proteinPolicy: ProteinEnginePolicy = DEFAULT_PROTEIN_ENGINE_POLICY
 ): MacroTargets {
   assertFinitePositive(targetCalories, 'targetCalories');
   assertFinitePositive(weightKg, 'weightKg');
 
-  const referenceWeightKg = calculateProteinReferenceWeightKg(weightKg, heightCm);
-  const proteinFactor = resolveProteinFactorGPerKg(goal, trainingType);
+  const referenceWeightKg = calculateProteinReferenceWeightKg(weightKg, heightCm, proteinPolicy);
+  const proteinFactor = resolveProteinFactorGPerKg(goal, trainingType, proteinPolicy);
   const rawProteinGrams = referenceWeightKg * proteinFactor;
   const calorieLimitedProteinGrams =
-    (targetCalories * MAX_PROTEIN_CALORIE_FRACTION) / KCAL_PER_GRAM_PROTEIN;
+    (targetCalories * proteinPolicy.maxProteinCalorieFraction) / KCAL_PER_GRAM_PROTEIN;
 
   const proteinGrams = Math.max(
     1,
     Math.round(
-      Math.min(rawProteinGrams, calorieLimitedProteinGrams, MAX_PROTEIN_GRAMS_PER_DAY)
+      Math.min(rawProteinGrams, calorieLimitedProteinGrams, proteinPolicy.maxProteinGramsPerDay)
     )
   );
   const proteinCal = proteinGrams * KCAL_PER_GRAM_PROTEIN;
@@ -354,7 +390,7 @@ export function calculateMacros(
   // Keep fat close to 25%, but make sure protein + fat cannot consume the
   // entire calorie budget after integer rounding.
   const desiredFatGrams = Math.round(
-    (targetCalories * FAT_CALORIE_FRACTION) / KCAL_PER_GRAM_FAT
+    (targetCalories * proteinPolicy.fatCalorieFraction) / KCAL_PER_GRAM_FAT
   );
   const maxFeasibleFatGrams = Math.max(
     1,
@@ -395,6 +431,8 @@ export interface FullNutritionCalcInput {
   isWorkoutDay?: boolean;
   /** Protein targeting uses this separately from the TDEE activity bucket. */
   trainingType?: TrainingType | null;
+  /** Supabase-backed runtime policy in production; deterministic defaults in tests/tools. */
+  proteinPolicy?: ProteinEnginePolicy;
   /** Test/diagnostic override only. Production callers normally omit this. */
   referenceDate?: Date;
 }
@@ -417,8 +455,21 @@ export interface NutritionCalculationTrace {
   targetCalories: number;
   trainingType: TrainingType | null;
   resistanceTrainingUsedForProtein: boolean;
+  proteinPolicyId: string;
+  proteinPolicyUpdatedAt: string | null;
+  proteinObesityBmiThreshold: number;
+  proteinReferenceBmi: number;
+  proteinExcessWeightFraction: number;
+  proteinMaxGramsPerDay: number;
+  proteinMaxCalorieFraction: number;
+  fatCalorieFraction: number;
   proteinReferenceWeightKg: number;
+  proteinMinimumFactorGPerKg: number;
+  proteinPreferredFactorGPerKg: number;
+  /** Active factor. Phase 2A intentionally equals preferred. */
   proteinFactorGPerKg: number;
+  proteinMinimumTargetGrams: number;
+  proteinPreferredTargetGrams: number;
   rawProteinTargetGrams: number;
   finalProteinTargetGrams: number;
   proteinCalorieShare: number;
@@ -467,16 +518,31 @@ export function calculateFullNutritionPlanWithTrace(
   const workoutBonusKcal = input.isWorkoutDay ? WORKOUT_DAY_CALORIE_BONUS : 0;
   const targetCalories = baseTargetCalories + workoutBonusKcal;
 
-  const proteinReferenceWeight = calculateProteinReferenceWeightKg(input.weightKg, input.heightCm);
-  const proteinFactorGPerKg = resolveProteinFactorGPerKg(input.goal, input.trainingType);
-  const rawProteinTargetGrams = proteinReferenceWeight * proteinFactorGPerKg;
-  const calorieProteinCapGrams = (targetCalories * MAX_PROTEIN_CALORIE_FRACTION) / KCAL_PER_GRAM_PROTEIN;
+  const proteinPolicy = input.proteinPolicy ?? DEFAULT_PROTEIN_ENGINE_POLICY;
+  const proteinReferenceWeight = calculateProteinReferenceWeightKg(
+    input.weightKg,
+    input.heightCm,
+    proteinPolicy
+  );
+  const proteinFactorRange = resolveProteinFactorRangeGPerKg(
+    input.goal,
+    input.trainingType,
+    proteinPolicy
+  );
+  // Phase 2A preserves current production behavior: preferred remains active.
+  const proteinFactorGPerKg = proteinFactorRange.preferred;
+  const proteinMinimumTargetRaw = proteinReferenceWeight * proteinFactorRange.minimum;
+  const proteinPreferredTargetRaw = proteinReferenceWeight * proteinFactorRange.preferred;
+  const rawProteinTargetGrams = proteinPreferredTargetRaw;
+  const calorieProteinCapGrams =
+    (targetCalories * proteinPolicy.maxProteinCalorieFraction) / KCAL_PER_GRAM_PROTEIN;
   const targets = calculateMacros(
     targetCalories,
     input.weightKg,
     input.goal,
     input.heightCm,
-    input.trainingType
+    input.trainingType,
+    proteinPolicy
   );
   return {
     targets,
@@ -498,13 +564,25 @@ export function calculateFullNutritionPlanWithTrace(
       targetCalories,
       trainingType: input.trainingType ?? null,
       resistanceTrainingUsedForProtein: isResistanceTraining(input.trainingType),
+      proteinPolicyId: proteinPolicy.id,
+      proteinPolicyUpdatedAt: proteinPolicy.updatedAt,
+      proteinObesityBmiThreshold: proteinPolicy.obesityBmiThreshold,
+      proteinReferenceBmi: proteinPolicy.referenceBmi,
+      proteinExcessWeightFraction: proteinPolicy.excessWeightFraction,
+      proteinMaxGramsPerDay: proteinPolicy.maxProteinGramsPerDay,
+      proteinMaxCalorieFraction: proteinPolicy.maxProteinCalorieFraction,
+      fatCalorieFraction: proteinPolicy.fatCalorieFraction,
       proteinReferenceWeightKg: Number(proteinReferenceWeight.toFixed(1)),
+      proteinMinimumFactorGPerKg: proteinFactorRange.minimum,
+      proteinPreferredFactorGPerKg: proteinFactorRange.preferred,
       proteinFactorGPerKg,
+      proteinMinimumTargetGrams: Number(proteinMinimumTargetRaw.toFixed(1)),
+      proteinPreferredTargetGrams: Number(proteinPreferredTargetRaw.toFixed(1)),
       rawProteinTargetGrams: Number(rawProteinTargetGrams.toFixed(1)),
       finalProteinTargetGrams: targets.proteinGrams,
       proteinCalorieShare: Number((targets.proteinCal / Math.max(1, targetCalories)).toFixed(3)),
       proteinCappedByCalories: rawProteinTargetGrams > calorieProteinCapGrams + 0.5,
-      proteinCappedByAbsoluteLimit: rawProteinTargetGrams > MAX_PROTEIN_GRAMS_PER_DAY + 0.5,
+      proteinCappedByAbsoluteLimit: rawProteinTargetGrams > proteinPolicy.maxProteinGramsPerDay + 0.5,
     },
   };
 }

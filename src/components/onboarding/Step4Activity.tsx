@@ -337,7 +337,7 @@ export function Step4Activity() {
                 <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">برآورد خودکار به‌تن</p>
                 <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-white">{activityMeta.label}</p>
               </div>
-              <div className="rounded-2xl bg-white px-3 py-2 text-center shadow-sm dark:bg-neutral-900">
+              <div className="rounded-2xl px-3 py-2 text-center">
                 <p className="text-[10px] text-neutral-400">ضریب TDEE</p>
                 <p className="font-bold text-primary-600 dark:text-primary-400" dir="ltr">× {activityMeta.multiplier}</p>
               </div>

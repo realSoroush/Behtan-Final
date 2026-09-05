@@ -316,3 +316,78 @@ comment on table public.meal_templates is
 comment on table public.meal_template_slots is
   'Ordered foods that compose each meal template.';
 
+
+-- ============================================================================
+-- TABLE: nutrition_protein_policy
+-- Singleton runtime configuration for Protein Engine v3.
+-- ============================================================================
+
+create table if not exists public.nutrition_protein_policy (
+  id text primary key default 'default' check (id = 'default'),
+  maintenance_no_rt_min numeric(4,2) not null default 1.20 check (maintenance_no_rt_min between 0.80 and 3.50),
+  maintenance_rt_min numeric(4,2) not null default 1.40 check (maintenance_rt_min between 0.80 and 3.50),
+  weight_loss_no_rt_min numeric(4,2) not null default 1.30 check (weight_loss_no_rt_min between 0.80 and 3.50),
+  weight_loss_rt_min numeric(4,2) not null default 1.60 check (weight_loss_rt_min between 0.80 and 3.50),
+  weight_gain_no_rt_min numeric(4,2) not null default 1.40 check (weight_gain_no_rt_min between 0.80 and 3.50),
+  weight_gain_rt_min numeric(4,2) not null default 1.60 check (weight_gain_rt_min between 0.80 and 3.50),
+  maintenance_no_rt numeric(4,2) not null default 1.40 check (maintenance_no_rt between 0.80 and 3.50),
+  maintenance_rt numeric(4,2) not null default 1.60 check (maintenance_rt between 0.80 and 3.50),
+  weight_loss_no_rt numeric(4,2) not null default 1.60 check (weight_loss_no_rt between 0.80 and 3.50),
+  weight_loss_rt numeric(4,2) not null default 2.00 check (weight_loss_rt between 0.80 and 3.50),
+  weight_gain_no_rt numeric(4,2) not null default 1.60 check (weight_gain_no_rt between 0.80 and 3.50),
+  weight_gain_rt numeric(4,2) not null default 1.70 check (weight_gain_rt between 0.80 and 3.50),
+  obesity_bmi_threshold numeric(4,1) not null default 30.0 check (obesity_bmi_threshold between 25 and 60),
+  reference_bmi numeric(4,1) not null default 25.0 check (reference_bmi between 18 and 35),
+  excess_weight_fraction numeric(5,3) not null default 0.400 check (excess_weight_fraction between 0 and 1),
+  max_protein_g_per_day numeric(6,1) not null default 220.0 check (max_protein_g_per_day between 50 and 400),
+  max_protein_calorie_fraction numeric(5,3) not null default 0.350 check (max_protein_calorie_fraction between 0.100 and 0.600),
+  fat_calorie_fraction numeric(5,3) not null default 0.250 check (fat_calorie_fraction between 0.150 and 0.450),
+  notes text not null default 'Protein Engine v3 Phase 1 default policy',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint nutrition_protein_policy_maintenance_no_rt_range_check check (maintenance_no_rt_min <= maintenance_no_rt),
+  constraint nutrition_protein_policy_maintenance_rt_range_check check (maintenance_rt_min <= maintenance_rt),
+  constraint nutrition_protein_policy_weight_loss_no_rt_range_check check (weight_loss_no_rt_min <= weight_loss_no_rt),
+  constraint nutrition_protein_policy_weight_loss_rt_range_check check (weight_loss_rt_min <= weight_loss_rt),
+  constraint nutrition_protein_policy_weight_gain_no_rt_range_check check (weight_gain_no_rt_min <= weight_gain_no_rt),
+  constraint nutrition_protein_policy_weight_gain_rt_range_check check (weight_gain_rt_min <= weight_gain_rt),
+  constraint nutrition_protein_policy_reference_lt_obesity_check check (reference_bmi < obesity_bmi_threshold),
+  constraint nutrition_protein_policy_macro_room_check check (max_protein_calorie_fraction + fat_calorie_fraction <= 0.850)
+);
+
+insert into public.nutrition_protein_policy (
+  id,
+  maintenance_no_rt_min, maintenance_rt_min,
+  weight_loss_no_rt_min, weight_loss_rt_min,
+  weight_gain_no_rt_min, weight_gain_rt_min,
+  maintenance_no_rt, maintenance_rt, weight_loss_no_rt, weight_loss_rt,
+  weight_gain_no_rt, weight_gain_rt, obesity_bmi_threshold, reference_bmi,
+  excess_weight_fraction, max_protein_g_per_day,
+  max_protein_calorie_fraction, fat_calorie_fraction, notes
+)
+values (
+  'default',
+  1.20, 1.40, 1.30, 1.60, 1.40, 1.60,
+  1.40, 1.60, 1.60, 2.00, 1.60, 1.70, 30.0, 25.0,
+  0.400, 220.0, 0.350, 0.250, 'Protein Engine v3 Phase 1 default policy'
+)
+on conflict (id) do nothing;
+
+drop trigger if exists trg_nutrition_protein_policy_updated_at on public.nutrition_protein_policy;
+create trigger trg_nutrition_protein_policy_updated_at
+before update on public.nutrition_protein_policy
+for each row execute function public.set_updated_at();
+
+alter table public.nutrition_protein_policy enable row level security;
+
+drop policy if exists "Authenticated users can read protein policy" on public.nutrition_protein_policy;
+create policy "Authenticated users can read protein policy"
+  on public.nutrition_protein_policy for select to authenticated
+  using (id = 'default');
+
+revoke all on public.nutrition_protein_policy from anon;
+revoke insert, update, delete on public.nutrition_protein_policy from authenticated;
+grant select on public.nutrition_protein_policy to authenticated;
+
+comment on table public.nutrition_protein_policy is
+  'Singleton runtime configuration for Behtan Protein Engine v3. Edit in Supabase Dashboard; browser clients are read-only.';
