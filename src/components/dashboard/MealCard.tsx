@@ -11,9 +11,10 @@ import type { Meal, MealComponent } from '@/types';
 interface ComponentRowProps {
   component: MealComponent;
   onSwap: () => void;
+  swapDisabled?: boolean;
 }
 
-function ComponentRow({ component, onSwap }: ComponentRowProps) {
+function ComponentRow({ component, onSwap, swapDisabled = false }: ComponentRowProps) {
   const { foodItem, grams, kcal } = component;
 
   // Display quantity in the food's natural unit (عدد/برش/اسکوپ) when it's
@@ -44,8 +45,9 @@ function ComponentRow({ component, onSwap }: ComponentRowProps) {
       <button
         type="button"
         onClick={onSwap}
-        title="جایگزینی این ماده غذایی"
-        className="flex-shrink-0 flex items-center gap-1 text-xs text-primary-600 dark:text-primary-400 font-medium hover:text-primary-700 transition-colors mt-0.5 py-1 px-2 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/20"
+        disabled={swapDisabled}
+        title={swapDisabled ? 'برای تغییر غذای مصرف‌شده، ابتدا تیک وعده را بردارید' : 'جایگزینی این ماده غذایی'}
+        className="flex-shrink-0 flex items-center gap-1 text-xs text-primary-600 dark:text-primary-400 font-medium hover:text-primary-700 transition-colors mt-0.5 py-1 px-2 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/20 disabled:text-neutral-300 dark:disabled:text-neutral-700 disabled:hover:bg-transparent disabled:cursor-not-allowed"
       >
         <RefreshCw size={13} />
         <span>جایگزین</span>
@@ -60,11 +62,13 @@ function ComponentRow({ component, onSwap }: ComponentRowProps) {
 
 interface MealCardProps {
   meal: Meal;
+  isConsumedSaving?: boolean;
+  consumedToggleDisabled?: boolean;
   onToggleConsumed: () => void;
   onSwapComponent: (componentIndex: number) => void;
 }
 
-export function MealCard({ meal, onToggleConsumed, onSwapComponent }: MealCardProps) {
+export function MealCard({ meal, isConsumedSaving = false, consumedToggleDisabled = false, onToggleConsumed, onSwapComponent }: MealCardProps) {
   const [expanded, setExpanded] = useState(!meal.consumed);
 
   return (
@@ -83,7 +87,10 @@ export function MealCard({ meal, onToggleConsumed, onSwapComponent }: MealCardPr
         <button
           type="button"
           onClick={onToggleConsumed}
-          className="flex-shrink-0 text-primary-500 hover:text-primary-600 transition-colors"
+          disabled={isConsumedSaving || consumedToggleDisabled}
+          aria-label={meal.consumed ? 'علامت‌گذاری وعده به‌عنوان مصرف‌نشده' : 'علامت‌گذاری وعده به‌عنوان مصرف‌شده'}
+          title={consumedToggleDisabled ? 'همگام‌سازی وضعیت وعده‌ها در دسترس نیست' : undefined}
+          className={`flex-shrink-0 text-primary-500 hover:text-primary-600 transition-colors disabled:cursor-not-allowed ${isConsumedSaving ? 'opacity-60' : ''}`}
         >
           {meal.consumed
             ? <CheckCircle2 size={22} className="text-primary-500" />
@@ -140,6 +147,7 @@ export function MealCard({ meal, onToggleConsumed, onSwapComponent }: MealCardPr
                 <ComponentRow
                   key={`${component.foodItem.id}-${idx}`}
                   component={component}
+                  swapDisabled={meal.consumed}
                   onSwap={() => onSwapComponent(idx)}
                 />
               ))}

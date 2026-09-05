@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useNutritionCatalog } from '@/hooks/useNutritionCatalog';
 import { useProteinEnginePolicy } from '@/hooks/useProteinEnginePolicy';
+import { useDailyMealProgress } from '@/hooks/useDailyMealProgress';
 import { calculateFullNutritionPlanWithTrace, toPersianDigits } from '@/utils/nutritionHelpers';
 import {
   generateDailyMealPlan,
@@ -20,6 +21,7 @@ import { APP_LOGO_PATH, APP_NAME_FA } from '@/constants/brand';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { NUTRITION_DEBUG_CONFIG } from '@/config/nutritionConfig';
 import { evaluateDailyFoodQuality } from '@/utils/nutritionQuality';
+import { applyDailyMealSnapshots, getLocalDateKey } from '@/utils/dailyMealProgress';
 
 // ============================================================================
 // Helper: compute consumed macros from meal checkboxes
@@ -62,6 +64,26 @@ export function DashboardPage() {
   } = useProteinEnginePolicy();
 
   const [isWorkoutDay, setIsWorkoutDay] = useState(false);
+  const [todayKey, setTodayKey] = useState(() => getLocalDateKey());
+
+  useEffect(() => {
+    const syncDate = () => setTodayKey(getLocalDateKey());
+    const timer = window.setInterval(syncDate, 60_000);
+    window.addEventListener('focus', syncDate);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', syncDate);
+    };
+  }, []);
+
+  const {
+    snapshots: consumedMealSnapshots,
+    loading: mealProgressLoading,
+    error: mealProgressError,
+    savingSlots: mealProgressSavingSlots,
+    setMealConsumed,
+    refetch: refetchMealProgress,
+  } = useDailyMealProgress(user?.id, todayKey);
 
   // Swap modal state - identifies which meal + which component within it
   const [swapMealIndex, setSwapMealIndex] = useState<number | null>(null);
@@ -114,7 +136,7 @@ export function DashboardPage() {
     }
 
     try {
-      const dateKey = `${new Date().toISOString().slice(0, 10)}-v${planVersion}`;
+      const dateKey = `${todayKey}-v${planVersion}`;
       return {
         plan: generateDailyMealPlan(
           targets,
@@ -131,35 +153,44 @@ export function DashboardPage() {
         : 'تولید برنامه غذایی با خطا مواجه شد.';
       return { plan: null, error: message };
     }
-  }, [catalog, targets, profile, isWorkoutDay, planVersion]);
+  }, [catalog, targets, profile, isWorkoutDay, planVersion, todayKey]);
 
   const mealPlan = mealPlanResult.plan;
 
-  // Apply per-meal consumed toggles and any swaps on top of the generated plan
+  // Swaps stay editable in memory; consumed state is persistent daily history.
   const [swappedPlan, setSwappedPlan] = useState<DailyMealPlan | null>(null);
-  const activePlan = swappedPlan ?? mealPlan;
+  const editablePlan = swappedPlan ?? mealPlan;
+  const activePlan = useMemo(
+    () => applyDailyMealSnapshots(editablePlan, consumedMealSnapshots),
+    [editablePlan, consumedMealSnapshots]
+  );
 
   const resetSwapped = useCallback(() => setSwappedPlan(null), []);
 
+  useEffect(() => {
+    setSwappedPlan(null);
+    setPlanVersion(0);
+    setSwapMealIndex(null);
+    setSwapComponentIndex(null);
+  }, [todayKey]);
+
   const handleToggleConsumed = (mealIdx: number) => {
-    if (!activePlan) return;
-    const updated = {
-      ...activePlan,
-      meals: activePlan.meals.map((m, i) => (i === mealIdx ? { ...m, consumed: !m.consumed } : m)),
-    };
-    setSwappedPlan(updated);
+    const meal = activePlan?.meals[mealIdx];
+    if (!meal || mealProgressError || mealProgressSavingSlots.has(meal.slot)) return;
+    void setMealConsumed(meal, !meal.consumed).catch(() => {});
   };
 
   const handleSwapComponent = (mealIdx: number, componentIdx: number) => {
+    if (activePlan?.meals[mealIdx]?.consumed) return;
     setSwapMealIndex(mealIdx);
     setSwapComponentIndex(componentIdx);
   };
 
   const handleSwapSelect = (option: FoodSwapOption) => {
-    if (!option.isEquivalent || !activePlan || swapMealIndex === null) return;
+    if (!option.isEquivalent || !editablePlan || swapMealIndex === null) return;
     const updated = {
-      ...activePlan,
-      meals: activePlan.meals.map((m, i) => (i === swapMealIndex ? option.updatedMeal : m)),
+      ...editablePlan,
+      meals: editablePlan.meals.map((m, i) => (i === swapMealIndex ? option.updatedMeal : m)),
     };
     setSwappedPlan(updated);
   };
@@ -210,7 +241,7 @@ export function DashboardPage() {
   );
 
   // ---- Loading / error states ----
-  if (profileLoading || catalogLoading || proteinPolicyLoading) {
+  if (profileLoading || catalogLoading || proteinPolicyLoading || mealProgressLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-3">
@@ -336,6 +367,22 @@ export function DashboardPage() {
           تولید برنامه غذایی جدید
         </button>
 
+        {mealProgressError && (
+          <div className="rounded-2xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 flex items-center justify-between gap-3">
+            <p className="text-xs leading-5 text-amber-800 dark:text-amber-200">
+              {mealProgressError} تا همگام‌سازی مجدد، تغییر تیک وعده‌ها غیرفعال است.
+            </p>
+            <button
+              type="button"
+              onClick={() => void refetchMealProgress()}
+              className="flex-shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-amber-300 dark:border-amber-800 px-2.5 py-1.5 text-xs font-semibold text-amber-800 dark:text-amber-200"
+            >
+              <RefreshCw size={12} />
+              تلاش دوباره
+            </button>
+          </div>
+        )}
+
         {/* Meals section */}
         {mealPlanResult.error ? (
           <div className="rounded-2xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 p-5 text-center space-y-3">
@@ -361,6 +408,8 @@ export function DashboardPage() {
               <MealCard
                 key={meal.slot}
                 meal={meal}
+                isConsumedSaving={mealProgressSavingSlots.has(meal.slot)}
+                consumedToggleDisabled={Boolean(mealProgressError)}
                 onToggleConsumed={() => handleToggleConsumed(mealIdx)}
                 onSwapComponent={(componentIdx) => handleSwapComponent(mealIdx, componentIdx)}
               />

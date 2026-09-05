@@ -44,6 +44,9 @@ assert(schema.includes('revoke all on public.user_profiles from anon'), 'Anonymo
 assert(schema.includes('revoke all on public.food_items from anon'), 'Anonymous catalog access is not explicitly revoked');
 assert(schema.includes('grant select, insert, update on public.user_profiles to authenticated'), 'Authenticated profile grants are incomplete');
 assert(schema.includes('grant select on public.food_items to authenticated'), 'Authenticated catalog select grant missing');
+assert(schema.includes('alter table public.daily_meal_checkins enable row level security'), 'Daily meal check-ins must have RLS enabled');
+assert(schema.includes('revoke all on public.daily_meal_checkins from anon'), 'Anonymous daily meal check-in access is not explicitly revoked');
+assert(schema.includes('grant select, insert, update, delete on public.daily_meal_checkins to authenticated'), 'Authenticated daily meal check-in grants are incomplete');
 
 console.log('✅ Behtan Auth/RLS security smoke test passed');
 console.log('   Production auth path: phone OTP only');
