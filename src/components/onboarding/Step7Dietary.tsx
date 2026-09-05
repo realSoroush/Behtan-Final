@@ -2,7 +2,7 @@ import { StepHeader } from '@/components/ui/StepHeader';
 import { Button } from '@/components/ui/Button';
 import { OptionCard, CheckboxCard } from '@/components/ui/Card';
 import { useOnboardingStore } from '@/hooks/useOnboardingStore';
-import type { Allergy, VegetarianStatus } from '@/types';
+import type { Allergy, ProteinBudgetPreference, VegetarianStatus } from '@/types';
 
 const VEGETARIAN_OPTIONS: { value: VegetarianStatus; icon: string; label: string; description: string }[] = [
   { value: 'none', icon: '🍖', label: 'همه‌چیزخوار', description: 'هیچ محدودیتی ندارم' },
@@ -21,6 +21,32 @@ const ALLERGIES: { value: Allergy; icon: string; label: string }[] = [
   { value: 'seafood', icon: '🦐', label: 'غذاهای دریایی' },
 ];
 
+const PROTEIN_BUDGET_OPTIONS: {
+  value: ProteinBudgetPreference;
+  icon: string;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: 'economic',
+    icon: '💰',
+    label: 'اقتصادی',
+    description: 'پروتئین کافی با تمرکز بیشتر روی پایین نگه داشتن هزینه مواد غذایی',
+  },
+  {
+    value: 'balanced',
+    icon: '⚖️',
+    label: 'متعادل',
+    description: 'تعادل بین هزینه مواد غذایی و پروتئین بالاتر برای ترکیب بدنی بهتر',
+  },
+  {
+    value: 'performance',
+    icon: '💪',
+    label: 'عملکردی',
+    description: 'اولویت بیشتر به حفظ یا ساخت عضله؛ ممکن است هزینه مواد غذایی بالاتر باشد',
+  },
+];
+
 export function Step7Dietary() {
   const { data, updateData, nextStep, prevStep, currentStep } = useOnboardingStore();
 
@@ -37,12 +63,11 @@ export function Step7Dietary() {
     <div className="space-y-7">
       <StepHeader
         step={currentStep}
-        title="رژیم غذایی و آلرژی‌ها"
-        subtitle="فیلتر دقیق غذاها بر اساس پاسخ‌های این مرحله انجام می‌شود."
+        title="رژیم غذایی، آلرژی و بودجه"
+        subtitle="نوع غذاها و سطح هدف پروتئین بر اساس پاسخ‌های این مرحله شخصی‌سازی می‌شود."
         onBack={prevStep}
       />
 
-      {/* Vegetarian status */}
       <div>
         <p className="text-sm font-semibold text-neutral-600 dark:text-neutral-400 mb-3">نوع رژیم</p>
         <div className="space-y-2">
@@ -59,7 +84,6 @@ export function Step7Dietary() {
         </div>
       </div>
 
-      {/* Allergies */}
       <div>
         <p className="text-sm font-semibold text-neutral-600 dark:text-neutral-400 mb-3">
           آلرژی یا عدم تحمل غذایی{' '}
@@ -78,7 +102,28 @@ export function Step7Dietary() {
         </div>
       </div>
 
-      <Button onClick={nextStep}>ادامه</Button>
+      <div>
+        <p className="text-sm font-semibold text-neutral-600 dark:text-neutral-400 mb-1">
+          اولویت هزینه برای پروتئین
+        </p>
+        <p className="mb-3 text-xs leading-5 text-neutral-400 dark:text-neutral-500">
+          این انتخاب کیفیت و ایمنی رژیم را تغییر نمی‌دهد؛ فقط مشخص می‌کند هدف پروتئین شما در محدوده به‌تن چقدر به سمت حد اقتصادی یا هدف عملکردی نزدیک باشد.
+        </p>
+        <div className="space-y-2">
+          {PROTEIN_BUDGET_OPTIONS.map((opt) => (
+            <OptionCard
+              key={opt.value}
+              selected={data.proteinBudgetPreference === opt.value}
+              onClick={() => updateData({ proteinBudgetPreference: opt.value })}
+              icon={opt.icon}
+              label={opt.label}
+              description={opt.description}
+            />
+          ))}
+        </div>
+      </div>
+
+      <Button onClick={nextStep} disabled={!data.proteinBudgetPreference}>ادامه</Button>
     </div>
   );
 }

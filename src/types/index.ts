@@ -10,6 +10,7 @@ export type DailyStepsRange = 'under_4000' | '4000_7000' | '7000_10000' | 'over_
 export type WorkoutDurationRange = 'under_30' | '30_60' | 'over_60';
 export type WorkoutIntensity = 'light' | 'moderate' | 'vigorous';
 export type TrainingType = 'cardio' | 'resistance' | 'mixed';
+export type ProteinBudgetPreference = 'economic' | 'balanced' | 'performance';
 export type WorkoutLocation = 'home' | 'gym' | 'none';
 export type Motivation = 'health' | 'appearance' | 'confidence' | 'medical' | 'performance' | 'event';
 export type WeightLossSpeed = 'mild' | 'standard' | 'fast';
@@ -89,6 +90,8 @@ export interface UserProfile {
   schedule_json: ScheduleJson | null;
   medical_conditions_json: MedicalConditionsJson | null;
   dietary_preferences_json: DietaryPreferencesJson | null;
+  /** User-selected protein affordability/performance preference. Null = legacy profile, treated as performance to preserve prior output. */
+  protein_budget_preference: ProteinBudgetPreference | null;
   weight_loss_speed: WeightLossSpeed | null;
   body_fat_pct: number | null;
   /** Provenance matters: AI visual estimates are informational; measured values may drive Katch-McArdle automatically. */
@@ -334,6 +337,10 @@ export interface ProteinEnginePolicy {
   weightLossResistanceTraining: number;
   weightGainNoResistanceTraining: number;
   weightGainResistanceTraining: number;
+  /** Interpolation positions between the minimum and preferred protein endpoints. */
+  economicProteinRangePosition: number;
+  balancedProteinRangePosition: number;
+  performanceProteinRangePosition: number;
   obesityBmiThreshold: number;
   referenceBmi: number;
   excessWeightFraction: number;
@@ -383,6 +390,7 @@ export interface OnboardingData {
   medications: string;
   vegetarianStatus: VegetarianStatus;
   allergies: Allergy[];
+  proteinBudgetPreference: ProteinBudgetPreference | null;
   weightLossSpeed: WeightLossSpeed;
   bodyScanImage: string | null;
   bodyScanSkipped: boolean;
@@ -428,6 +436,7 @@ export const createEmptyOnboardingData = (): OnboardingData => ({
   medications: '',
   vegetarianStatus: 'none',
   allergies: [],
+  proteinBudgetPreference: null,
   weightLossSpeed: 'standard',
   bodyScanImage: null,
   bodyScanSkipped: false,

@@ -19,6 +19,7 @@ import type {
   WeightLossSpeed,
   BodyFatSource,
   TrainingType,
+  ProteinBudgetPreference,
   ProteinEnginePolicy,
 } from '@/types';
 import { DEFAULT_PROTEIN_ENGINE_POLICY } from './proteinPolicy.ts';
@@ -318,14 +319,29 @@ export function resolveProteinFactorRangeGPerKg(
   }
 }
 
+export function resolveProteinBudgetPosition(
+  preference: ProteinBudgetPreference = 'performance',
+  policy: ProteinEnginePolicy = DEFAULT_PROTEIN_ENGINE_POLICY
+): number {
+  switch (preference) {
+    case 'economic':
+      return policy.economicProteinRangePosition;
+    case 'balanced':
+      return policy.balancedProteinRangePosition;
+    case 'performance':
+      return policy.performanceProteinRangePosition;
+  }
+}
+
 export function resolveProteinFactorGPerKg(
   goal: Goal,
   trainingType?: TrainingType | null,
-  policy: ProteinEnginePolicy = DEFAULT_PROTEIN_ENGINE_POLICY
+  policy: ProteinEnginePolicy = DEFAULT_PROTEIN_ENGINE_POLICY,
+  budgetPreference: ProteinBudgetPreference = 'performance'
 ): number {
-  // Phase 2A introduces a range but intentionally keeps the preferred endpoint
-  // as the active prescription. Budget Preference will select/interpolate later.
-  return resolveProteinFactorRangeGPerKg(goal, trainingType, policy).preferred;
+  const range = resolveProteinFactorRangeGPerKg(goal, trainingType, policy);
+  const position = resolveProteinBudgetPosition(budgetPreference, policy);
+  return range.minimum + (range.preferred - range.minimum) * position;
 }
 
 /**
@@ -368,13 +384,19 @@ export function calculateMacros(
   goal: Goal,
   heightCm?: number,
   trainingType?: TrainingType | null,
-  proteinPolicy: ProteinEnginePolicy = DEFAULT_PROTEIN_ENGINE_POLICY
+  proteinPolicy: ProteinEnginePolicy = DEFAULT_PROTEIN_ENGINE_POLICY,
+  proteinBudgetPreference: ProteinBudgetPreference = 'performance'
 ): MacroTargets {
   assertFinitePositive(targetCalories, 'targetCalories');
   assertFinitePositive(weightKg, 'weightKg');
 
   const referenceWeightKg = calculateProteinReferenceWeightKg(weightKg, heightCm, proteinPolicy);
-  const proteinFactor = resolveProteinFactorGPerKg(goal, trainingType, proteinPolicy);
+  const proteinFactor = resolveProteinFactorGPerKg(
+    goal,
+    trainingType,
+    proteinPolicy,
+    proteinBudgetPreference
+  );
   const rawProteinGrams = referenceWeightKg * proteinFactor;
   const calorieLimitedProteinGrams =
     (targetCalories * proteinPolicy.maxProteinCalorieFraction) / KCAL_PER_GRAM_PROTEIN;
@@ -431,6 +453,8 @@ export interface FullNutritionCalcInput {
   isWorkoutDay?: boolean;
   /** Protein targeting uses this separately from the TDEE activity bucket. */
   trainingType?: TrainingType | null;
+  /** User-selected affordability/performance position. Legacy callers default to performance to preserve prior output. */
+  proteinBudgetPreference?: ProteinBudgetPreference | null;
   /** Supabase-backed runtime policy in production; deterministic defaults in tests/tools. */
   proteinPolicy?: ProteinEnginePolicy;
   /** Test/diagnostic override only. Production callers normally omit this. */
@@ -466,10 +490,12 @@ export interface NutritionCalculationTrace {
   proteinReferenceWeightKg: number;
   proteinMinimumFactorGPerKg: number;
   proteinPreferredFactorGPerKg: number;
-  /** Active factor. Phase 2A intentionally equals preferred. */
-  proteinFactorGPerKg: number;
   proteinMinimumTargetGrams: number;
   proteinPreferredTargetGrams: number;
+  proteinBudgetPreference: ProteinBudgetPreference;
+  proteinBudgetPosition: number;
+  /** Active factor selected inside the minimum↔preferred range. */
+  proteinFactorGPerKg: number;
   rawProteinTargetGrams: number;
   finalProteinTargetGrams: number;
   proteinCalorieShare: number;
@@ -529,11 +555,20 @@ export function calculateFullNutritionPlanWithTrace(
     input.trainingType,
     proteinPolicy
   );
-  // Phase 2A preserves current production behavior: preferred remains active.
-  const proteinFactorGPerKg = proteinFactorRange.preferred;
+  const proteinBudgetPreference = input.proteinBudgetPreference ?? 'performance';
+  const proteinBudgetPosition = resolveProteinBudgetPosition(
+    proteinBudgetPreference,
+    proteinPolicy
+  );
+  const proteinFactorGPerKg = resolveProteinFactorGPerKg(
+    input.goal,
+    input.trainingType,
+    proteinPolicy,
+    proteinBudgetPreference
+  );
   const proteinMinimumTargetRaw = proteinReferenceWeight * proteinFactorRange.minimum;
   const proteinPreferredTargetRaw = proteinReferenceWeight * proteinFactorRange.preferred;
-  const rawProteinTargetGrams = proteinPreferredTargetRaw;
+  const rawProteinTargetGrams = proteinReferenceWeight * proteinFactorGPerKg;
   const calorieProteinCapGrams =
     (targetCalories * proteinPolicy.maxProteinCalorieFraction) / KCAL_PER_GRAM_PROTEIN;
   const targets = calculateMacros(
@@ -542,7 +577,8 @@ export function calculateFullNutritionPlanWithTrace(
     input.goal,
     input.heightCm,
     input.trainingType,
-    proteinPolicy
+    proteinPolicy,
+    proteinBudgetPreference
   );
   return {
     targets,
@@ -578,6 +614,8 @@ export function calculateFullNutritionPlanWithTrace(
       proteinFactorGPerKg,
       proteinMinimumTargetGrams: Number(proteinMinimumTargetRaw.toFixed(1)),
       proteinPreferredTargetGrams: Number(proteinPreferredTargetRaw.toFixed(1)),
+      proteinBudgetPreference,
+      proteinBudgetPosition: Number(proteinBudgetPosition.toFixed(3)),
       rawProteinTargetGrams: Number(rawProteinTargetGrams.toFixed(1)),
       finalProteinTargetGrams: targets.proteinGrams,
       proteinCalorieShare: Number((targets.proteinCal / Math.max(1, targetCalories)).toFixed(3)),

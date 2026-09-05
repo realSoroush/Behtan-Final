@@ -87,6 +87,9 @@ export function DashboardPage() {
       bodyFatSource: profile.body_fat_source,
       isWorkoutDay,
       trainingType: profile.activity_profile_json?.trainingType ?? null,
+      // Legacy profiles predate budget preference. Keep their previous preferred-target
+      // behavior instead of silently lowering protein after this release.
+      proteinBudgetPreference: profile.protein_budget_preference ?? 'performance',
       proteinPolicy,
     });
   }, [profile, isWorkoutDay, proteinPolicy]);

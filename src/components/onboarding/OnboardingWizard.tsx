@@ -149,6 +149,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         vegetarianStatus: data.vegetarianStatus,
         allergies: data.allergies,
       },
+      protein_budget_preference: data.proteinBudgetPreference,
       weight_loss_speed: data.weightLossSpeed,
       body_fat_pct: data.bodyScanResult?.bodyFatPct ?? null,
       body_fat_source: data.bodyScanResult ? 'ai_visual' : null,

@@ -28,7 +28,8 @@
     "test:routing": "node scripts/routing-stability.smoke-test.mjs",
     "test:protein": "node --experimental-strip-types scripts/protein-engine-v3.smoke-test.mjs",
     "test:protein-policy": "node --experimental-strip-types scripts/protein-policy-supabase.smoke-test.mjs",
-    "test:protein-range": "node --experimental-strip-types scripts/protein-minimum-preferred.smoke-test.mjs"
+    "test:protein-range": "node --experimental-strip-types scripts/protein-minimum-preferred.smoke-test.mjs",
+    "test:protein-budget": "node --experimental-strip-types scripts/protein-budget-preference.smoke-test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

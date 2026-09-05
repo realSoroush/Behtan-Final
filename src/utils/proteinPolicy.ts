@@ -18,6 +18,9 @@ export const DEFAULT_PROTEIN_ENGINE_POLICY: ProteinEnginePolicy = {
   weightLossResistanceTraining: 2.0,
   weightGainNoResistanceTraining: 1.6,
   weightGainResistanceTraining: 1.7,
+  economicProteinRangePosition: 0.0,
+  balancedProteinRangePosition: 0.5,
+  performanceProteinRangePosition: 1.0,
   obesityBmiThreshold: 30,
   referenceBmi: 25,
   excessWeightFraction: 0.4,
@@ -41,6 +44,9 @@ export interface ProteinEnginePolicyRow {
   weight_loss_rt: number | string;
   weight_gain_no_rt: number | string;
   weight_gain_rt: number | string;
+  budget_economic_position: number | string;
+  budget_balanced_position: number | string;
+  budget_performance_position: number | string;
   obesity_bmi_threshold: number | string;
   reference_bmi: number | string;
   excess_weight_fraction: number | string;
@@ -85,6 +91,9 @@ export function buildProteinEnginePolicy(row: ProteinEnginePolicyRow): ProteinEn
     weightLossResistanceTraining: inRange(numeric(row.weight_loss_rt, 'weight_loss_rt'), 0.8, 3.5, 'weight_loss_rt'),
     weightGainNoResistanceTraining: inRange(numeric(row.weight_gain_no_rt, 'weight_gain_no_rt'), 0.8, 3.5, 'weight_gain_no_rt'),
     weightGainResistanceTraining: inRange(numeric(row.weight_gain_rt, 'weight_gain_rt'), 0.8, 3.5, 'weight_gain_rt'),
+    economicProteinRangePosition: inRange(numeric(row.budget_economic_position, 'budget_economic_position'), 0, 1, 'budget_economic_position'),
+    balancedProteinRangePosition: inRange(numeric(row.budget_balanced_position, 'budget_balanced_position'), 0, 1, 'budget_balanced_position'),
+    performanceProteinRangePosition: inRange(numeric(row.budget_performance_position, 'budget_performance_position'), 0, 1, 'budget_performance_position'),
     obesityBmiThreshold: inRange(numeric(row.obesity_bmi_threshold, 'obesity_bmi_threshold'), 25, 60, 'obesity_bmi_threshold'),
     referenceBmi: inRange(numeric(row.reference_bmi, 'reference_bmi'), 18, 35, 'reference_bmi'),
     excessWeightFraction: inRange(numeric(row.excess_weight_fraction, 'excess_weight_fraction'), 0, 1, 'excess_weight_fraction'),
@@ -106,6 +115,13 @@ export function buildProteinEnginePolicy(row: ProteinEnginePolicyRow): ProteinEn
     if (minimum > preferred) {
       throw new Error(`[proteinPolicy] ${label}_min cannot exceed its preferred factor.`);
     }
+  }
+
+  if (!(
+    policy.economicProteinRangePosition <= policy.balancedProteinRangePosition
+    && policy.balancedProteinRangePosition <= policy.performanceProteinRangePosition
+  )) {
+    throw new Error('[proteinPolicy] budget protein positions must be ordered economic <= balanced <= performance.');
   }
 
   if (policy.referenceBmi >= policy.obesityBmiThreshold) {

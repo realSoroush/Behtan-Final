@@ -29,6 +29,7 @@ create table if not exists public.user_profiles (
   schedule_json jsonb,
   medical_conditions_json jsonb,
   dietary_preferences_json jsonb,
+  protein_budget_preference text check (protein_budget_preference in ('economic', 'balanced', 'performance')),
   weight_loss_speed text check (weight_loss_speed in ('mild', 'standard', 'fast')),
   body_fat_pct numeric,
   body_fat_source text check (body_fat_source in ('ai_visual', 'measured')),
