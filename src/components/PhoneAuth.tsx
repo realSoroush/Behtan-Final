@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/hooks/useAuth';
 import { APP_LOGO_PATH, APP_NAME_FA } from '@/constants/brand';
@@ -7,7 +8,11 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 type AuthStep = 'phone' | 'otp';
 
-export function PhoneAuth() {
+interface PhoneAuthProps {
+  onBack?: () => void;
+}
+
+export function PhoneAuth({ onBack }: PhoneAuthProps) {
   const { beginPhoneAuth, verifyPhoneOtp, phoneAuthMode, loading, error, clearError } = useAuth();
   const [step, setStep] = useState<AuthStep>('phone');
   const [phone, setPhone] = useState('');
@@ -86,6 +91,16 @@ export function PhoneAuth() {
   return (
     <div className="relative min-h-screen bg-neutral-50 dark:bg-neutral-950 flex flex-col">
       <ThemeToggle className="fixed right-4 top-4 z-50" />
+      {onBack && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="fixed left-4 top-4 z-50 inline-flex h-9 items-center gap-1.5 rounded-xl border border-neutral-200 bg-white/80 px-3 text-xs font-bold text-neutral-600 shadow-sm backdrop-blur transition-colors hover:bg-neutral-100 hover:text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900/80 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-white"
+        >
+          <ArrowRight size={16} aria-hidden="true" />
+          صفحه اصلی
+        </button>
+      )}
       <div className="flex-1 flex flex-col items-center justify-center px-6 text-center pb-8">
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}

@@ -61,4 +61,11 @@
   .option-card-selected {
     @apply border-primary-500 bg-primary-50 dark:bg-primary-900/20;
   }
+
+  .enamad-seal img {
+    display: block;
+    width: auto;
+    max-width: 86px;
+    max-height: 104px;
+  }
 }

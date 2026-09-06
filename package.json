@@ -32,7 +32,8 @@
     "test:protein-budget": "node --experimental-strip-types scripts/protein-budget-preference.smoke-test.mjs",
     "test:meal-progress": "node --experimental-strip-types scripts/daily-meal-progress.smoke-test.mjs",
     "test:medical-safety": "node --experimental-strip-types scripts/medical-eligibility.smoke-test.mjs",
-    "test:body-scan": "node --experimental-strip-types scripts/body-scan-privacy.smoke-test.mjs"
+    "test:body-scan": "node --experimental-strip-types scripts/body-scan-privacy.smoke-test.mjs",
+    "test:landing": "node scripts/landing-page.smoke-test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

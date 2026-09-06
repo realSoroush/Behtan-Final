@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { PhoneAuth } from '@/components/PhoneAuth';
@@ -7,6 +7,11 @@ import { DashboardPage } from '@/components/dashboard/DashboardPage';
 import { SafetyReviewPage } from '@/components/safety/SafetyReviewPage';
 import { MedicalSafetyBlockedPage } from '@/components/safety/MedicalSafetyBlockedPage';
 import { evaluateProfileMedicalEligibility } from '@/utils/medicalEligibility';
+import { LandingPage } from '@/components/landing/LandingPage';
+
+function isAuthRequested() {
+  return typeof window !== 'undefined' && window.location.hash === '#auth';
+}
 
 /**
  * App routing is intentionally derived from authoritative auth/profile state.
@@ -26,6 +31,31 @@ export default function App() {
     upsertProfile,
   } = useUserProfile(user?.id);
   const [reviewingSafetyForUserId, setReviewingSafetyForUserId] = useState<string | null>(null);
+  const [authRequested, setAuthRequested] = useState(isAuthRequested);
+
+  useEffect(() => {
+    const handleHashChange = () => setAuthRequested(isAuthRequested());
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  useEffect(() => {
+    if (!user || window.location.hash !== '#auth') return;
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    setAuthRequested(false);
+  }, [user]);
+
+  const openAuth = () => {
+    if (window.location.hash !== '#auth') window.history.pushState(null, '', '#auth');
+    setAuthRequested(true);
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  };
+
+  const closeAuth = () => {
+    if (window.location.hash === '#auth') window.history.pushState(null, '', window.location.pathname + window.location.search);
+    setAuthRequested(false);
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  };
 
   if (authLoading || (user && profileLoading)) {
     return (
@@ -39,7 +69,7 @@ export default function App() {
   }
 
   if (!user) {
-    return <PhoneAuth />;
+    return authRequested ? <PhoneAuth onBack={closeAuth} /> : <LandingPage onStart={openAuth} />;
   }
 
   if (!profile || profile.onboarding_completed !== true) {
