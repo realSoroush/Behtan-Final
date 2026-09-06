@@ -5,7 +5,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Vazirmatn', 'IRANSans', 'Tahoma', 'sans-serif'],
+        sans: ['IRANSansX', 'IRANSans', 'Tahoma', 'sans-serif'],
       },
       colors: {
         primary: {

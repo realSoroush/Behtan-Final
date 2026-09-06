@@ -50,10 +50,6 @@
 }
 
 @layer components {
-  .landing-font {
-    font-family: 'IRANSansX', 'Vazirmatn', 'IRANSans', Tahoma, sans-serif;
-  }
-
   .card {
     @apply bg-white dark:bg-neutral-900 rounded-3xl shadow-sm border border-neutral-100 dark:border-neutral-800 p-5;
   }
