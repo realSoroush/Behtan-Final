@@ -52,7 +52,7 @@ const STEPS = [
 function LogoLockup() {
   return (
     <a href="#top" className="inline-flex items-center gap-2.5" aria-label="صفحه اصلی به‌تن">
-      <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-neutral-950 p-1.5 shadow-sm dark:bg-white">
+      <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-neutral-950 p-1.5 shadow-sm dark:bg-transparent dark:shadow-none">
         <img src={APP_LOGO_PATH} alt="" className="h-full w-full object-contain" />
       </span>
       <span className="text-xl font-black tracking-tight text-neutral-950 dark:text-white">
@@ -287,14 +287,14 @@ export function LandingPage({ onStart }: LandingPageProps) {
           </div>
         </section>
 
-        <section className="border-t border-neutral-100 bg-primary-50/60 px-5 py-20 text-center dark:border-neutral-900 dark:bg-primary-950/20 sm:px-8 sm:py-24">
+        <section className="border-t border-primary-400 bg-primary-500 px-5 py-20 text-center sm:px-8 sm:py-24">
           <div className="mx-auto max-w-2xl">
-            <h2 className="text-3xl font-black tracking-tight text-neutral-950 dark:text-white sm:text-4xl">آماده‌ای برنامه خودت را بسازی؟</h2>
-            <p className="mt-4 leading-7 text-neutral-600 dark:text-neutral-400">اطلاعاتت را وارد کن و برنامه غذایی شخصی خودت را در به‌تن ببین.</p>
+            <h2 className="text-3xl font-black tracking-tight text-white sm:text-4xl">آماده‌ای برنامه خودت را بسازی؟</h2>
+            <p className="mt-4 leading-7 text-primary-50">اطلاعاتت را وارد کن و برنامه غذایی شخصی خودت را در به‌تن ببین.</p>
             <button
               type="button"
               onClick={onStart}
-              className="mx-auto mt-8 inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-neutral-950 px-8 py-4 font-black text-white transition-all hover:-translate-y-0.5 dark:bg-white dark:text-neutral-950"
+              className="mx-auto mt-8 inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-white px-8 py-4 font-black text-neutral-950 shadow-lg shadow-primary-800/15 transition-all hover:-translate-y-0.5 hover:bg-neutral-50"
             >
               شروع رایگان
               <ArrowLeft size={19} />

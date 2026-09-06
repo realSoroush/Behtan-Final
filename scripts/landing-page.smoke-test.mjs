@@ -13,5 +13,7 @@ assert.match(landing, /ساخت برنامه شخصی/, 'The primary onboarding 
 assert.match(landing, /ورود به حساب/, 'The returning-user CTA is missing.');
 assert.match(app, /authRequested \? <PhoneAuth onBack=\{closeAuth\} \/> : <LandingPage onStart=\{openAuth\} \/>/, 'Logged-out routing must lead to landing or auth.');
 assert.match(auth, /onBack\?: \(\) => void/, 'Auth needs a safe route back to landing.');
+assert.match(landing, /dark:bg-transparent dark:shadow-none/, 'Landing logo background must be transparent in dark mode.');
+assert.match(landing, /border-primary-400 bg-primary-500/, 'The final CTA must keep the brand-green background in both themes.');
 
 console.log('✓ Landing page, auth handoff, and exact eNamad embed verified.');
