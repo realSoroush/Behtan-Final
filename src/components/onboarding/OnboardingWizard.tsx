@@ -24,6 +24,10 @@ import {
   MEDICAL_SAFETY_SCREENING_VERSION,
   resolveSafeWeightLossSpeed,
 } from '@/utils/medicalEligibility';
+import {
+  buildBodyScanConsentRecord,
+  resolveBodyScanResumeStep,
+} from '@/utils/bodyScanPrivacy';
 
 interface OnboardingWizardProps {
   onComplete: () => void | Promise<void>;
@@ -101,7 +105,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       );
       hydrateFromDraft(
         user.id,
-        draftNeedsSafetyReview ? 6 : profile.onboarding_step,
+        draftNeedsSafetyReview
+          ? 6
+          : resolveBodyScanResumeStep(profile.onboarding_step, profile.onboarding_draft_json),
         profile.onboarding_draft_json
       );
     } else {
@@ -184,6 +190,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       weight_loss_speed: resolveSafeWeightLossSpeed(data.weightLossSpeed, medicalEligibility),
       body_fat_pct: data.bodyScanResult?.bodyFatPct ?? null,
       body_fat_source: data.bodyScanResult ? 'ai_visual' : null,
+      body_scan_consent_json: buildBodyScanConsentRecord(data),
       body_type: data.bodyScanResult?.bodyType ?? data.manualBodyType ?? null,
       subscription_tier: data.selectedTier,
       // Completion is committed atomically with clearing the resume draft.

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { createEmptyOnboardingData } from '@/types';
 import type { OnboardingData } from '@/types';
 import { persistOnboardingBeforeAdvance } from '@/utils/onboardingProgress';
+import { sanitizeHydratedOnboardingDraft } from '@/utils/bodyScanPrivacy';
 
 const TOTAL_STEPS = 11;
 
@@ -142,9 +143,9 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   hydrateFromDraft: (userId, step, draft) =>
     set({
       currentStep: Math.max(1, Math.min(step, TOTAL_STEPS)),
-      // Merge with defaults so an older saved draft remains compatible when a
-      // new onboarding field is introduced in a future release.
-      data: { ...createEmptyOnboardingData(), ...draft },
+      // Merge with defaults for legacy compatibility, but never revive an old
+      // Base64 body photo from a persisted draft.
+      data: sanitizeHydratedOnboardingDraft(draft),
       isHydrated: true,
       hydratedUserId: userId,
       submitError: null,

@@ -14,7 +14,7 @@ AI is limited to the optional Body Scan path.
   - `meal_templates`
   - `meal_template_slots`
 - **Nutrition engine:** deterministic TypeScript engine with calorie/macro, allergy/diet, portion-realism and swap guardrails
-- **Body Scan:** browser -> Supabase Edge Function -> Gemini; no AI is used for meal math
+- **Body Scan:** ephemeral browser image -> authenticated Supabase Edge Function -> Gemini; raw photos are not persisted and no AI is used for meal math
 
 ## Setup
 
@@ -44,6 +44,8 @@ For an existing Behtan database, apply migrations in order:
 ```text
 supabase/migrations/20260825_001_nutrition_catalog.sql
 supabase/migrations/20260825_002_security_auth_cleanup.sql
+...
+supabase/migrations/20260906_012_body_scan_privacy.sql
 ```
 
 Verification queries:
@@ -74,6 +76,16 @@ Provider/API details live behind `SmsProvider`; see `PHONE_AUTH_ABSTRACTION_NOTE
 
 Do not reintroduce synthetic-email or phone-derived passwords.
 
+## Body Scan deployment
+
+1. Apply `supabase/migrations/20260906_012_body_scan_privacy.sql`. It adds consent metadata and removes any legacy Base64 photo from onboarding drafts.
+   Run `supabase/verify_body_scan_privacy.sql` afterward; all three count queries must return zero.
+2. Set `GEMINI_API_KEY` as a Supabase Edge Function secret.
+3. If a Vercel preview origin is used, add it to the comma-separated `BODY_SCAN_ALLOWED_ORIGINS` Edge Function secret.
+4. Deploy with JWT verification enabled: `supabase functions deploy body-scan`.
+
+The camera requires HTTPS (localhost is allowed for development). Behtan stores only the validated estimate and consent metadata, never the raw image.
+
 ## Tests
 
 ```bash
@@ -87,6 +99,7 @@ npm run test:nutrition
 npm run test:onboarding
 npm run test:age
 npm run test:brand
+npm run test:body-scan
 npm run build
 ```
 

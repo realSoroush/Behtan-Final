@@ -33,6 +33,31 @@ create table if not exists public.user_profiles (
   weight_loss_speed text check (weight_loss_speed in ('mild', 'standard', 'fast')),
   body_fat_pct numeric,
   body_fat_source text check (body_fat_source in ('ai_visual', 'measured')),
+  body_scan_consent_json jsonb check (
+    body_scan_consent_json is null
+    or (
+      jsonb_typeof(body_scan_consent_json) = 'object'
+      and body_scan_consent_json ?& array[
+        'version',
+        'acceptedAt',
+        'analysisRequestedAt',
+        'processor',
+        'rawImageStored'
+      ]
+      and body_scan_consent_json - array[
+        'version',
+        'acceptedAt',
+        'analysisRequestedAt',
+        'processor',
+        'rawImageStored'
+      ] = '{}'::jsonb
+      and body_scan_consent_json->'version' = '1'::jsonb
+      and jsonb_typeof(body_scan_consent_json->'acceptedAt') = 'string'
+      and jsonb_typeof(body_scan_consent_json->'analysisRequestedAt') = 'string'
+      and body_scan_consent_json->>'processor' = 'google_gemini'
+      and body_scan_consent_json->'rawImageStored' = 'false'::jsonb
+    )
+  ),
   body_type text check (body_type in ('ectomorph', 'mesomorph', 'endomorph')),
   subscription_tier text check (subscription_tier in ('silver', 'gold')),
   onboarding_step int2 not null default 1 check (onboarding_step between 1 and 11),

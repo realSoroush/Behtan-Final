@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import type { OnboardingData, UserProfile } from '@/types';
+import { toPersistedOnboardingDraft } from '@/utils/bodyScanPrivacy';
 
 interface UseUserProfileReturn {
   profile: UserProfile | null;
@@ -98,7 +99,9 @@ export function useUserProfile(userId: string | undefined): UseUserProfileReturn
         {
           id: userId,
           onboarding_step: step,
-          onboarding_draft_json: draft,
+          // Raw body photos are volatile UI state and must never cross this
+          // persistence boundary into user_profiles.
+          onboarding_draft_json: toPersistedOnboardingDraft(draft),
           onboarding_completed: false,
         },
         { onConflict: 'id' }

@@ -80,6 +80,14 @@ export interface DietaryPreferencesJson {
   allergies: Allergy[];
 }
 
+export interface BodyScanConsentJson {
+  version: number;
+  acceptedAt: string;
+  analysisRequestedAt: string | null;
+  processor: 'google_gemini';
+  rawImageStored: false;
+}
+
 // ============================================================================
 // DATABASE MODELS
 // ============================================================================
@@ -110,11 +118,13 @@ export interface UserProfile {
   body_fat_pct: number | null;
   /** Provenance matters: AI visual estimates are informational; measured values may drive Katch-McArdle automatically. */
   body_fat_source: BodyFatSource | null;
+  /** Consent/audit metadata only. The raw body photo is never stored in the profile. */
+  body_scan_consent_json: BodyScanConsentJson | null;
   body_type: BodyType | null;
   subscription_tier: SubscriptionTier | null;
   /** Next onboarding wizard step (1-11) to show when the user resumes. */
   onboarding_step: number;
-  /** Full in-progress OnboardingData snapshot, cleared once onboarding completes. */
+  /** Sanitized in-progress snapshot; volatile bodyScanImage is excluded and the draft is cleared on completion. */
   onboarding_draft_json: OnboardingData | null;
   /** True only after the final onboarding write succeeds. */
   onboarding_completed: boolean;
@@ -410,7 +420,12 @@ export interface OnboardingData {
   allergies: Allergy[];
   proteinBudgetPreference: ProteinBudgetPreference | null;
   weightLossSpeed: WeightLossSpeed;
+  /** Volatile, in-memory-only data URL. Persistence code must always strip this field. */
   bodyScanImage: string | null;
+  bodyScanConsentAccepted: boolean;
+  bodyScanConsentVersion: number | null;
+  bodyScanConsentAcceptedAt: string | null;
+  bodyScanAnalysisRequestedAt: string | null;
   bodyScanSkipped: boolean;
   manualBodyType: BodyType | null;
   bodyScanResult: BodyScanResult | null;
@@ -461,6 +476,10 @@ export const createEmptyOnboardingData = (): OnboardingData => ({
   proteinBudgetPreference: null,
   weightLossSpeed: 'standard',
   bodyScanImage: null,
+  bodyScanConsentAccepted: false,
+  bodyScanConsentVersion: null,
+  bodyScanConsentAcceptedAt: null,
+  bodyScanAnalysisRequestedAt: null,
   bodyScanSkipped: false,
   manualBodyType: null,
   bodyScanResult: null,

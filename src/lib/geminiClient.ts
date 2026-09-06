@@ -17,13 +17,20 @@
 
 import { supabase } from './supabaseClient';
 import type { BodyScanResult, Gender } from '@/types';
+import { isSafeNormalizedBodyScanDataUrl } from '@/utils/bodyScanImage';
 
 export interface BodyScanRequest {
-  imageBase64: string; // data URL or raw base64 (edge function normalizes)
+  /** Volatile normalized JPEG data URL. It is never written to Supabase tables/storage. */
+  imageBase64: string;
   gender: Gender;
   heightCm: number;
   weightKg: number;
   age: number;
+}
+
+export interface BodyScanRequestOptions {
+  signal?: AbortSignal;
+  timeoutMs?: number;
 }
 
 export class BodyScanError extends Error {
@@ -40,13 +47,28 @@ export class BodyScanError extends Error {
  * rejected client-side rather than trusted blindly.
  */
 export async function analyzeBodyScan(
-  request: BodyScanRequest
+  request: BodyScanRequest,
+  options: BodyScanRequestOptions = {}
 ): Promise<BodyScanResult> {
+  if (!isSafeNormalizedBodyScanDataUrl(request.imageBase64)) {
+    throw new BodyScanError('تصویر آماده‌شده معتبر نیست. لطفاً عکس را دوباره ثبت کنید.');
+  }
+
   const { data, error } = await supabase.functions.invoke('body-scan', {
     body: request,
+    signal: options.signal,
+    timeout: options.timeoutMs ?? 45_000,
   });
 
   if (error) {
+    if (options.signal?.aborted) {
+      throw new BodyScanError('تحلیل تصویر لغو شد.', error);
+    }
+
+    const errorText = String(error).toLowerCase();
+    if (errorText.includes('abort') || errorText.includes('timeout')) {
+      throw new BodyScanError('زمان پاسخ سرویس تمام شد. اتصال اینترنت را بررسی و دوباره تلاش کنید.', error);
+    }
     throw new BodyScanError('تحلیل تصویر با خطا مواجه شد. لطفاً دوباره تلاش کنید.', error);
   }
 
@@ -63,7 +85,7 @@ export async function analyzeBodyScan(
  * so the UI can fall back to the manual "visual selection" path instead
  * of showing bogus numbers.
  */
-function isValidBodyScanResult(data: unknown): data is BodyScanResult {
+export function isValidBodyScanResult(data: unknown): data is BodyScanResult {
   if (!data || typeof data !== 'object') return false;
   const d = data as Record<string, unknown>;
 
@@ -73,17 +95,20 @@ function isValidBodyScanResult(data: unknown): data is BodyScanResult {
 
   return (
     typeof d.bodyFatPct === 'number' &&
-    d.bodyFatPct > 0 &&
-    d.bodyFatPct < 70 &&
+    Number.isFinite(d.bodyFatPct) &&
+    d.bodyFatPct >= 5 &&
+    d.bodyFatPct <= 50 &&
     typeof d.biologicalAge === 'number' &&
-    d.biologicalAge > 10 &&
-    d.biologicalAge < 100 &&
+    Number.isFinite(d.biologicalAge) &&
+    d.biologicalAge >= 15 &&
+    d.biologicalAge <= 80 &&
     typeof d.bodyType === 'string' &&
     bodyTypes.includes(d.bodyType) &&
     typeof d.estimatedMuscleMass === 'string' &&
     muscleLevels.includes(d.estimatedMuscleMass) &&
     typeof d.narrative === 'string' &&
     d.narrative.length > 0 &&
+    d.narrative.length <= 600 &&
     typeof d.confidence === 'string' &&
     confidenceLevels.includes(d.confidence)
   );
