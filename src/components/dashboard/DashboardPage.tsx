@@ -22,6 +22,10 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { NUTRITION_DEBUG_CONFIG } from '@/config/nutritionConfig';
 import { evaluateDailyFoodQuality } from '@/utils/nutritionQuality';
 import { applyDailyMealSnapshots, getLocalDateKey } from '@/utils/dailyMealProgress';
+import {
+  evaluateProfileMedicalEligibility,
+  resolveSafeWeightLossSpeed,
+} from '@/utils/medicalEligibility';
 
 // ============================================================================
 // Helper: compute consumed macros from meal checkboxes
@@ -92,9 +96,14 @@ export function DashboardPage() {
   // Plan state (regeneratable via date-seed rotation)
   const [planVersion, setPlanVersion] = useState(0);
 
+  const medicalEligibility = useMemo(
+    () => profile ? evaluateProfileMedicalEligibility(profile) : null,
+    [profile]
+  );
+
   // ---- Compute nutrition targets + a permanent diagnostic trace ----
   const nutritionResult = useMemo(() => {
-    if (!proteinPolicy || !profile?.weight || !profile?.height || !profile?.birth_date || !profile?.gender || !profile?.activity_level || !profile?.goal) {
+    if (!medicalEligibility?.canGenerateAutomaticPlan || !proteinPolicy || !profile?.weight || !profile?.height || !profile?.birth_date || !profile?.gender || !profile?.activity_level || !profile?.goal) {
       return null;
     }
     return calculateFullNutritionPlanWithTrace({
@@ -104,7 +113,7 @@ export function DashboardPage() {
       gender: profile.gender,
       activityLevel: profile.activity_level,
       goal: profile.goal,
-      weightLossSpeed: profile.weight_loss_speed ?? undefined,
+      weightLossSpeed: resolveSafeWeightLossSpeed(profile.weight_loss_speed, medicalEligibility),
       bodyFatPercentage: profile.body_fat_pct ?? undefined,
       bodyFatSource: profile.body_fat_source,
       isWorkoutDay,
@@ -114,7 +123,7 @@ export function DashboardPage() {
       proteinBudgetPreference: profile.protein_budget_preference ?? 'performance',
       proteinPolicy,
     });
-  }, [profile, isWorkoutDay, proteinPolicy]);
+  }, [profile, isWorkoutDay, proteinPolicy, medicalEligibility]);
 
   const targets: MacroTargets | null = nutritionResult?.targets ?? null;
 
@@ -330,6 +339,15 @@ export function DashboardPage() {
       </header>
 
       <div className="max-w-md mx-auto px-4 py-5 space-y-4">
+        {medicalEligibility?.status === 'eligible_with_caution' && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/60 dark:bg-amber-950/30">
+            <p className="font-semibold text-amber-800 dark:text-amber-200">محدودیت ایمنی برنامه فعال است</p>
+            <ul className="mt-1 space-y-1 text-xs leading-5 text-amber-700 dark:text-amber-300">
+              {medicalEligibility.cautions.map((caution) => <li key={caution.code}>• {caution.detail}</li>)}
+            </ul>
+          </div>
+        )}
+
         {/* Daily overview carousel */}
         {(targets && consumed) || foodQuality ? (
           <DailyOverviewCarousel

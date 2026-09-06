@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { StepHeader } from '@/components/ui/StepHeader';
 import { Button } from '@/components/ui/Button';
@@ -5,6 +6,7 @@ import { OptionCard } from '@/components/ui/Card';
 import { useOnboardingStore } from '@/hooks/useOnboardingStore';
 import type { WeightLossSpeed } from '@/types';
 import { WEIGHT_LOSS_SPEED_POLICY, toPersianDigits } from '@/utils/nutritionHelpers';
+import { evaluateOnboardingMedicalEligibility } from '@/utils/medicalEligibility';
 
 interface SpeedOption {
   value: WeightLossSpeed;
@@ -51,6 +53,14 @@ const SPEEDS: SpeedOption[] = [
 
 export function Step8Speed() {
   const { data, updateData, nextStep, prevStep, currentStep } = useOnboardingStore();
+  const medicalEligibility = evaluateOnboardingMedicalEligibility(data);
+  const fastRestricted = !medicalEligibility.fastWeightLossAllowed;
+
+  useEffect(() => {
+    if (fastRestricted && data.weightLossSpeed === 'fast') {
+      updateData({ weightLossSpeed: 'standard' });
+    }
+  }, [data.weightLossSpeed, fastRestricted, updateData]);
 
   // If not a weight loss goal, skip this step automatically
   const isWeightLoss = data.goal === 'weight_loss';
@@ -89,9 +99,12 @@ export function Step8Speed() {
             key={speed.value}
             selected={data.weightLossSpeed === speed.value}
             onClick={() => updateData({ weightLossSpeed: speed.value })}
+            disabled={speed.value === 'fast' && fastRestricted}
             icon={speed.icon}
             label={speed.label}
-            description={`${speed.range} — ${speed.deficit}`}
+            description={speed.value === 'fast' && fastRestricted
+              ? 'به‌دلیل پاسخ‌های ارزیابی ایمنی، این گزینه برای شما فعال نیست.'
+              : `${speed.range} — ${speed.deficit}`}
           />
         ))}
       </div>
@@ -106,6 +119,15 @@ export function Step8Speed() {
               کاهش وزن سریع می‌تواند منجر به افت عضله، ریزش مو، و کمبود ریزمغذی‌ها شود. توصیه می‌شود با پزشک مشورت کنید.
             </p>
           </div>
+        </div>
+      )}
+
+      {fastRestricted && (
+        <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
+          <AlertTriangle size={20} className="mt-0.5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+          <p className="text-sm leading-relaxed text-amber-700 dark:text-amber-300">
+            برای محافظت از سلامت شما، بیشترین سرعت قابل انتخاب «استاندارد» است.
+          </p>
         </div>
       )}
 

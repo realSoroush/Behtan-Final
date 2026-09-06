@@ -109,7 +109,7 @@ serve(async (req: Request) => {
       );
     }
 
-    let parsed: any;
+    let parsed: unknown;
     try {
       parsed = JSON.parse(rawText);
     } catch {

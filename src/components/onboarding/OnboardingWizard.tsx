@@ -19,6 +19,11 @@ import { Step11Paywall } from './Step11Paywall';
 import type { UserProfile } from '@/types';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { estimateActivityLevel } from '@/utils/activityLevel';
+import {
+  evaluateOnboardingMedicalEligibility,
+  MEDICAL_SAFETY_SCREENING_VERSION,
+  resolveSafeWeightLossSpeed,
+} from '@/utils/medicalEligibility';
 
 interface OnboardingWizardProps {
   onComplete: () => void | Promise<void>;
@@ -56,6 +61,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     setProgressSaver,
     hydrateFromDraft,
     markHydratedEmpty,
+    goToStep,
   } = useOnboardingStore();
   const { user } = useAuth();
   const {
@@ -89,7 +95,15 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     checkedUserIdRef.current = user.id;
 
     if (profile?.onboarding_draft_json && profile.onboarding_step > 1) {
-      hydrateFromDraft(user.id, profile.onboarding_step, profile.onboarding_draft_json);
+      const draftNeedsSafetyReview = profile.onboarding_step > 6 && (
+        profile.onboarding_draft_json.safetyScreeningVersion !== MEDICAL_SAFETY_SCREENING_VERSION
+        || profile.onboarding_draft_json.safetyAnswersConfirmed !== true
+      );
+      hydrateFromDraft(
+        user.id,
+        draftNeedsSafetyReview ? 6 : profile.onboarding_step,
+        profile.onboarding_draft_json
+      );
     } else {
       markHydratedEmpty(user.id);
     }
@@ -103,6 +117,19 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
   const handleComplete = async () => {
     if (!user || isSubmitting) return;
+
+    // Defense in depth: never let a stale route, old draft or direct Step 11
+    // interaction bypass the medical gate.
+    const medicalEligibility = evaluateOnboardingMedicalEligibility(data);
+    if (!medicalEligibility.canGenerateAutomaticPlan) {
+      goToStep(6);
+      setSubmitError(
+        medicalEligibility.status === 'needs_screening'
+          ? 'برای ادامه، ارزیابی ایمنی پزشکی را کامل و پاسخ‌ها را تأیید کنید.'
+          : 'با اطلاعات پزشکی ثبت‌شده، به‌تن نمی‌تواند برنامه عمومی خودکار صادر کند.'
+      );
+      return;
+    }
 
     setSubmitting(true);
     setSubmitError(null);
@@ -144,13 +171,17 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         conditions: data.medicalConditions,
         injuries: data.injuries,
         medications: data.medications,
+        pregnancyStatus: data.gender === 'male' ? 'not_applicable' : data.pregnancyStatus,
+        eatingDisorderStatus: data.eatingDisorderStatus,
+        safetyScreeningVersion: data.safetyScreeningVersion,
+        safetyAnswersConfirmed: data.safetyAnswersConfirmed,
       },
       dietary_preferences_json: {
         vegetarianStatus: data.vegetarianStatus,
         allergies: data.allergies,
       },
       protein_budget_preference: data.proteinBudgetPreference,
-      weight_loss_speed: data.weightLossSpeed,
+      weight_loss_speed: resolveSafeWeightLossSpeed(data.weightLossSpeed, medicalEligibility),
       body_fat_pct: data.bodyScanResult?.bodyFatPct ?? null,
       body_fat_source: data.bodyScanResult ? 'ai_visual' : null,
       body_type: data.bodyScanResult?.bodyType ?? data.manualBodyType ?? null,

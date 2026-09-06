@@ -33,13 +33,15 @@ interface OptionCardProps {
   label: string;
   description?: string;
   className?: string;
+  disabled?: boolean;
 }
 
-export function OptionCard({ selected, onClick, icon, label, description, className = '' }: OptionCardProps) {
+export function OptionCard({ selected, onClick, icon, label, description, className = '', disabled = false }: OptionCardProps) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={`
         relative w-full flex items-center gap-4 border-2 rounded-2xl p-4 text-right
         transition-all duration-200 cursor-pointer
@@ -48,6 +50,7 @@ export function OptionCard({ selected, onClick, icon, label, description, classN
             ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
             : 'border-neutral-200 dark:border-neutral-700 hover:border-primary-300 dark:hover:border-primary-700 bg-white dark:bg-neutral-900'
         }
+        ${disabled ? 'cursor-not-allowed opacity-45' : ''}
         ${className}
       `}
     >

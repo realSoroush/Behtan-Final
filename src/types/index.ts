@@ -17,7 +17,16 @@ export type WeightLossSpeed = 'mild' | 'standard' | 'fast';
 export type BodyType = 'ectomorph' | 'mesomorph' | 'endomorph';
 export type VegetarianStatus = 'none' | 'vegan' | 'lacto_ovo' | 'pescatarian' | 'raw';
 export type Allergy = 'dairy' | 'gluten' | 'peanut' | 'tree_nut' | 'soy' | 'seafood';
-export type MedicalCondition = 'diabetes' | 'fatty_liver' | 'pcos' | 'thyroid';
+export type MedicalCondition =
+  | 'diabetes'
+  | 'kidney_disease'
+  | 'heart_disease'
+  | 'advanced_liver_disease'
+  | 'fatty_liver'
+  | 'pcos'
+  | 'thyroid';
+export type PregnancyStatus = 'not_applicable' | 'not_pregnant' | 'pregnant' | 'breastfeeding';
+export type EatingDisorderStatus = 'none' | 'history' | 'active_or_treatment';
 
 export type MealSlot =
   | 'breakfast'
@@ -59,6 +68,11 @@ export interface MedicalConditionsJson {
   conditions: MedicalCondition[];
   injuries: string;
   medications: string;
+  /** Added by Medical Eligibility & Safety Gate v1. Optional for legacy rows. */
+  pregnancyStatus?: PregnancyStatus | null;
+  eatingDisorderStatus?: EatingDisorderStatus | null;
+  safetyScreeningVersion?: number | null;
+  safetyAnswersConfirmed?: boolean;
 }
 
 export interface DietaryPreferencesJson {
@@ -388,6 +402,10 @@ export interface OnboardingData {
   medicalConditions: MedicalCondition[];
   injuries: string;
   medications: string;
+  pregnancyStatus: PregnancyStatus | null;
+  eatingDisorderStatus: EatingDisorderStatus | null;
+  safetyScreeningVersion: number | null;
+  safetyAnswersConfirmed: boolean;
   vegetarianStatus: VegetarianStatus;
   allergies: Allergy[];
   proteinBudgetPreference: ProteinBudgetPreference | null;
@@ -434,6 +452,10 @@ export const createEmptyOnboardingData = (): OnboardingData => ({
   medicalConditions: [],
   injuries: '',
   medications: '',
+  pregnancyStatus: null,
+  eatingDisorderStatus: null,
+  safetyScreeningVersion: null,
+  safetyAnswersConfirmed: false,
   vegetarianStatus: 'none',
   allergies: [],
   proteinBudgetPreference: null,

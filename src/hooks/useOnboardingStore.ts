@@ -21,6 +21,8 @@ interface OnboardingState {
    * Returns true only when the server save succeeded.
    */
   nextStep: () => Promise<boolean>;
+  /** Persist the current draft without navigating (used by medical hard-stop). */
+  saveCurrentStep: () => Promise<boolean>;
   prevStep: () => void;
   goToStep: (step: number) => void;
   updateData: (partial: Partial<OnboardingData>) => void;
@@ -80,6 +82,30 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
       set({
         isSubmitting: false,
         submitError: 'ذخیره اطلاعات انجام نشد. اتصال اینترنت را بررسی کنید و دوباره «ادامه» را بزنید.',
+      });
+      return false;
+    }
+  },
+
+  saveCurrentStep: async () => {
+    const state = get();
+    if (state.isSubmitting) return false;
+    if (!state.progressSaver) {
+      set({ submitError: 'اتصال ذخیره‌سازی آماده نیست. لطفاً چند لحظه دیگر دوباره تلاش کنید.' });
+      return false;
+    }
+
+    set({ isSubmitting: true, submitError: null });
+    try {
+      const latest = get();
+      await latest.progressSaver!(latest.currentStep, latest.data);
+      set({ isSubmitting: false, submitError: null });
+      return true;
+    } catch (error) {
+      console.error('Failed to save current onboarding step:', error);
+      set({
+        isSubmitting: false,
+        submitError: 'ذخیره اطلاعات انجام نشد. اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.',
       });
       return false;
     }

@@ -1,72 +1,128 @@
+import { useMemo, useState } from 'react';
+import { AlertTriangle, ShieldAlert } from 'lucide-react';
 import { StepHeader } from '@/components/ui/StepHeader';
 import { Button } from '@/components/ui/Button';
-import { CheckboxCard } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
 import { useOnboardingStore } from '@/hooks/useOnboardingStore';
-import type { MedicalCondition } from '@/types';
-
-const CONDITIONS: { value: MedicalCondition; icon: string; label: string; description: string }[] = [
-  { value: 'diabetes', icon: '🩸', label: 'دیابت', description: 'دیابت نوع ۱ یا ۲' },
-  { value: 'fatty_liver', icon: '🫀', label: 'کبد چرب', description: 'استئاتوهپاتیت غیرالکلی' },
-  { value: 'pcos', icon: '🔬', label: 'سندروم تخمدان پلی‌کیستیک (PCOS)', description: 'ویژه بانوان' },
-  { value: 'thyroid', icon: '🦋', label: 'مشکل تیروئید', description: 'کم‌کاری یا پرکاری' },
-];
+import { MedicalSafetyForm, type MedicalSafetyFormValue } from '@/components/safety/MedicalSafetyForm';
+import {
+  evaluateOnboardingMedicalEligibility,
+  resolveSafeWeightLossSpeed,
+} from '@/utils/medicalEligibility';
 
 export function Step6Medical() {
-  const { data, updateData, nextStep, prevStep, currentStep } = useOnboardingStore();
+  const {
+    data,
+    updateData,
+    nextStep,
+    saveCurrentStep,
+    prevStep,
+    currentStep,
+    isSubmitting,
+  } = useOnboardingStore();
+  const [savedBlockedAnswers, setSavedBlockedAnswers] = useState(false);
 
-  const toggleCondition = (condition: MedicalCondition) => {
-    const has = data.medicalConditions.includes(condition);
-    updateData({
-      medicalConditions: has
-        ? data.medicalConditions.filter((c) => c !== condition)
-        : [...data.medicalConditions, condition],
-    });
+  const eligibility = useMemo(() => evaluateOnboardingMedicalEligibility(data), [data]);
+  const pregnancyAnswered = data.gender === 'male' || (
+    data.pregnancyStatus === 'not_pregnant'
+    || data.pregnancyStatus === 'pregnant'
+    || data.pregnancyStatus === 'breastfeeding'
+  );
+  const questionnaireComplete = Boolean(
+    data.gender
+    && pregnancyAnswered
+    && data.eatingDisorderStatus
+    && data.safetyAnswersConfirmed
+  );
+  const isBlocked = questionnaireComplete && eligibility.status === 'blocked';
+
+  const handleChange = (patch: Partial<MedicalSafetyFormValue>) => {
+    setSavedBlockedAnswers(false);
+    updateData(patch);
   };
+
+  const handleContinue = async () => {
+    if (!eligibility.fastWeightLossAllowed && data.weightLossSpeed === 'fast') {
+      updateData({ weightLossSpeed: resolveSafeWeightLossSpeed(data.weightLossSpeed, eligibility) });
+    }
+    await nextStep();
+  };
+
+  const handleSaveBlockedAnswers = async () => {
+    const saved = await saveCurrentStep();
+    setSavedBlockedAnswers(saved);
+  };
+
+  if (!data.gender) return null;
 
   return (
     <div className="space-y-6">
       <StepHeader
         step={currentStep}
-        title="وضعیت پزشکی"
-        subtitle="در صورت داشتن هر کدام از شرایط زیر، تیک بزنید. این اطلاعات فقط برای شخصی‌سازی برنامه استفاده می‌شود."
+        title="ارزیابی ایمنی پزشکی"
+        subtitle="پاسخ‌ها مشخص می‌کنند آیا ساخت برنامه غذایی خودکار برای شما مناسب است یا به بررسی متخصص نیاز دارد."
         onBack={prevStep}
       />
 
-      {/* Conditions */}
-      <div className="space-y-3">
-        {CONDITIONS.map((c) => (
-          <CheckboxCard
-            key={c.value}
-            checked={data.medicalConditions.includes(c.value)}
-            onChange={() => toggleCondition(c.value)}
-            icon={c.icon}
-            label={c.label}
-            description={c.description}
-          />
-        ))}
-      </div>
+      <MedicalSafetyForm gender={data.gender} value={data} onChange={handleChange} />
 
-      {/* Free text */}
-      <Input
-        label="آسیب‌دیدگی یا محدودیت جسمی (اختیاری)"
-        placeholder="مثال: زانو درد، کمر درد، دیسک..."
-        value={data.injuries}
-        onChange={(e) => updateData({ injuries: e.target.value })}
-      />
+      {isBlocked && (
+        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-900/60 dark:bg-red-950/30">
+          <div className="flex items-start gap-3">
+            <ShieldAlert size={22} className="mt-0.5 shrink-0 text-red-600 dark:text-red-400" />
+            <div className="space-y-3">
+              <div>
+                <p className="font-bold text-red-800 dark:text-red-200">برنامه خودکار برای شما صادر نمی‌شود</p>
+                <p className="mt-1 text-sm leading-6 text-red-700 dark:text-red-300">
+                  این نتیجه تشخیص پزشکی نیست؛ یعنی نسخه فعلی به‌تن برای شرایط ثبت‌شده شما شخصی‌سازی کافی ندارد.
+                </p>
+              </div>
+              <ul className="space-y-2">
+                {eligibility.blockers.map((blocker) => (
+                  <li key={blocker.code} className="text-sm leading-6 text-red-700 dark:text-red-300">
+                    <strong>{blocker.title}:</strong> {blocker.detail}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-sm leading-6 text-red-800 dark:text-red-200">
+                برای دریافت برنامه، اطلاعات و داروهای خود را با پزشک یا متخصص تغذیه دارای صلاحیت بررسی کنید.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
-      <Input
-        label="داروهای مصرفی (اختیاری)"
-        placeholder="مثال: متفورمین، لووتیروکسین..."
-        value={data.medications}
-        onChange={(e) => updateData({ medications: e.target.value })}
-      />
+      {!isBlocked && eligibility.cautions.length > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/60 dark:bg-amber-950/30">
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={20} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+            <div>
+              <p className="font-semibold text-amber-800 dark:text-amber-200">برنامه با محدودیت ایمنی ساخته می‌شود</p>
+              <ul className="mt-2 space-y-1 text-sm leading-6 text-amber-700 dark:text-amber-300">
+                {eligibility.cautions.map((caution) => <li key={caution.code}>• {caution.detail}</li>)}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
 
-      <p className="text-xs text-neutral-400 dark:text-neutral-500 leading-relaxed">
-        ⚠️ این اپلیکیشن جایگزین مشاوره پزشکی نیست. در صورت داشتن بیماری خاص، حتماً با پزشک مشورت کنید.
-      </p>
-
-      <Button onClick={nextStep}>ادامه</Button>
+      {isBlocked ? (
+        <div className="space-y-2">
+          <Button variant="secondary" onClick={handleSaveBlockedAnswers} loading={isSubmitting}>
+            ذخیره پاسخ‌ها
+          </Button>
+          {savedBlockedAnswers && (
+            <p role="status" className="text-center text-sm text-green-600 dark:text-green-400">پاسخ‌ها با موفقیت ذخیره شدند.</p>
+          )}
+        </div>
+      ) : (
+        <Button
+          onClick={handleContinue}
+          disabled={!questionnaireComplete || !eligibility.canGenerateAutomaticPlan}
+          loading={isSubmitting}
+        >
+          ادامه
+        </Button>
+      )}
     </div>
   );
 }

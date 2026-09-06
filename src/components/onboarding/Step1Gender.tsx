@@ -32,7 +32,16 @@ export function Step1Gender() {
 
   const canContinue = !!data.gender && !!data.province && !!data.city;
 
-  const handleGender = (g: Gender) => updateData({ gender: g, city: '' });
+  const handleGender = (g: Gender) => updateData({
+    gender: g,
+    city: '',
+    medicalConditions: g === 'male'
+      ? data.medicalConditions.filter((condition) => condition !== 'pcos')
+      : data.medicalConditions,
+    pregnancyStatus: g === 'male' ? 'not_applicable' : null,
+    safetyScreeningVersion: null,
+    safetyAnswersConfirmed: false,
+  });
   const handleProvince = (province: string) => updateData({ province, city: '' });
 
   return (

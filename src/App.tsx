@@ -1,8 +1,12 @@
+import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { PhoneAuth } from '@/components/PhoneAuth';
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 import { DashboardPage } from '@/components/dashboard/DashboardPage';
+import { SafetyReviewPage } from '@/components/safety/SafetyReviewPage';
+import { MedicalSafetyBlockedPage } from '@/components/safety/MedicalSafetyBlockedPage';
+import { evaluateProfileMedicalEligibility } from '@/utils/medicalEligibility';
 
 /**
  * App routing is intentionally derived from authoritative auth/profile state.
@@ -14,12 +18,14 @@ import { DashboardPage } from '@/components/dashboard/DashboardPage';
  * send a completed user back into onboarding.
  */
 export default function App() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const {
     profile,
     loading: profileLoading,
     refetch: refetchProfile,
+    upsertProfile,
   } = useUserProfile(user?.id);
+  const [reviewingSafetyForUserId, setReviewingSafetyForUserId] = useState<string | null>(null);
 
   if (authLoading || (user && profileLoading)) {
     return (
@@ -42,6 +48,32 @@ export default function App() {
         onComplete={async () => {
           await refetchProfile();
         }}
+      />
+    );
+  }
+
+  const medicalEligibility = evaluateProfileMedicalEligibility(profile);
+
+  if (medicalEligibility.status === 'needs_screening' || reviewingSafetyForUserId === user.id) {
+    return (
+      <SafetyReviewPage
+        profile={profile}
+        onSignOut={signOut}
+        onSave={async (medical) => {
+          await upsertProfile({ medical_conditions_json: medical });
+          await refetchProfile();
+          setReviewingSafetyForUserId(null);
+        }}
+      />
+    );
+  }
+
+  if (!medicalEligibility.canGenerateAutomaticPlan) {
+    return (
+      <MedicalSafetyBlockedPage
+        eligibility={medicalEligibility}
+        onReviewAnswers={() => setReviewingSafetyForUserId(user.id)}
+        onSignOut={signOut}
       />
     );
   }
