@@ -51,6 +51,27 @@ const mealFrom = (components, slot = 'breakfast') => {
 const prefs = { vegetarianStatus: 'none', allergies: [] };
 
 // ---------------------------------------------------------------------------
+// Regression: a leaner whole-food protein must not be blocked merely because
+// it reduces fat. 225 g ground beef -> 175 g chicken keeps protein close while
+// lowering fat/calories. The reverse direction still fails the fat-increase
+// guardrail, so this does not open a path to silent calorie/fat bombs.
+// ---------------------------------------------------------------------------
+const groundBeef = getSubstitutesFor('chicken_breast').find((f) => f.id === 'ground_beef_lean');
+const chickenBreast = getSubstitutesFor('ground_beef_lean').find((f) => f.id === 'chicken_breast');
+assert(groundBeef && chickenBreast, 'Ground-beef/chicken substitution graph is incomplete');
+
+const beefMeal = mealFrom([component(groundBeef, 2.25)], 'lunch');
+const chickenOption = getSwapOptionsForMeal(beefMeal, 0, prefs).find((o) => o.foodItem.id === 'chicken_breast');
+assert(chickenOption?.isEquivalent, '225g ground beef -> chicken breast should be selectable');
+assert(chickenOption.replacementComponent.grams === 175, `Expected 175g chicken, got ${chickenOption.replacementComponent.grams}g`);
+assert(Math.abs(chickenOption.proteinDeviationPct) <= 12.01, `Chicken protein drift too large: ${chickenOption.proteinDeviationPct}%`);
+assert(chickenOption.fatDeviationPct < 0, 'Chicken replacement should be identified as the leaner option');
+
+const chickenMeal = mealFrom([component(chickenBreast, 1.75)], 'lunch');
+const beefOption = getSwapOptionsForMeal(chickenMeal, 0, prefs).find((o) => o.foodItem.id === 'ground_beef_lean');
+assert(beefOption && !beefOption.isEquivalent, 'Chicken -> much fattier ground beef must remain guarded');
+
+// ---------------------------------------------------------------------------
 // Regression: 9 egg whites must NEVER become 1 whole egg and be accepted.
 // ---------------------------------------------------------------------------
 const eggWhite = getSubstitutesFor('egg_whole').find((f) => f.id === 'egg_white');
@@ -85,6 +106,8 @@ assert(Math.abs(riceOption.carbDeviationPct) <= 12.01, `Rice carb drift too larg
 assert(Math.abs(riceOption.kcalDeviationPct) <= 25.01, `Rice kcal drift too large: ${riceOption.kcalDeviationPct}%`);
 
 console.log('✅ Behtan food-swap equivalence smoke test passed');
+console.log('   225g ground beef -> 175g chicken breast: selectable leaner protein swap');
+console.log('   175g chicken breast -> high-fat ground beef amount: safely blocked');
 console.log(`   9 egg whites -> whole egg: safely blocked (${eggOption.replacementComponent.units} eggs was closest realistic option)`);
 console.log(`   200g brown rice -> ${riceOption.replacementComponent.grams}g white rice: macro-equivalent`);
 

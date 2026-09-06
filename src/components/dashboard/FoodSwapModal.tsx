@@ -135,7 +135,11 @@ export function FoodSwapModal({ isOpen, onClose, currentComponent, candidates, o
                             {option.isEquivalent ? (
                               <>
                                 <CheckCircle2 size={14} className="text-emerald-500 mt-0.5 flex-shrink-0" />
-                                <span className="text-emerald-600 dark:text-emerald-400">معادل ماکرویی قابل قبول</span>
+                                <span className="text-emerald-600 dark:text-emerald-400">
+                                  {currentComponent.foodItem.role === 'protein' && option.fatDeviationPct < -25
+                                    ? 'پروتئین مشابه؛ انتخاب کم‌چرب‌تر'
+                                    : 'معادل ماکرویی قابل قبول'}
+                                </span>
                               </>
                             ) : (
                               <>

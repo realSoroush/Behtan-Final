@@ -1112,11 +1112,13 @@ function isMacroEquivalentSwap(original: MealComponent, candidate: MealComponent
   const proteinDev = Math.abs(candidate.protein - original.protein) / Math.max(5, original.protein);
   const carbDev = Math.abs(candidate.carbs - original.carbs) / Math.max(10, original.carbs);
   const fatDev = Math.abs(candidate.fat - original.fat) / Math.max(5, original.fat);
-  const fatDeltaGrams = Math.abs(candidate.fat - original.fat);
+  const fatDeltaGrams = candidate.fat - original.fat;
   const sameSwapGroup = original.foodItem.swapGroup === candidate.foodItem.swapGroup;
 
   // The role-defining macro is the hard invariant. Calories are a second
-  // invariant so a lean protein cannot silently become a calorie/fat bomb.
+  // invariant. For protein swaps, a large fat INCREASE is blocked, while a
+  // leaner whole-food replacement is allowed when protein and calories remain
+  // within tolerance (for example ground beef -> chicken breast).
   if (role === 'protein') {
     return proteinDev <= 0.12 && kcalDev <= 0.35 && fatDeltaGrams <= 8;
   }
