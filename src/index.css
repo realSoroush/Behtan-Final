@@ -3,6 +3,22 @@
 @tailwind utilities;
 
 @layer base {
+  @font-face {
+    font-family: 'IRANSansX';
+    src: url('/fonts/IRANSansX-Regular.woff') format('woff');
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: 'IRANSansX';
+    src: url('/fonts/IRANSansX-Bold.woff') format('woff');
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+  }
+
   html {
     direction: rtl;
     scroll-behavior: smooth;
@@ -34,6 +50,10 @@
 }
 
 @layer components {
+  .landing-font {
+    font-family: 'IRANSansX', 'Vazirmatn', 'IRANSans', Tahoma, sans-serif;
+  }
+
   .card {
     @apply bg-white dark:bg-neutral-900 rounded-3xl shadow-sm border border-neutral-100 dark:border-neutral-800 p-5;
   }

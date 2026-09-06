@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 
 const landing = await readFile(new URL('../src/components/landing/LandingPage.tsx', import.meta.url), 'utf8');
 const app = await readFile(new URL('../src/App.tsx', import.meta.url), 'utf8');
 const auth = await readFile(new URL('../src/components/PhoneAuth.tsx', import.meta.url), 'utf8');
+const styles = await readFile(new URL('../src/index.css', import.meta.url), 'utf8');
 
 const enamad = "<a referrerpolicy='origin' target='_blank' href='https://trustseal.enamad.ir/?id=7609793&Code=scgNPXGx8ajk1qpPJJpjVvWnsT3T3IOO'><img referrerpolicy='origin' src='https://trustseal.enamad.ir/logo.aspx?id=7609793&Code=scgNPXGx8ajk1qpPJJpjVvWnsT3T3IOO' alt='' style='cursor:pointer' code='scgNPXGx8ajk1qpPJJpjVvWnsT3T3IOO'></a>";
 
@@ -15,5 +16,11 @@ assert.match(app, /authRequested \? <PhoneAuth onBack=\{closeAuth\} \/> : <Landi
 assert.match(auth, /onBack\?: \(\) => void/, 'Auth needs a safe route back to landing.');
 assert.match(landing, /dark:bg-transparent dark:shadow-none/, 'Landing logo background must be transparent in dark mode.');
 assert.match(landing, /border-primary-400 bg-primary-500/, 'The final CTA must keep the brand-green background in both themes.');
+assert.match(landing, /className="landing-font /, 'IRANSansX must be scoped to the landing page.');
+assert.match(styles, /font-family: 'IRANSansX'/, 'IRANSansX font-face is missing.');
+assert.match(styles, /url\('\/fonts\/IRANSansX-Regular\.woff'\)/, 'IRANSansX regular source is missing.');
+assert.match(styles, /url\('\/fonts\/IRANSansX-Bold\.woff'\)/, 'IRANSansX bold source is missing.');
+await access(new URL('../public/fonts/IRANSansX-Regular.woff', import.meta.url));
+await access(new URL('../public/fonts/IRANSansX-Bold.woff', import.meta.url));
 
 console.log('✓ Landing page, auth handoff, and exact eNamad embed verified.');

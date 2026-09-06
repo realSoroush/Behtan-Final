@@ -130,7 +130,7 @@ function DailyPlanPreview() {
 
 export function LandingPage({ onStart }: LandingPageProps) {
   return (
-    <div id="top" className="min-h-screen overflow-hidden bg-white text-neutral-950 dark:bg-neutral-950 dark:text-white">
+    <div id="top" className="landing-font min-h-screen overflow-hidden bg-white text-neutral-950 dark:bg-neutral-950 dark:text-white">
       <header className="sticky top-0 z-40 border-b border-neutral-200/70 bg-white/85 backdrop-blur-xl dark:border-neutral-800/80 dark:bg-neutral-950/85">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:h-20 sm:px-8">
           <LogoLockup />
