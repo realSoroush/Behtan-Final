@@ -92,6 +92,14 @@ const proteinPolicyHookSource = readFileSync(
   resolve(projectRoot, 'src/hooks/useProteinEnginePolicy.ts'),
   'utf8'
 );
+const subscriptionMigrationSource = readFileSync(
+  resolve(projectRoot, 'supabase/migrations/20260907_013_subscription_plans.sql'),
+  'utf8'
+);
+const subscriptionHookSource = readFileSync(
+  resolve(projectRoot, 'src/hooks/useSubscriptionPlans.ts'),
+  'utf8'
+);
 
 assert(!/const\s+FOOD_ITEMS\s*:/.test(engineSource), 'Production engine still contains hard-coded FOOD_ITEMS');
 assert(!/const\s+MEAL_TEMPLATES\s*:/.test(engineSource), 'Production engine still contains hard-coded MEAL_TEMPLATES');
@@ -118,6 +126,9 @@ assert(proteinPolicyMigrationSource.includes('public.nutrition_protein_policy'),
 assert(proteinPolicyMigrationSource.includes('weight_loss_rt'), 'Protein runtime policy missing weight_loss_rt');
 assert(proteinPolicyMigrationSource.includes('max_protein_calorie_fraction'), 'Protein runtime policy missing calorie guardrail');
 assert(proteinPolicyHookSource.includes(".from('nutrition_protein_policy')"), 'App is not loading protein policy from Supabase');
+assert(subscriptionMigrationSource.includes('public.subscription_plans'), 'Subscription plans migration missing');
+assert(subscriptionMigrationSource.includes('price_toman'), 'Subscription plans need an authoritative toman price');
+assert(subscriptionHookSource.includes(".from('subscription_plans')"), 'Paywall is not loading subscription plans from Supabase');
 
 // The old anonymous user_profiles lookup is incompatible with the table's RLS.
 assert(

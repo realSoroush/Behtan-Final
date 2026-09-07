@@ -121,7 +121,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     markHydratedEmpty,
   ]);
 
-  const handleComplete = async () => {
+  const handleComplete = async (planCode: string | null) => {
     if (!user || isSubmitting) return;
 
     // Defense in depth: never let a stale route, old draft or direct Step 11
@@ -192,7 +192,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       body_fat_source: data.bodyScanResult ? 'ai_visual' : null,
       body_scan_consent_json: buildBodyScanConsentRecord(data),
       body_type: data.bodyScanResult?.bodyType ?? data.manualBodyType ?? null,
-      subscription_tier: data.selectedTier,
+      // Catalog selection only; verified payment entitlements are a separate step.
+      subscription_tier: planCode,
       // Completion is committed atomically with clearing the resume draft.
       onboarding_step: 1,
       onboarding_draft_json: null,

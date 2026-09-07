@@ -36,7 +36,9 @@ export type MealSlot =
   | 'dinner'
   | 'night_snack';
 
-export type SubscriptionTier = 'silver' | 'gold';
+/** Stable database code for a runtime-managed subscription plan. */
+export type SubscriptionTier = string;
+export type SubscriptionPlanTheme = 'silver' | 'gold' | 'green';
 
 // ============================================================================
 // SCHEDULE / MEDICAL / DIETARY (JSON columns)
@@ -129,6 +131,20 @@ export interface UserProfile {
   /** True only after the final onboarding write succeeds. */
   onboarding_completed: boolean;
   created_at: string;
+}
+
+/** Public, read-only subscription catalog managed from Supabase Dashboard. */
+export interface SubscriptionPlan {
+  code: SubscriptionTier;
+  name: string;
+  emoji: string;
+  priceToman: number;
+  priceNote: string;
+  durationDays: number;
+  features: string[];
+  badge: string | null;
+  theme: SubscriptionPlanTheme;
+  sortOrder: number;
 }
 
 // ============================================================================
