@@ -15,7 +15,7 @@ export type AuthErrorCode =
   | 'sms_delivery_failed'
   | 'profile_bootstrap_failed'
   | 'network_error'
-  | 'test_bridge_failed'
+  | 'captcha_required'
   | 'unknown';
 
 export class AuthServiceError extends Error {
@@ -35,7 +35,7 @@ export type PhoneAuthStartResult =
 export interface AuthAdapter {
   getSession(): Promise<AuthSession | null>;
   subscribe(listener: (session: AuthSession | null) => void): () => void;
-  startPhoneAuth(phone: string): Promise<PhoneAuthStartResult>;
+  startPhoneAuth(phone: string, captchaToken: string): Promise<PhoneAuthStartResult>;
   verifyPhoneOtp(phone: string, token: string): Promise<AuthSession>;
   signOut(): Promise<void>;
 }

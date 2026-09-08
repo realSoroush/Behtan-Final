@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/hooks/useAuth';
 import { APP_LOGO_PATH, APP_NAME_FA } from '@/constants/brand';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { TurnstileWidget } from '@/components/auth/TurnstileWidget';
+import { AUTH_CONFIG } from '@/config/authConfig';
 
 type AuthStep = 'phone' | 'otp';
 
@@ -13,12 +15,20 @@ interface PhoneAuthProps {
 }
 
 export function PhoneAuth({ onBack }: PhoneAuthProps) {
-  const { beginPhoneAuth, verifyPhoneOtp, phoneAuthMode, loading, error, clearError } = useAuth();
+  const { beginPhoneAuth, verifyPhoneOtp, loading, error, clearError } = useAuth();
   const [step, setStep] = useState<AuthStep>('phone');
   const [phone, setPhone] = useState('');
   const [normalizedPhone, setNormalizedPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [resendSeconds, setResendSeconds] = useState(0);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
+  const [captchaError, setCaptchaError] = useState(false);
+  const handleCaptchaToken = useCallback((token: string | null) => {
+    setCaptchaToken(token);
+    if (token) setCaptchaError(false);
+  }, []);
+  const handleCaptchaError = useCallback(() => setCaptchaError(true), []);
 
   useEffect(() => {
     if (resendSeconds <= 0) return;
@@ -41,7 +51,11 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
   const handleStartAuth = async () => {
     clearError();
     try {
-      const result = await beginPhoneAuth(phone);
+      if (!captchaToken) {
+        setCaptchaError(true);
+        return;
+      }
+      const result = await beginPhoneAuth(phone, captchaToken);
       setNormalizedPhone(result.normalizedPhone);
 
       if (result.status === 'authenticated') {
@@ -52,9 +66,12 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
 
       setOtp('');
       setStep('otp');
-      setResendSeconds(60);
+      setResendSeconds(AUTH_CONFIG.otp.resendSeconds);
     } catch {
       // useAuth owns the user-facing error message.
+    } finally {
+      setCaptchaToken(null);
+      setCaptchaResetKey((value) => value + 1);
     }
   };
 
@@ -72,11 +89,18 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
     if (resendSeconds > 0 || loading) return;
     clearError();
     try {
-      const result = await beginPhoneAuth(normalizedPhone || phone);
+      if (!captchaToken) {
+        setCaptchaError(true);
+        return;
+      }
+      const result = await beginPhoneAuth(normalizedPhone || phone, captchaToken);
       setNormalizedPhone(result.normalizedPhone);
-      setResendSeconds(60);
+      setResendSeconds(AUTH_CONFIG.otp.resendSeconds);
     } catch {
       // useAuth owns the user-facing error message.
+    } finally {
+      setCaptchaToken(null);
+      setCaptchaResetKey((value) => value + 1);
     }
   };
 
@@ -157,9 +181,7 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
 
         <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-6 leading-relaxed">
           {step === 'phone'
-            ? phoneAuthMode === 'otp'
-              ? 'شماره موبایل خود را وارد کنید تا کد تأیید یک‌بارمصرف برایتان ارسال شود.'
-              : 'شماره موبایل خود را برای ورود آزمایشی وارد کنید.'
+            ? 'شماره موبایل خود را وارد کنید تا کد تأیید یک‌بارمصرف برایتان ارسال شود.'
             : `کد ۶ رقمی ارسال‌شده به ${normalizedPhone || phone} را وارد کنید.`}
         </p>
 
@@ -228,6 +250,19 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
           </div>
         )}
 
+        <div className="mb-4">
+          <TurnstileWidget
+            resetKey={captchaResetKey}
+            onToken={handleCaptchaToken}
+            onError={handleCaptchaError}
+          />
+          {captchaError && !captchaToken && (
+            <p className="mt-1 text-xs leading-6 text-red-600 dark:text-red-400">
+              تأیید امنیتی آماده نیست. اتصال اینترنت و تنظیمات امنیتی سایت را بررسی کنید.
+            </p>
+          )}
+        </div>
+
         {error && (
           <motion.div
             initial={{ opacity: 0, y: -4 }}
@@ -240,14 +275,8 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
         )}
 
         {step === 'phone' ? (
-          <Button onClick={handleStartAuth} loading={loading} disabled={!phone.trim()}>
-            {loading
-              ? phoneAuthMode === 'otp'
-                ? 'در حال ارسال...'
-                : 'در حال ورود...'
-              : phoneAuthMode === 'otp'
-                ? 'ارسال کد تأیید ←'
-                : 'ورود ←'}
+          <Button onClick={handleStartAuth} loading={loading} disabled={!phone.trim() || !captchaToken}>
+            {loading ? 'در حال ارسال...' : 'ارسال کد تأیید ←'}
           </Button>
         ) : (
           <>
@@ -277,9 +306,7 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
         )}
 
         <p className="text-xs text-center text-neutral-400 dark:text-neutral-600 mt-5 leading-relaxed">
-          {phoneAuthMode === 'otp'
-            ? 'ورود به حساب فقط پس از تأیید مالکیت شماره موبایل انجام می‌شود.'
-            : 'حالت تست فعال است؛ ارسال پیامک و تأیید OTP موقتاً غیرفعال است.'}
+          ورود به حساب فقط پس از تأیید مالکیت شماره موبایل انجام می‌شود.
         </p>
       </motion.div>
     </div>

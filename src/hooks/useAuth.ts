@@ -1,21 +1,18 @@
 /**
  * UI-facing authentication state.
  *
- * This hook knows nothing about concrete Supabase auth calls. The active mode
- * is selected behind authAdapter. OTP can be temporarily disabled for testing
- * without removing the OTP infrastructure.
+ * This hook knows nothing about concrete Supabase auth calls.
  */
 
 import { useEffect, useState } from 'react';
 import {
   AuthServiceError,
-  PHONE_AUTH_MODE,
+  AUTH_CONFIG,
   authAdapter,
   isValidIranPhone,
   normalizeIranPhone,
   type AuthSession,
   type AuthUser,
-  type PhoneAuthMode,
 } from '@/services/auth';
 
 interface AuthState {
@@ -31,8 +28,7 @@ export interface BeginPhoneAuthResult {
 }
 
 interface UseAuthReturn extends AuthState {
-  phoneAuthMode: PhoneAuthMode;
-  beginPhoneAuth: (phone: string) => Promise<BeginPhoneAuthResult>;
+  beginPhoneAuth: (phone: string, captchaToken: string) => Promise<BeginPhoneAuthResult>;
   verifyPhoneOtp: (phone: string, token: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
@@ -49,8 +45,8 @@ function userMessageForAuthError(error: unknown, fallback: string): string {
         return 'ارسال پیامک تأیید انجام نشد. چند لحظه دیگر دوباره تلاش کنید.';
       case 'profile_bootstrap_failed':
         return 'ورود انجام شد اما ساخت پروفایل با خطا مواجه شد. دوباره تلاش کنید.';
-      case 'test_bridge_failed':
-        return error.message || 'ورود آزمایشی انجام نشد. دوباره تلاش کنید.';
+      case 'captcha_required':
+        return 'تأیید امنیتی کامل نشد. دوباره تلاش کنید.';
       case 'network_error':
         return 'ارتباط با سرویس ورود برقرار نشد. اتصال اینترنت را بررسی کنید.';
       default:
@@ -112,7 +108,7 @@ export function useAuth(): UseAuthReturn {
     };
   }, []);
 
-  const beginPhoneAuth = async (phone: string): Promise<BeginPhoneAuthResult> => {
+  const beginPhoneAuth = async (phone: string, captchaToken: string): Promise<BeginPhoneAuthResult> => {
     setState((current) => ({ ...current, loading: true, error: null }));
 
     if (!isValidIranPhone(phone)) {
@@ -123,8 +119,14 @@ export function useAuth(): UseAuthReturn {
 
     const normalized = normalizeIranPhone(phone);
 
+    if (!captchaToken) {
+      const message = 'ابتدا تأیید امنیتی را کامل کنید.';
+      setState((current) => ({ ...current, loading: false, error: message }));
+      throw new Error(message);
+    }
+
     try {
-      const result = await authAdapter.startPhoneAuth(normalized);
+      const result = await authAdapter.startPhoneAuth(normalized, captchaToken);
 
       if (result.status === 'authenticated') {
         setState((current) => ({
@@ -143,10 +145,7 @@ export function useAuth(): UseAuthReturn {
         status: result.status,
       };
     } catch (error) {
-      const fallback =
-        PHONE_AUTH_MODE === 'otp'
-          ? 'ارسال کد تأیید انجام نشد. اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.'
-          : 'ورود آزمایشی انجام نشد. اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.';
+      const fallback = 'ارسال کد تأیید انجام نشد. اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.';
       const message = userMessageForAuthError(error, fallback);
       setState((current) => ({ ...current, loading: false, error: message }));
       throw new Error(message);
@@ -156,17 +155,11 @@ export function useAuth(): UseAuthReturn {
   const verifyPhoneOtp = async (phone: string, token: string): Promise<void> => {
     setState((current) => ({ ...current, loading: true, error: null }));
 
-    if (PHONE_AUTH_MODE !== 'otp') {
-      const message = 'OTP در حالت تست غیرفعال است.';
-      setState((current) => ({ ...current, loading: false, error: message }));
-      throw new Error(message);
-    }
-
     const normalized = normalizeIranPhone(phone);
     const cleanToken = token.replace(/\D/g, '');
 
-    if (!isValidIranPhone(normalized) || !/^\d{6}$/.test(cleanToken)) {
-      const message = 'کد تأیید باید ۶ رقم باشد.';
+    if (!isValidIranPhone(normalized) || cleanToken.length !== AUTH_CONFIG.otp.digits) {
+      const message = `کد تأیید باید ${AUTH_CONFIG.otp.digits.toLocaleString('fa-IR')} رقم باشد.`;
       setState((current) => ({ ...current, loading: false, error: message }));
       throw new Error(message);
     }
@@ -204,7 +197,6 @@ export function useAuth(): UseAuthReturn {
 
   return {
     ...state,
-    phoneAuthMode: PHONE_AUTH_MODE,
     beginPhoneAuth,
     verifyPhoneOtp,
     signOut,

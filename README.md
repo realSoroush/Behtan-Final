@@ -6,7 +6,7 @@ AI is limited to the optional Body Scan path.
 
 ## Current MVP architecture
 
-- **Auth:** adapter-based Phone OTP; current driver is Supabase Auth with a provider-agnostic Send SMS Hook
+- **Auth:** Supabase Phone OTP with a signed Send SMS Hook, SMS.ir Verify API and mandatory Cloudflare Turnstile
 - **Profiles/onboarding:** `user_profiles` with RLS; onboarding progress is saved to Supabase on every Next
 - **Nutrition catalog:** Supabase is the production source of truth
   - `food_items`
@@ -29,6 +29,7 @@ Required client environment variables:
 ```text
 VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
+VITE_TURNSTILE_SITE_KEY=...
 ```
 
 ## Supabase database
@@ -46,6 +47,9 @@ supabase/migrations/20260825_001_nutrition_catalog.sql
 supabase/migrations/20260825_002_security_auth_cleanup.sql
 ...
 supabase/migrations/20260906_012_body_scan_privacy.sql
+supabase/migrations/20260907_013_subscription_plans.sql
+supabase/migrations/20260907_014_zarinpal_billing.sql
+supabase/migrations/20260908_015_production_auth_billing.sql
 ```
 
 Verification queries:
@@ -69,10 +73,10 @@ Before deploying the secure auth code:
 
 1. Enable **Authentication -> Providers -> Phone** in Supabase.
 2. Deploy `supabase/functions/send-sms` and configure it as the **Send SMS HTTP Hook**.
-3. Configure your Iranian SMS panel only through server-side `SMS_PROVIDER_*` secrets.
+3. Configure `SMS_IR_API_KEY`, `SMS_IR_TEMPLATE_ID`, `SMS_IR_PARAMETER_NAME` and the Hook signing secret only as Edge Function secrets.
 4. Confirm that a real Iranian `+98` number receives and verifies an OTP.
 
-Provider/API details live behind `SmsProvider`; see `PHONE_AUTH_ABSTRACTION_NOTES.md`.
+The production deployment order is documented in `PRODUCTION_AUTH_PAYMENT_SETUP.md`.
 
 Do not reintroduce synthetic-email or phone-derived passwords.
 
@@ -100,6 +104,7 @@ npm run test:onboarding
 npm run test:age
 npm run test:brand
 npm run test:body-scan
+npm run test:production
 npm run build
 ```
 

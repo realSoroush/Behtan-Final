@@ -99,7 +99,7 @@ assert.match(paywall, /formatSubscriptionPrice\(plan\.priceToman\)/);
 assert.match(paywall, /!isFree/);
 assert.match(paywall, /'تومان '/);
 assert.match(paywall, /isSameSubscriptionOffer\(selectedPlan, latestPlan\)/);
-assert.match(paywall, /onComplete\(null\)/, 'Skip must not save a paid-plan selection');
+assert.doesNotMatch(paywall, /onComplete\(null\)/, 'Only a catalog offer can initiate checkout; there is no unverified free bypass');
 assert.match(hook, /30_000/);
 assert.match(hook, /visibilitychange/);
 assert.match(hook, /removeEventListener/);

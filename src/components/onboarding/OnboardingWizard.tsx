@@ -16,7 +16,8 @@ import { Step8Speed } from './Step8Speed';
 import { Step9BodyScan } from './Step9BodyScan';
 import { Step10Analysis } from './Step10Analysis';
 import { Step11Paywall } from './Step11Paywall';
-import type { UserProfile } from '@/types';
+import type { SubscriptionPlan, UserProfile } from '@/types';
+import { startCheckout } from '@/lib/payments';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { estimateActivityLevel } from '@/utils/activityLevel';
 import {
@@ -121,8 +122,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     markHydratedEmpty,
   ]);
 
-  const handleComplete = async (planCode: string | null) => {
-    if (!user || isSubmitting) return;
+  const handleComplete = async (planCode: string | null, plan?: SubscriptionPlan) => {
+    if (!user || isSubmitting || !plan) return;
 
     // Defense in depth: never let a stale route, old draft or direct Step 11
     // interaction bypass the medical gate.
@@ -202,6 +203,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
     try {
       await upsertProfile(profilePayload);
+      await startCheckout(plan);
       // Keep completion locked until the root App has refreshed its own
       // authoritative profile snapshot.
       await onComplete();
@@ -210,7 +212,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       console.error('Failed to complete onboarding:', error);
       setSubmitting(false);
       setSubmitError(
-        'ذخیره نهایی اطلاعات انجام نشد. اطلاعات شما از بین نرفته؛ اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.'
+        error instanceof Error ? error.message : 'تکمیل اشتراک انجام نشد. اطلاعات شما محفوظ است؛ دوباره تلاش کنید.'
       );
     }
   };

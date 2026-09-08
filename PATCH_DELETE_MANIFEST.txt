@@ -1,0 +1,4 @@
+Files intentionally removed in v8. Delete them when applying this Patch:
+- src/services/auth/supabaseTestBridgeAuthAdapter.ts
+- supabase/functions/send-sms/core/template.ts
+- supabase/functions/send-sms/providers/genericHttp.ts

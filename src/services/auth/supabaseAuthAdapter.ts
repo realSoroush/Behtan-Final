@@ -27,6 +27,10 @@ function mapSupabaseAuthError(error: unknown): AuthServiceError {
     return new AuthServiceError('rate_limited', value?.message);
   }
 
+  if (message.includes('captcha')) {
+    return new AuthServiceError('captcha_required', value?.message);
+  }
+
   if (message.includes('sms') || message.includes('provider') || message.includes('hook')) {
     return new AuthServiceError('sms_delivery_failed', value?.message);
   }
@@ -57,11 +61,12 @@ export class SupabaseAuthAdapter implements AuthAdapter {
     return () => data.subscription.unsubscribe();
   }
 
-  async startPhoneAuth(phone: string): Promise<PhoneAuthStartResult> {
+  async startPhoneAuth(phone: string, captchaToken: string): Promise<PhoneAuthStartResult> {
     const { error } = await supabase.auth.signInWithOtp({
       phone,
       options: {
         shouldCreateUser: true,
+        captchaToken,
       },
     });
 

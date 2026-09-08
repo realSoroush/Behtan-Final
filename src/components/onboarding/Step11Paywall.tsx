@@ -77,6 +77,7 @@ function PlanCard({ plan, selected, onSelect }: PlanCardProps) {
         <span className="mr-1 text-sm text-neutral-500">
           {!isFree && 'تومان '}/ {plan.priceNote}
         </span>
+        <p className="mt-2 text-xs text-neutral-500">مدت اعتبار: {plan.durationDays.toLocaleString('fa-IR')} روز</p>
       </div>
 
       <ul className="space-y-2">
@@ -97,7 +98,7 @@ function PlanCard({ plan, selected, onSelect }: PlanCardProps) {
   );
 }
 
-export function Step11Paywall({ onComplete }: { onComplete: (planCode: string | null) => Promise<void> }) {
+export function Step11Paywall({ onComplete, checkout = false }: { onComplete: (planCode: string | null, plan?: SubscriptionPlan) => Promise<void>; checkout?: boolean }) {
   const { data, updateData, prevStep, currentStep } = useOnboardingStore();
   const { plans, loading, error, refetch } = useSubscriptionPlans();
   const selectedPlan = plans.find((plan) => plan.code === data.selectedTier) ?? null;
@@ -132,7 +133,9 @@ export function Step11Paywall({ onComplete }: { onComplete: (planCode: string | 
         setNotice('اطلاعات این پلن به‌روزرسانی شد. قیمت و جزئیات جدید را بررسی و دوباره تأیید کنید.');
         return;
       }
-      await onComplete(latestPlan.code);
+      await onComplete(latestPlan.code, latestPlan);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'شروع پرداخت ممکن نشد. دوباره تلاش کنید.');
     } finally {
       checkingRef.current = false;
       setChecking(false);
@@ -141,12 +144,12 @@ export function Step11Paywall({ onComplete }: { onComplete: (planCode: string | 
 
   return (
     <div className="space-y-6">
-      <StepHeader
+      {!checkout && <StepHeader
         step={currentStep}
         title="شروع سفر سلامتی"
-        subtitle="پلن مناسب خود را انتخاب کنید. ۷ روز تضمین بازگشت وجه."
+        subtitle="پلن مناسب خود را انتخاب کنید؛ اشتراک پس از تأیید پرداخت فعال می‌شود."
         onBack={() => { if (!checking) prevStep(); }}
-      />
+      />}
 
       {loading ? (
         <div className="flex min-h-48 items-center justify-center rounded-3xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
@@ -192,30 +195,17 @@ export function Step11Paywall({ onComplete }: { onComplete: (planCode: string | 
 
       <div className="flex justify-center gap-6 text-xs text-neutral-400 dark:text-neutral-500">
         <span>🔒 پرداخت امن</span>
-        <span>↩️ بازگشت ۷ روزه</span>
-        <span>❌ لغو آسان</span>
+        <span>تمدید خودکار ندارد</span>
       </div>
 
       {notice && <p role="status" className="text-sm leading-6 text-neutral-600 dark:text-neutral-300">{notice}</p>}
 
       <Button onClick={() => void completeSelection()} loading={checking} disabled={!selectedPlan || loading || Boolean(error)}>
         {selectedPlan
-          ? `شروع کن — ${selectedPlan.emoji ? `${selectedPlan.emoji} ` : ''}پلن ${selectedPlan.name}`
+          ? `${selectedPlan.priceToman === 0 ? 'فعال‌سازی رایگان' : 'پرداخت و فعال‌سازی'} — پلن ${selectedPlan.name}`
           : 'پلن را انتخاب کنید'}
       </Button>
 
-      <button
-        type="button"
-        disabled={checking}
-        onClick={() => {
-          // Skipping the offer must not save the previously selected paid plan.
-          updateData({ selectedTier: null });
-          void onComplete(null);
-        }}
-        className="w-full py-2 text-center text-sm text-neutral-400 transition-colors hover:text-neutral-600 dark:hover:text-neutral-300"
-      >
-        فعلاً رایگان ادامه می‌دهم
-      </button>
     </div>
   );
 }

@@ -1,12 +1,9 @@
-import { PHONE_AUTH_MODE } from '@/config/authConfig';
 import type { AuthAdapter } from './types';
 import { SupabaseAuthAdapter } from './supabaseAuthAdapter';
-import { SupabaseTestBridgeAuthAdapter } from './supabaseTestBridgeAuthAdapter';
 
 export * from './types';
 export * from './phone';
-export { AUTH_CONFIG, PHONE_AUTH_MODE } from '@/config/authConfig';
-export type { PhoneAuthMode } from '@/config/authConfig';
+export { AUTH_CONFIG } from '@/config/authConfig';
 
 export type AuthDriverName = 'supabase';
 
@@ -16,13 +13,6 @@ function createAuthAdapter(): AuthAdapter {
   if (configured !== 'supabase') {
     // Fail closed. A misspelled driver must not silently downgrade auth.
     throw new Error(`[auth] Unsupported VITE_AUTH_DRIVER: ${configured}`);
-  }
-
-  if (PHONE_AUTH_MODE === 'test_bridge') {
-    console.warn(
-      '[auth] OTP IS DISABLED. Behtan is using the insecure test bridge. Do not use this mode for public launch.'
-    );
-    return new SupabaseTestBridgeAuthAdapter();
   }
 
   return new SupabaseAuthAdapter();

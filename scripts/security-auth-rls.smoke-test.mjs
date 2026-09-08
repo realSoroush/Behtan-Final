@@ -12,7 +12,6 @@ const read = (path) => readFileSync(resolve(root, path), 'utf8');
 
 const authHook = read('src/hooks/useAuth.ts');
 const otpAdapter = read('src/services/auth/supabaseAuthAdapter.ts');
-const testBridge = read('src/services/auth/supabaseTestBridgeAuthAdapter.ts');
 const authIndex = read('src/services/auth/index.ts');
 const authConfig = read('src/config/authConfig.ts');
 const phoneAuth = read('src/components/PhoneAuth.tsx');
@@ -26,12 +25,13 @@ assert(otpAdapter.includes('signInWithOtp'), 'Production Supabase adapter must s
 assert(otpAdapter.includes('verifyOtp'), 'Production Supabase adapter must verify phone OTP');
 assert(!otpAdapter.includes('signInWithPassword'), 'Production OTP adapter contains password sign-in');
 assert(!otpAdapter.includes('toDerivedPassword'), 'Production OTP adapter contains derived password logic');
-assert(testBridge.includes('signInWithPassword'), 'Explicit test bridge is missing');
-assert(testBridge.includes('_slmt'), 'Test bridge is not compatible with pre-OTP test accounts');
-assert(authIndex.includes("PHONE_AUTH_MODE === 'test_bridge'"), 'Test bridge must be explicitly gated by auth mode');
-assert(authConfig.includes('NEVER launch publicly with OTP disabled'), 'Auth config lacks public-launch security warning');
+assert(!existsSync(resolve(root, 'src/services/auth/supabaseTestBridgeAuthAdapter.ts')), 'Test bridge still exists');
+assert(!authIndex.includes('test_bridge'), 'Auth registry still contains a test bridge');
+assert(authIndex.includes("configured !== 'supabase'"), 'Unknown auth drivers must fail closed');
+assert(!authConfig.includes('isActive'), 'OTP can still be disabled from client config');
 assert(phoneAuth.includes("type AuthStep = 'phone' | 'otp'"), 'PhoneAuth is missing the OTP step');
 assert(phoneAuth.includes('autoComplete="one-time-code"'), 'OTP input is not configured for one-time codes');
+assert(phoneAuth.includes('TurnstileWidget'), 'PhoneAuth is missing CAPTCHA protection');
 
 assert(!schema.includes('create table if not exists public.food_exchanges'), 'Legacy food_exchanges remains in final schema');
 assert(migration.includes('drop table if exists public.food_exchanges cascade'), 'Cleanup migration does not drop food_exchanges');
@@ -53,7 +53,7 @@ assert(schema.includes('grant select, insert, update, delete on public.daily_mea
 
 console.log('✅ Behtan Auth/RLS security smoke test passed');
 console.log('   Production auth path: phone OTP only');
-console.log('   Test bridge: isolated behind explicit feature switch');
-console.log('   PUBLIC LAUNCH REQUIREMENT: otp.isActive must be true');
+console.log('   Test bridge: removed');
+console.log('   OTP abuse protection: mandatory Turnstile token');
 console.log('   user_profiles: own-row authenticated RLS');
 console.log('   Nutrition catalog: authenticated read-only');

@@ -8,6 +8,7 @@ import { SafetyReviewPage } from '@/components/safety/SafetyReviewPage';
 import { MedicalSafetyBlockedPage } from '@/components/safety/MedicalSafetyBlockedPage';
 import { evaluateProfileMedicalEligibility } from '@/utils/medicalEligibility';
 import { LandingPage } from '@/components/landing/LandingPage';
+import { BillingAccess } from '@/components/billing/BillingAccess';
 
 function isAuthRequested() {
   return typeof window !== 'undefined' && window.location.hash === '#auth';
@@ -108,5 +109,5 @@ export default function App() {
     );
   }
 
-  return <DashboardPage />;
+  return <BillingAccess key={user.id} onSignOut={signOut}><DashboardPage /></BillingAccess>;
 }
