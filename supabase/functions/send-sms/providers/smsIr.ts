@@ -45,7 +45,9 @@ export class SmsIrProvider implements SmsProvider {
       response = await this.fetcher(SMS_IR_VERIFY_URL, {
         method: 'POST',
         redirect: 'error',
-        signal: AbortSignal.timeout(8_000),
+        // Supabase HTTP Auth Hooks have a 5-second deadline. Fail first so the
+        // caller receives our normalized delivery error instead of a hook timeout.
+        signal: AbortSignal.timeout(4_000),
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json',

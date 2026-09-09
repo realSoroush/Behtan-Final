@@ -62,7 +62,7 @@ Deno.serve(async (req: Request) => {
     const phone = event.user?.phone ?? '';
     const otp = event.sms?.otp ?? '';
 
-    if (!/^\+989\d{9}$/.test(phone)) {
+    if (!/^\+?989\d{9}$/.test(phone)) {
       return errorResponse(400, 'Unsupported phone number');
     }
 

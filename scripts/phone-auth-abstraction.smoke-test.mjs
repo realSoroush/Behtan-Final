@@ -18,6 +18,7 @@ const authConfig = read('src/config/authConfig.ts');
 const phoneAuth = read('src/components/PhoneAuth.tsx');
 const turnstile = read('src/components/auth/TurnstileWidget.tsx');
 const hook = read('supabase/functions/send-sms/index.ts');
+const smsIrProvider = read('supabase/functions/send-sms/providers/smsIr.ts');
 
 assert(!useAuth.includes('supabase.auth'), 'useAuth must not depend directly on Supabase Auth');
 assert(useAuth.includes('authAdapter'), 'useAuth must call the auth abstraction');
@@ -37,6 +38,7 @@ assert(turnstile.includes('request_phone_otp'), 'Turnstile action is missing');
 assert(hook.includes('standardwebhooks'), 'Send SMS hook must verify Supabase signatures');
 assert(hook.includes('createSmsProvider'), 'Send SMS hook must use the dedicated provider registry');
 assert(hook.includes('64_000'), 'Send SMS hook must enforce a request-size limit');
+assert(smsIrProvider.includes('AbortSignal.timeout(4_000)'), 'SMS.ir timeout must remain below the Auth Hook deadline');
 
 assert(smsIrMobile('+989121234567') === '9121234567', 'SMS.ir phone normalization failed for E.164');
 assert(smsIrMobile('09121234567') === '9121234567', 'SMS.ir phone normalization failed for local format');
