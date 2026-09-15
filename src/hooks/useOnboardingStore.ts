@@ -4,6 +4,8 @@ import type { OnboardingData } from '@/types';
 import { persistOnboardingBeforeAdvance } from '@/utils/onboardingProgress';
 import { sanitizeHydratedOnboardingDraft } from '@/utils/bodyScanPrivacy';
 
+import { mergeActivityAnswers, resolveActivityResumeStep } from '@/utils/onboardingActivity';
+
 const TOTAL_STEPS = 11;
 
 type ProgressSaver = (nextStep: number, draft: OnboardingData) => Promise<void>;
@@ -142,10 +144,10 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
 
   hydrateFromDraft: (userId, step, draft) =>
     set({
-      currentStep: Math.max(1, Math.min(step, TOTAL_STEPS)),
+      currentStep: resolveActivityResumeStep(Math.max(1, Math.min(step, TOTAL_STEPS)), draft),
       // Merge with defaults for legacy compatibility, but never revive an old
       // Base64 body photo from a persisted draft.
-      data: sanitizeHydratedOnboardingDraft(draft),
+      data: mergeActivityAnswers(sanitizeHydratedOnboardingDraft(draft), {}),
       isHydrated: true,
       hydratedUserId: userId,
       submitError: null,

@@ -48,8 +48,8 @@ assert(result.trace.proteinFactorGPerKg === result.trace.proteinPreferredFactorG
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
-const step4 = readFileSync(resolve(root, 'src/components/onboarding/Step4Activity.tsx'), 'utf8');
-assert(!step4.includes('rounded-2xl bg-white px-3 py-2 text-center shadow-sm dark:bg-neutral-900'), 'TDEE multiplier card still has hard background');
+const step5 = readFileSync(resolve(root, 'src/components/onboarding/Step5Workout.tsx'), 'utf8');
+assert(!step5.includes('rounded-2xl bg-white px-3 py-2 text-center shadow-sm dark:bg-neutral-900'), 'TDEE multiplier card still has hard background');
 
 console.log('✅ Behtan Protein Minimum/Preferred Phase 2A smoke test passed');
 console.log('   Loss + RT @125kg/178cm: minimum ~156 g, preferred ~195 g');

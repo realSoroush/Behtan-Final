@@ -9,7 +9,7 @@ import { Step1Gender } from './Step1Gender';
 import { Step2Physical } from './Step2Physical';
 import { Step3Goal } from './Step3Goal';
 import { Step4Activity } from './Step4Activity';
-import { Step5Schedule } from './Step5Schedule';
+import { Step5Workout } from './Step5Workout';
 import { Step6Medical } from './Step6Medical';
 import { Step7Dietary } from './Step7Dietary';
 import { Step8Speed } from './Step8Speed';
@@ -20,6 +20,7 @@ import type { SubscriptionPlan, UserProfile } from '@/types';
 import { startCheckout } from '@/lib/payments';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { estimateActivityLevel } from '@/utils/activityLevel';
+import { resolveActivityResumeStep } from '@/utils/onboardingActivity';
 import {
   evaluateOnboardingMedicalEligibility,
   MEDICAL_SAFETY_SCREENING_VERSION,
@@ -125,6 +126,13 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const handleComplete = async (planCode: string | null, plan?: SubscriptionPlan) => {
     if (!user || isSubmitting || !plan) return;
 
+    const activityStep = resolveActivityResumeStep(11, data);
+    if (activityStep < 6) {
+      goToStep(activityStep);
+      setSubmitError('برای ادامه، پاسخ‌های تحرک روزانه و ورزش را کامل کنید.');
+      return;
+    }
+
     // Defense in depth: never let a stale route, old draft or direct Step 11
     // interaction bypass the medical gate.
     const medicalEligibility = evaluateOnboardingMedicalEligibility(data);
@@ -172,8 +180,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
           : null,
       workout_location: data.workoutLocation,
       workout_days: data.workoutDays,
-      motivation: data.motivation,
-      schedule_json: data.schedule,
+      // Motivation and schedule are paused. Do not persist unasked defaults or overwrite legacy answers.
       medical_conditions_json: {
         conditions: data.medicalConditions,
         injuries: data.injuries,
@@ -223,7 +230,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       case 2:  return <Step2Physical />;
       case 3:  return <Step3Goal />;
       case 4:  return <Step4Activity />;
-      case 5:  return <Step5Schedule />;
+      case 5:  return <Step5Workout />;
       case 6:  return <Step6Medical />;
       case 7:  return <Step7Dietary />;
       case 8:  return <Step8Speed />;
