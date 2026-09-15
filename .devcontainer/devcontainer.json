@@ -1,0 +1,11 @@
+{
+  "name": "Behtan app and admin",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "postCreateCommand": "npm ci",
+  "forwardPorts": [5173, 5174],
+  "portsAttributes": {
+    "5173": { "label": "Behtan App", "onAutoForward": "notify" },
+    "5174": { "label": "Behtan Admin", "onAutoForward": "notify" }
+  },
+  "customizations": { "vscode": { "extensions": ["dbaeumer.vscode-eslint", "bradlc.vscode-tailwindcss"] } }
+}

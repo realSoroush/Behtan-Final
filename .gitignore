@@ -33,3 +33,7 @@ yarn-error.log*
 
 # TypeScript
 *.tsbuildinfo
+
+# Admin build output
+dist-admin/
+.vercel/

@@ -12,9 +12,10 @@ interface ComponentRowProps {
   component: MealComponent;
   onSwap: () => void;
   swapDisabled?: boolean;
+  readOnly?: boolean;
 }
 
-function ComponentRow({ component, onSwap, swapDisabled = false }: ComponentRowProps) {
+function ComponentRow({ component, onSwap, swapDisabled = false, readOnly = false }: ComponentRowProps) {
   const { foodItem, grams, kcal } = component;
 
   // Display quantity in the food's natural unit (عدد/برش/اسکوپ) when it's
@@ -42,7 +43,7 @@ function ComponentRow({ component, onSwap, swapDisabled = false }: ComponentRowP
           </span>
         </div>
       </div>
-      <button
+      {!readOnly && <button
         type="button"
         onClick={onSwap}
         disabled={swapDisabled}
@@ -51,7 +52,7 @@ function ComponentRow({ component, onSwap, swapDisabled = false }: ComponentRowP
       >
         <RefreshCw size={13} />
         <span>جایگزین</span>
-      </button>
+      </button>}
     </div>
   );
 }
@@ -62,13 +63,14 @@ function ComponentRow({ component, onSwap, swapDisabled = false }: ComponentRowP
 
 interface MealCardProps {
   meal: Meal;
+  readOnly?: boolean;
   isConsumedSaving?: boolean;
   consumedToggleDisabled?: boolean;
   onToggleConsumed: () => void;
   onSwapComponent: (componentIndex: number) => void;
 }
 
-export function MealCard({ meal, isConsumedSaving = false, consumedToggleDisabled = false, onToggleConsumed, onSwapComponent }: MealCardProps) {
+export function MealCard({ meal, readOnly = false, isConsumedSaving = false, consumedToggleDisabled = false, onToggleConsumed, onSwapComponent }: MealCardProps) {
   const [expanded, setExpanded] = useState(!meal.consumed);
 
   return (
@@ -87,7 +89,7 @@ export function MealCard({ meal, isConsumedSaving = false, consumedToggleDisable
         <button
           type="button"
           onClick={onToggleConsumed}
-          disabled={isConsumedSaving || consumedToggleDisabled}
+          disabled={readOnly || isConsumedSaving || consumedToggleDisabled}
           aria-label={meal.consumed ? 'علامت‌گذاری وعده به‌عنوان مصرف‌نشده' : 'علامت‌گذاری وعده به‌عنوان مصرف‌شده'}
           title={consumedToggleDisabled ? 'همگام‌سازی وضعیت وعده‌ها در دسترس نیست' : undefined}
           className={`flex-shrink-0 text-primary-500 hover:text-primary-600 transition-colors disabled:cursor-not-allowed ${isConsumedSaving ? 'opacity-60' : ''}`}
@@ -147,6 +149,7 @@ export function MealCard({ meal, isConsumedSaving = false, consumedToggleDisable
                 <ComponentRow
                   key={`${component.foodItem.id}-${idx}`}
                   component={component}
+                  readOnly={readOnly}
                   swapDisabled={meal.consumed}
                   onSwap={() => onSwapComponent(idx)}
                 />

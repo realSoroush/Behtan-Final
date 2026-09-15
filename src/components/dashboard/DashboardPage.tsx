@@ -1,3 +1,4 @@
+import { usePlanReporting } from '@/hooks/usePlanReporting';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { LogOut, RefreshCw, AlertCircle } from 'lucide-react';
 import { MacroSummary } from './MacroSummary';
@@ -173,6 +174,12 @@ export function DashboardPage() {
     () => applyDailyMealSnapshots(editablePlan, consumedMealSnapshots),
     [editablePlan, consumedMealSnapshots]
   );
+
+  const planReporting = usePlanReporting(todayKey,
+    activePlan && targets && profile?.id === user?.id && !profileLoading && !catalogLoading && !proteinPolicyLoading && !mealProgressLoading && !mealProgressError && mealProgressSavingSlots.size === 0
+      ? { schemaVersion: 1, plan: activePlan, targets, trace: nutritionResult?.trace,
+          isWorkoutDay, profile, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, engineVersion: 'admin-snapshot-v1' }
+      : null);
 
   const resetSwapped = useCallback(() => setSwappedPlan(null), []);
 
@@ -375,6 +382,10 @@ export function DashboardPage() {
         {/* Workout day toggle */}
         <WorkoutDayToggle isWorkoutDay={isWorkoutDay} onChange={(v) => { setIsWorkoutDay(v); resetSwapped(); }} />
 
+        {planReporting.error && <div role="status" className="text-sm text-amber-600 p-3">
+          ذخیرهٔ نسخهٔ برنامه انجام نشد؛ اتصال را بررسی کنید.
+          <button type="button" onClick={planReporting.retry} className="underline mr-2">تلاش دوباره</button>
+        </div>}
         {/* Regenerate plan button */}
         <button
           type="button"
