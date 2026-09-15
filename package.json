@@ -36,7 +36,10 @@
     "test:landing": "node scripts/landing-page.smoke-test.mjs",
     "test:subscriptions": "node --experimental-strip-types scripts/subscription-plans.smoke-test.mjs",
     "test:payments": "node --experimental-strip-types scripts/payments.smoke-test.mjs && node scripts/billing-database.smoke-test.mjs",
-    "test:production": "npm run test:auth && npm run test:security && npm run test:payments && node scripts/production-readiness.smoke-test.mjs"
+    "test:production": "npm run test:auth && npm run test:security && npm run test:payments && node scripts/production-readiness.smoke-test.mjs",
+    "dev:admin": "vite --config vite.admin.config.ts",
+    "build:admin": "tsc -b && vite build --config vite.admin.config.ts",
+    "test:admin": "node scripts/admin-database.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
