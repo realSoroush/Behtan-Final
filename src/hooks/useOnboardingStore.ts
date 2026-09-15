@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { createEmptyOnboardingData } from '@/types';
 import type { OnboardingData } from '@/types';
-import { persistOnboardingBeforeAdvance } from '@/utils/onboardingProgress';
+import { persistOnboardingBeforeAdvance, resolveActiveOnboardingStep } from '@/utils/onboardingProgress';
 import { sanitizeHydratedOnboardingDraft } from '@/utils/bodyScanPrivacy';
 
 import { mergeActivityAnswers, resolveActivityResumeStep } from '@/utils/onboardingActivity';
@@ -117,7 +117,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   prevStep: () => {
     if (get().isSubmitting) return;
     set((state) => ({
-      currentStep: Math.max(state.currentStep - 1, 1),
+      currentStep: (state.currentStep === 9 ? 7 : Math.max(state.currentStep - 1, 1)),
       submitError: null,
     }));
   },
@@ -125,7 +125,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   goToStep: (step) => {
     if (get().isSubmitting) return;
     set({
-      currentStep: Math.max(1, Math.min(step, TOTAL_STEPS)),
+      currentStep: resolveActiveOnboardingStep(Math.max(1, Math.min(step, TOTAL_STEPS))),
       submitError: null,
     });
   },
@@ -144,7 +144,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
 
   hydrateFromDraft: (userId, step, draft) =>
     set({
-      currentStep: resolveActivityResumeStep(Math.max(1, Math.min(step, TOTAL_STEPS)), draft),
+      currentStep: resolveActiveOnboardingStep(resolveActivityResumeStep(Math.max(1, Math.min(step, TOTAL_STEPS)), draft)),
       // Merge with defaults for legacy compatibility, but never revive an old
       // Base64 body photo from a persisted draft.
       data: mergeActivityAnswers(sanitizeHydratedOnboardingDraft(draft), {}),

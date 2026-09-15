@@ -189,7 +189,7 @@ export function evaluateMedicalEligibility(input: MedicalEligibilityInput): Medi
     cautions.push({
       code: 'eating_disorder_history',
       title: 'سابقه اختلال خوردن',
-      detail: 'حالت کاهش وزن سریع غیرفعال شده است؛ در صورت بازگشت علائم، برنامه را متوقف و با متخصص صحبت کنید.',
+      detail: 'در صورت بازگشت علائم، برنامه را متوقف و با متخصص صحبت کنید.',
     });
   }
 
@@ -221,7 +221,7 @@ export function evaluateMedicalEligibility(input: MedicalEligibilityInput): Medi
       cautions.push({
         code: 'high_risk_bmi',
         title: 'BMI بالا',
-        detail: 'حالت کاهش وزن سریع غیرفعال شده و بررسی فشار خون، قند خون و وضعیت عمومی توسط پزشک توصیه می‌شود.',
+        detail: 'بررسی فشار خون، قند خون و وضعیت عمومی توسط پزشک توصیه می‌شود.',
       });
     }
   }
@@ -233,7 +233,7 @@ export function evaluateMedicalEligibility(input: MedicalEligibilityInput): Medi
     cautions.push({
       code: 'medical_condition_present',
       title: 'شرایط پزشکی ثبت‌شده',
-      detail: 'برنامه محافظه‌کارانه‌تر می‌شود؛ پیگیری درمان و توصیه پزشک باید در اولویت بماند.',
+      detail: 'پیگیری درمان و توصیه پزشک باید در اولویت بماند.',
     });
   }
 
@@ -241,7 +241,7 @@ export function evaluateMedicalEligibility(input: MedicalEligibilityInput): Medi
     cautions.push({
       code: 'medication_review',
       title: 'مصرف دارو',
-      detail: 'حالت کاهش وزن سریع غیرفعال شده است. دارو را بدون نظر پزشک تغییر یا قطع نکنید.',
+      detail: 'دارو را بدون نظر پزشک تغییر یا قطع نکنید.',
     });
   }
 

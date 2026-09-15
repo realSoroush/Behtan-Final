@@ -86,17 +86,14 @@ assert(mifflinAiVisual === mifflinNoBodyFat, 'AI visual body fat changed default
 assert(katchMeasured !== mifflinNoBodyFat, 'Measured body fat did not select Katch-McArdle');
 
 
-// Weight-loss speed UI and engine share one policy object. Verify both the
-// percentage behavior and hard deficit caps that Step8Speed displays.
-assert(WEIGHT_LOSS_SPEED_POLICY.mild.percentage === 0.10, 'Mild speed policy drifted');
-assert(WEIGHT_LOSS_SPEED_POLICY.standard.percentage === 0.20, 'Standard speed policy drifted');
-assert(WEIGHT_LOSS_SPEED_POLICY.fast.percentage === 0.25, 'Fast speed policy drifted');
-assert(calculateTargetCalories(2000, 'weight_loss', 'mild') === 1800, 'Mild deficit mismatch');
-assert(calculateTargetCalories(2000, 'weight_loss', 'standard') === 1600, 'Standard deficit mismatch');
-assert(calculateTargetCalories(2000, 'weight_loss', 'fast') === 1500, 'Fast deficit mismatch');
-assert(calculateTargetCalories(4000, 'weight_loss', 'mild') === 3650, 'Mild deficit cap mismatch');
-assert(calculateTargetCalories(4000, 'weight_loss', 'standard') === 3400, 'Standard deficit cap mismatch');
-assert(calculateTargetCalories(4000, 'weight_loss', 'fast') === 3250, 'Fast deficit cap mismatch');
+// Legacy speeds all resolve to the automatic policy.
+for (const speed of ['mild', 'standard', 'fast']) {
+  assert(WEIGHT_LOSS_SPEED_POLICY[speed].percentage === 0.22, 'Automatic rate drifted');
+  assert(calculateTargetCalories(2000, 'weight_loss', speed) === 1560, 'Deficit mismatch');
+  assert(calculateTargetCalories(6000, 'weight_loss', speed) === 4800, 'Deficit cap mismatch');
+  assert(calculateTargetCalories(2000, 'weight_gain', speed) === 2440, 'Surplus mismatch');
+  assert(calculateTargetCalories(6000, 'weight_gain', speed) === 7200, 'Surplus cap mismatch');
+}
 
 // Obesity-range body weights should not make protein scale linearly forever.
 // With height supplied, calculateMacros uses an adjusted reference weight.

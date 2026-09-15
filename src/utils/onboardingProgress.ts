@@ -1,3 +1,14 @@
+// Keep persisted step IDs stable: step 8 (speed selection) is retired.
+export function resolveActiveOnboardingStep(step: number): number {
+  return step === 8 ? 9 : step;
+}
+
+export const VISIBLE_ONBOARDING_STEPS = 10;
+export function getVisibleOnboardingStep(step: number): number {
+  const active = resolveActiveOnboardingStep(step);
+  return active > 8 ? active - 1 : active;
+}
+
 /**
  * Small, framework-free onboarding checkpoint helper.
  * Kept separate so the critical "save before advance" rule is easy to test.
@@ -8,7 +19,7 @@ export function getNextOnboardingStep(currentStep: number, totalSteps: number): 
   }
 
   const safeCurrent = Math.max(1, Math.min(Math.trunc(currentStep), Math.trunc(totalSteps)));
-  return Math.min(safeCurrent + 1, Math.trunc(totalSteps));
+  return Math.min(resolveActiveOnboardingStep(safeCurrent + 1), Math.trunc(totalSteps));
 }
 
 export async function persistOnboardingBeforeAdvance<T>(params: {
