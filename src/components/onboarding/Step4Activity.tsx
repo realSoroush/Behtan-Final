@@ -326,8 +326,11 @@ export function Step4Activity() {
       )}
 
       <div className={`rounded-3xl border p-4 transition-all ${
-        activityMeta
-          ? 'border-primary-200 bg-primary-50/70 dark:border-primary-900/60 dark:bg-primary-950/20'
+        activitgit diff -- src/components/onboarding/Step4Activity.tsx
+git add src/components/onboarding/Step4Activity.tsx
+git commit -m "Fix activity box background in dark mode"
+git push -u origin HEADyMeta
+          ? 'border-primary-200 bg-primary-50/70 dark:border-primary-900/60 dark:bg-neutral-900'
           : 'border-dashed border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900/50'
       }`}>
         {activityMeta ? (

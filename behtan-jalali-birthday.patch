@@ -1,0 +1,243 @@
+diff --git a/src/components/onboarding/Step2Physical.tsx b/src/components/onboarding/Step2Physical.tsx
+--- a/src/components/onboarding/Step2Physical.tsx
++++ b/src/components/onboarding/Step2Physical.tsx
+@@ -1,43 +1,11 @@
++import { JalaliBirthDate } from '@/components/ui/JalaliBirthDate';
+ import { StepHeader } from '@/components/ui/StepHeader';
+ import { Button } from '@/components/ui/Button';
+ import { Input } from '@/components/ui/Input';
+ import { useOnboardingStore } from '@/hooks/useOnboardingStore';
+ import {
+-  MAX_SUPPORTED_AGE,
+-  MIN_SUPPORTED_AGE,
+   tryCalculateAge,
+ } from '@/utils/nutritionHelpers';
+-
+-function formatLocalIsoDate(date: Date): string {
+-  const year = date.getFullYear();
+-  const month = String(date.getMonth() + 1).padStart(2, '0');
+-  const day = String(date.getDate()).padStart(2, '0');
+-  return `${year}-${month}-${day}`;
+-}
+-
+-/**
+- * For an inclusive 18–70 age range:
+- * - latest allowed birthday = today minus 18 years
+- * - earliest allowed birthday = day after today minus 71 years
+- */
+-function getAllowedBirthDateRange(referenceDate: Date = new Date()) {
+-  const maxDate = new Date(
+-    referenceDate.getFullYear() - MIN_SUPPORTED_AGE,
+-    referenceDate.getMonth(),
+-    referenceDate.getDate()
+-  );
+-
+-  const minDate = new Date(
+-    referenceDate.getFullYear() - (MAX_SUPPORTED_AGE + 1),
+-    referenceDate.getMonth(),
+-    referenceDate.getDate() + 1
+-  );
+-
+-  return {
+-    min: formatLocalIsoDate(minDate),
+-    max: formatLocalIsoDate(maxDate),
+-  };
+-}
+ 
+ export function Step2Physical() {
+   const { data, updateData, nextStep, prevStep, currentStep } = useOnboardingStore();
+@@ -48,7 +16,6 @@
+   const isValidAge = age !== null;
+   const isValidHeight = data.height !== null && data.height >= 100 && data.height <= 250;
+   const isValidWeight = data.weight !== null && data.weight >= 30 && data.weight <= 300;
+-  const { min: minBirthDate, max: maxBirthDate } = getAllowedBirthDateRange();
+ 
+   const canContinue = isValidAge && isValidHeight && isValidWeight;
+ 
+@@ -63,28 +30,15 @@
+ 
+       {/* Birth Date */}
+       <div className="flex flex-col gap-1.5">
+-        <label className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+-          تاریخ تولد
+-        </label>
+-        <input
+-          type="date"
++        <JalaliBirthDate
+           value={data.birthDate}
+-          onChange={(e) => updateData({ birthDate: e.target.value })}
+-          min={minBirthDate}
+-          max={maxBirthDate}
+-          aria-invalid={hasBirthDate && !isValidAge}
+-          aria-describedby={hasBirthDate && !isValidAge ? 'birth-date-error' : undefined}
+-          className={`w-full bg-neutral-50 dark:bg-neutral-800 border rounded-2xl py-3.5 px-4 outline-none focus:ring-2 focus:border-transparent transition-all ${
+-            hasBirthDate && !isValidAge
+-              ? 'border-red-400 focus:ring-red-400/30 dark:border-red-500'
+-              : 'border-neutral-200 dark:border-neutral-700 focus:ring-primary-500'
+-          }`}
+-          dir="ltr"
++          onChange={(birthDate) => updateData({ birthDate })}
++          invalid={hasBirthDate && !isValidAge}
+         />
+ 
+         {isValidAge && (
+           <p className="text-sm text-primary-600 dark:text-primary-400 font-medium">
+-            سن شما: {age} سال
++            سن شما: {age?.toLocaleString('fa-IR')} سال
+           </p>
+         )}
+ 
+diff --git a/src/components/ui/JalaliBirthDate.tsx b/src/components/ui/JalaliBirthDate.tsx
+new file mode 100644
+--- /dev/null
++++ b/src/components/ui/JalaliBirthDate.tsx
+@@ -0,0 +1,68 @@
++import { useEffect, useRef, useState } from 'react';
++import { isoToJalali, jalaliMonthLength, jalaliToIso } from '@/utils/jalaliDate';
++import { MIN_SUPPORTED_AGE, MAX_SUPPORTED_AGE } from '@/utils/nutritionHelpers';
++
++const months = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
++const fa = (n: number) => n.toLocaleString('fa-IR', { useGrouping: false });
++const read = (iso: string) => {
++  const date = isoToJalali(iso);
++  return date && date.year >= 1200 && date.year <= 1600
++    ? date : { year: 0, month: 0, day: 0 };
++};
++
++export function JalaliBirthDate({ value, onChange, invalid }: {
++  value: string; onChange: (iso: string) => void; invalid: boolean;
++}) {
++  const [draft, setDraft] = useState(() => read(value));
++  const emitted = useRef(value);
++  useEffect(() => {
++    // Keep partial selections, but hydrate dates restored from the saved onboarding draft.
++    if (value !== emitted.current) {
++      setDraft(read(value));
++      emitted.current = value;
++    }
++  }, [value]);
++  const now = new Date();
++  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
++  const currentYear = isoToJalali(today)!.year;
++  const latestYear = currentYear - MIN_SUPPORTED_AGE;
++  const earliestYear = currentYear - MAX_SUPPORTED_AGE - 1;
++  const years = Array.from({ length: latestYear - earliestYear + 1 }, (_, i) => latestYear - i);
++  if (draft.year && !years.includes(draft.year)) years.push(draft.year);
++  const dayCount = draft.month ? jalaliMonthLength(draft.year || currentYear, draft.month) : 31;
++
++  const change = (key: 'year' | 'month' | 'day', value: number) => {
++    const next = { ...draft, [key]: value };
++    if (next.month && next.day > jalaliMonthLength(next.year || currentYear, next.month)) next.day = 0;
++    setDraft(next);
++    const iso = next.year && next.month && next.day ? jalaliToIso(next.year, next.month, next.day) ?? '' : '';
++    emitted.current = iso;
++    onChange(iso);
++  };
++  const classes = `w-full min-w-0 bg-neutral-50 dark:bg-neutral-800 border rounded-2xl py-3.5 px-2 outline-none focus:ring-2 transition-all ${invalid ? 'border-red-400 focus:ring-red-400/30' : 'border-neutral-200 dark:border-neutral-700 focus:ring-primary-500'}`;
++  return (
++    <fieldset dir="rtl" aria-describedby={invalid ? 'birth-date-error' : undefined}>
++      <legend className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2">تاریخ تولد (شمسی)</legend>
++      <div className="grid grid-cols-[1fr_1.4fr_1fr] gap-2">
++        <label className="min-w-0"><span className="sr-only">روز تولد</span>
++          <select className={classes} value={draft.day} onChange={e => change('day', Number(e.target.value))} aria-invalid={invalid}>
++            <option value={0}>روز</option>
++            {Array.from({ length: dayCount }, (_, i) => i + 1).map(day => <option key={day} value={day}>{fa(day)}</option>)}
++          </select>
++        </label>
++        <label className="min-w-0"><span className="sr-only">ماه تولد</span>
++          <select className={classes} value={draft.month} onChange={e => change('month', Number(e.target.value))} aria-invalid={invalid}>
++            <option value={0}>ماه</option>
++            {months.map((month, i) => <option key={month} value={i + 1}>{month}</option>)}
++          </select>
++        </label>
++        <label className="min-w-0"><span className="sr-only">سال تولد</span>
++          <select className={classes} value={draft.year} onChange={e => change('year', Number(e.target.value))} aria-invalid={invalid}>
++            <option value={0}>سال</option>
++            {years.map(year => <option key={year} value={year}>{fa(year)}</option>)}
++          </select>
++        </label>
++      </div>
++    </fieldset>
++  );
++}
+diff --git a/src/utils/jalaliDate.ts b/src/utils/jalaliDate.ts
+new file mode 100644
+--- /dev/null
++++ b/src/utils/jalaliDate.ts
+@@ -0,0 +1,46 @@
++/** Date-only conversion: UTC prevents browser timezone from moving the birthday. */
++export interface JalaliDate { year: number; month: number; day: number }
++const formatter = new Intl.DateTimeFormat('en-US-u-ca-persian-nu-latn', {
++  year: 'numeric', month: 'numeric', day: 'numeric', timeZone: 'UTC',
++});
++const DAY = 86400000;
++function parts(date: Date): JalaliDate {
++  const values = formatter.formatToParts(date);
++  const get = (key: string) => Number(values.find(p => p.type === key)?.value);
++  return { year: get('year'), month: get('month'), day: get('day') };
++}
++export function isoToJalali(iso: string): JalaliDate | null {
++  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
++  const date = new Date(`${iso}T00:00:00Z`);
++  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== iso) return null;
++  return parts(date);
++}
++const starts = new Map<number, number>();
++function yearStart(year: number): number {
++  if (!Number.isInteger(year) || year < 1200 || year > 1601) throw new RangeError('Unsupported Persian year');
++  const cached = starts.get(year);
++  if (cached !== undefined) return cached;
++  // Locate Nowruz using the runtime Persian calendar, rather than a leap-year shortcut.
++  for (let day = 18; day <= 24; day++) {
++    const time = Date.UTC(year + 621, 2, day);
++    const p = parts(new Date(time));
++    if (p.year === year && p.month === 1 && p.day === 1) {
++      starts.set(year, time);
++      return time;
++    }
++  }
++  throw new RangeError('Persian calendar unavailable');
++}
++export function jalaliMonthLength(year: number, month: number): number {
++  if (!Number.isInteger(month) || month < 1 || month > 12) return 0;
++  if (month <= 6) return 31;
++  if (month <= 11) return 30;
++  return (yearStart(year + 1) - yearStart(year)) / DAY === 366 ? 30 : 29;
++}
++export function jalaliToIso(year: number, month: number, day: number): string | null {
++  if (![year, month, day].every(Number.isInteger) || year < 1200 || year > 1600 || month < 1 || month > 12 || day < 1 || day > jalaliMonthLength(year, month)) return null;
++  const offset = month <= 6 ? (month - 1) * 31 : 186 + (month - 7) * 30;
++  const iso = new Date(yearStart(year) + (offset + day - 1) * DAY).toISOString().slice(0, 10);
++  const back = isoToJalali(iso);
++  return back?.year === year && back.month === month && back.day === day ? iso : null;
++}
+diff --git a/scripts/jalali-date.test.mjs b/scripts/jalali-date.test.mjs
+new file mode 100644
+--- /dev/null
++++ b/scripts/jalali-date.test.mjs
+@@ -0,0 +1,25 @@
++import assert from 'node:assert/strict';
++import { isoToJalali, jalaliToIso, jalaliMonthLength } from '../src/utils/jalaliDate.ts';
++import { tryCalculateAge } from '../src/utils/nutritionHelpers.ts';
++assert.equal(jalaliToIso(1379,4,14),'2000-07-04');
++assert.deepEqual(isoToJalali('2000-07-04'),{year:1379,month:4,day:14});
++assert.equal(jalaliToIso(1403,1,1),'2024-03-20');
++assert.equal(jalaliToIso(1399,12,30),'2021-03-20');
++assert.equal(jalaliToIso(1400,12,30),null);
++assert.equal(jalaliMonthLength(1399,12),30);
++assert.equal(jalaliMonthLength(1400,12),29);
++assert.equal(jalaliToIso(1380,7,31),null);
++assert.equal(jalaliToIso(1380,0,10),null);
++assert.equal(isoToJalali('2000-02-31'),null);
++assert.equal(isoToJalali(''),null);
++// Round-trip every date covering all selectable birth years, including leap days.
++for(let time=Date.UTC(1950,0,1);time<Date.UTC(2010,0,1);time+=86400000){
++ const iso=new Date(time).toISOString().slice(0,10); const j=isoToJalali(iso);
++ assert.equal(jalaliToIso(j.year,j.month,j.day),iso);
++}
++const reference=new Date(2026,8,15);
++for(const iso of ['2008-09-15','2008-09-16','1955-09-16','1955-09-15']){
++ const j=isoToJalali(iso);
++ assert.equal(tryCalculateAge(jalaliToIso(j.year,j.month,j.day),reference),tryCalculateAge(iso,reference));
++}
++console.log('✅ Persian birthday: known dates, leap Esfand, invalid days, 60-year round-trip, age boundaries');
