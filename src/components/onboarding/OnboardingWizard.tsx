@@ -12,7 +12,6 @@ import { Step4Activity } from './Step4Activity';
 import { Step5Workout } from './Step5Workout';
 import { Step6Medical } from './Step6Medical';
 import { Step7Dietary } from './Step7Dietary';
-import { Step8Speed } from './Step8Speed';
 import { Step9BodyScan } from './Step9BodyScan';
 import { Step10Analysis } from './Step10Analysis';
 import { Step11Paywall } from './Step11Paywall';
@@ -24,7 +23,6 @@ import { resolveActivityResumeStep } from '@/utils/onboardingActivity';
 import {
   evaluateOnboardingMedicalEligibility,
   MEDICAL_SAFETY_SCREENING_VERSION,
-  resolveSafeWeightLossSpeed,
 } from '@/utils/medicalEligibility';
 import {
   buildBodyScanConsentRecord,
@@ -195,7 +193,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         allergies: data.allergies,
       },
       protein_budget_preference: data.proteinBudgetPreference,
-      weight_loss_speed: resolveSafeWeightLossSpeed(data.weightLossSpeed, medicalEligibility),
+      weight_loss_speed: 'standard',
       body_fat_pct: data.bodyScanResult?.bodyFatPct ?? null,
       body_fat_source: data.bodyScanResult ? 'ai_visual' : null,
       body_scan_consent_json: buildBodyScanConsentRecord(data),
@@ -233,7 +231,6 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       case 5:  return <Step5Workout />;
       case 6:  return <Step6Medical />;
       case 7:  return <Step7Dietary />;
-      case 8:  return <Step8Speed />;
       case 9:  return <Step9BodyScan />;
       case 10: return <Step10Analysis />;
       case 11: return <Step11Paywall onComplete={handleComplete} />;

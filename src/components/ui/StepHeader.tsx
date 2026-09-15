@@ -1,5 +1,5 @@
 import { ChevronRight } from 'lucide-react';
-import { TOTAL_STEPS } from '@/hooks/useOnboardingStore';
+import { VISIBLE_ONBOARDING_STEPS, getVisibleOnboardingStep } from '@/utils/onboardingProgress';
 import { toPersianDigits } from '@/utils/nutritionHelpers';
 
 interface StepHeaderProps {
@@ -10,14 +10,15 @@ interface StepHeaderProps {
 }
 
 export function StepHeader({ step, title, subtitle, onBack }: StepHeaderProps) {
-  const progress = (step / TOTAL_STEPS) * 100;
+  const visibleStep = getVisibleOnboardingStep(step);
+  const progress = (visibleStep / VISIBLE_ONBOARDING_STEPS) * 100;
 
   return (
     <div className="mb-8">
       {/* Top row: back + counter */}
       <div className="flex items-center justify-between mb-4">
         <span className="text-sm text-neutral-400 dark:text-neutral-500 tabular-fa">
-          {toPersianDigits(step)} از {toPersianDigits(TOTAL_STEPS)}
+          {toPersianDigits(visibleStep)} از {toPersianDigits(VISIBLE_ONBOARDING_STEPS)}
         </span>
         {onBack && step > 1 && (
           <button

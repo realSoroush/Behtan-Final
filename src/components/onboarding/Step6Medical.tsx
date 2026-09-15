@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, ShieldAlert } from 'lucide-react';
+import { ShieldAlert } from 'lucide-react';
 import { StepHeader } from '@/components/ui/StepHeader';
 import { Button } from '@/components/ui/Button';
 import { useOnboardingStore } from '@/hooks/useOnboardingStore';
 import { MedicalSafetyForm, type MedicalSafetyFormValue } from '@/components/safety/MedicalSafetyForm';
 import {
   evaluateOnboardingMedicalEligibility,
-  resolveSafeWeightLossSpeed,
 } from '@/utils/medicalEligibility';
 
 export function Step6Medical() {
@@ -41,9 +40,6 @@ export function Step6Medical() {
   };
 
   const handleContinue = async () => {
-    if (!eligibility.fastWeightLossAllowed && data.weightLossSpeed === 'fast') {
-      updateData({ weightLossSpeed: resolveSafeWeightLossSpeed(data.weightLossSpeed, eligibility) });
-    }
     await nextStep();
   };
 
@@ -86,20 +82,6 @@ export function Step6Medical() {
               <p className="text-sm leading-6 text-red-800 dark:text-red-200">
                 برای دریافت برنامه، اطلاعات و داروهای خود را با پزشک یا متخصص تغذیه دارای صلاحیت بررسی کنید.
               </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {!isBlocked && eligibility.cautions.length > 0 && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/60 dark:bg-amber-950/30">
-          <div className="flex items-start gap-3">
-            <AlertTriangle size={20} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
-            <div>
-              <p className="font-semibold text-amber-800 dark:text-amber-200">برنامه با محدودیت ایمنی ساخته می‌شود</p>
-              <ul className="mt-2 space-y-1 text-sm leading-6 text-amber-700 dark:text-amber-300">
-                {eligibility.cautions.map((caution) => <li key={caution.code}>• {caution.detail}</li>)}
-              </ul>
             </div>
           </div>
         </div>

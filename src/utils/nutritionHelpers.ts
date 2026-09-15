@@ -201,52 +201,35 @@ export interface CalorieAdjustmentRule {
   maxAbsoluteKcal: number;
 }
 
-/**
- * Single source of truth for the three weight-loss speeds.
- * Step8Speed imports this object directly, so the copy shown to the user can
- * never silently drift away from the formula used by the nutrition engine.
- */
+/** Automatic energy adjustment; legacy speed values no longer affect targets. */
+export const AUTOMATIC_CALORIE_POLICY: Readonly<CalorieAdjustmentRule> = {
+  percentage: 0.22,
+  maxAbsoluteKcal: 1200,
+};
+
+/** Compatibility for older imports; all former speeds use the same policy. */
 export const WEIGHT_LOSS_SPEED_POLICY: Readonly<Record<WeightLossSpeed, CalorieAdjustmentRule>> = {
-  mild: { percentage: 0.10, maxAbsoluteKcal: 350 },
-  standard: { percentage: 0.20, maxAbsoluteKcal: 600 },
-  fast: { percentage: 0.25, maxAbsoluteKcal: 750 },
+  mild: AUTOMATIC_CALORIE_POLICY,
+  standard: AUTOMATIC_CALORIE_POLICY,
+  fast: AUTOMATIC_CALORIE_POLICY,
 };
 
-const CALORIE_ADJUSTMENT_RULES: Record<
-  'weight_gain' | 'maintenance' | WeightLossSpeed,
-  CalorieAdjustmentRule
-> = {
-  weight_gain: { percentage: 0.15, maxAbsoluteKcal: 500 },
-  maintenance: { percentage: 0, maxAbsoluteKcal: 0 },
-  ...WEIGHT_LOSS_SPEED_POLICY,
-};
-
-function resolveCalorieAdjustment(
-  tdee: number,
-  goal: Goal,
-  weightLossSpeed?: WeightLossSpeed
-): number {
-  const ruleKey: 'weight_gain' | 'maintenance' | WeightLossSpeed =
-    goal === 'weight_gain'
-      ? 'weight_gain'
-      : goal === 'maintenance'
-        ? 'maintenance'
-        : (weightLossSpeed ?? 'standard');
-
-  const rule = CALORIE_ADJUSTMENT_RULES[ruleKey];
-  const magnitude = Math.min(tdee * rule.percentage, rule.maxAbsoluteKcal);
-  const sign = goal === 'weight_gain' ? 1 : goal === 'maintenance' ? 0 : -1;
-  return sign * magnitude;
+function resolveCalorieAdjustment(tdee: number, goal: Goal): number {
+  const magnitude = Math.min(
+    tdee * AUTOMATIC_CALORIE_POLICY.percentage,
+    AUTOMATIC_CALORIE_POLICY.maxAbsoluteKcal
+  );
+  return goal === 'weight_gain' ? magnitude : goal === 'maintenance' ? 0 : -magnitude;
 }
 
 export function calculateTargetCalories(
   tdee: number,
   goal: Goal,
-  weightLossSpeed?: WeightLossSpeed
+  _weightLossSpeed?: WeightLossSpeed
 ): number {
   assertFinitePositive(tdee, 'tdee');
 
-  const adjustment = resolveCalorieAdjustment(tdee, goal, weightLossSpeed);
+  const adjustment = resolveCalorieAdjustment(tdee, goal);
   const target = tdee + adjustment;
 
   // Product-level emergency floor. Clinical plans below this threshold should
@@ -541,7 +524,7 @@ export function calculateFullNutritionPlanWithTrace(
   // Derive the displayed adjustment from the actual rounded/floored target so
   // the trace always reconciles exactly: TDEE + adjustment + workout = target.
   const calorieAdjustmentKcal = baseTargetCalories - tdee;
-  const workoutBonusKcal = input.isWorkoutDay ? WORKOUT_DAY_CALORIE_BONUS : 0;
+  const workoutBonusKcal = input.goal === 'maintenance' && input.isWorkoutDay ? WORKOUT_DAY_CALORIE_BONUS : 0;
   const targetCalories = baseTargetCalories + workoutBonusKcal;
 
   const proteinPolicy = input.proteinPolicy ?? DEFAULT_PROTEIN_ENGINE_POLICY;
@@ -594,7 +577,7 @@ export function calculateFullNutritionPlanWithTrace(
       activityMultiplier,
       tdee,
       goal: input.goal,
-      weightLossSpeed: input.goal === 'weight_loss' ? (input.weightLossSpeed ?? 'standard') : null,
+      weightLossSpeed: null,
       calorieAdjustmentKcal,
       workoutBonusKcal,
       targetCalories,
