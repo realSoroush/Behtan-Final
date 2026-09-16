@@ -7,7 +7,8 @@ import { formatSubscriptionPrice } from '@/utils/subscriptionPlans';
 export function BillingAccess({children,onSignOut}:{children:ReactNode;onSignOut:()=>Promise<void>}) {
   const [status,setStatus]=useState<BillingStatus|null>(null);
   const [error,setError]=useState<string|null>(null);
-  const [busy,setBusy]=useState(false);
+  const [busy,setBusy]=useState(true);
+  const [returnAttempts,setReturnAttempts]=useState(0);
   const [token,setToken]=useState(()=>new URLSearchParams(window.location.search).get('payment'));
   const [returnedOrder,setReturnedOrder]=useState<PaymentOrder|null>(null);
   const mounted=useRef(true);
@@ -15,6 +16,7 @@ export function BillingAccess({children,onSignOut}:{children:ReactNode;onSignOut
   const refresh=useCallback(async (verifyToken?:string)=>{
     if(running.current)return;
     running.current=true;setBusy(true);
+    if(verifyToken)setReturnAttempts(n=>n+1);
     try {
       if(verifyToken){
         const result=await paymentRequest<{order:PaymentOrder}>({action:'verify',token:verifyToken});
@@ -40,18 +42,42 @@ export function BillingAccess({children,onSignOut}:{children:ReactNode;onSignOut
     const timer=window.setTimeout(()=>{setStatus(old=>old?{...old,active:null}:old);void refresh();},Math.min(remaining+50,2147483647));
     return()=>clearTimeout(timer);
   },[status,refresh]);
-  const closeResult=()=>{
+  const closeResult=useCallback(()=>{
     const url=new URL(window.location.href);url.searchParams.delete('payment');
-    window.history.replaceState(null,'',url.pathname+url.search+url.hash);setToken(null);setReturnedOrder(null);
-  };
-  const active=status?.active && Date.parse(status.active.expires_at)>Date.now();
-  if(active && !token && !error)return <>
-    <div dir="rtl" className="bg-primary-50 px-4 py-2 text-center text-xs text-primary-800 dark:bg-primary-950 dark:text-primary-200">
-      {status.mode==='sandbox'?'حالت آزمایشی — پرداخت و اشتراک واقعی نیست.':'اشتراک فعال'}
-      {' · تا '}{new Date(status.active!.expires_at).toLocaleDateString('fa-IR')}
+    window.history.replaceState(null,'',url.pathname+url.search+url.hash);setToken(null);setReturnedOrder(null);setReturnAttempts(0);
+  },[]);
+  const active=Boolean(status?.active && Date.parse(status.active.expires_at)>Date.now());
+  const order=returnedOrder ?? status?.orders.find(o=>o.token===token);
+  const confirmedReturn=Boolean(token && order?.status==='paid' && active && !error);
+  const waitingForReturn=Boolean(token && !error && order?.status!=='failed' && !confirmedReturn && returnAttempts<6);
+
+  useEffect(()=>{
+    if(confirmedReturn)closeResult();
+  },[confirmedReturn,closeResult]);
+
+  // Reconcile a delayed gateway callback automatically, with bounded retries.
+  useEffect(()=>{
+    if(!waitingForReturn || busy || !token)return;
+    const timer=window.setTimeout(()=>void refresh(token),3000);
+    return()=>window.clearTimeout(timer);
+  },[waitingForReturn,busy,token,refresh,returnAttempts]);
+
+  if((!status && !error) || (token && (busy || waitingForReturn || confirmedReturn)))return (
+    <main dir="rtl" className="min-h-screen flex items-center justify-center bg-neutral-50 px-5 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100" aria-busy="true">
+      <div role="status" aria-live="polite" className="space-y-4 text-center">
+        <div aria-hidden="true" className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
+        <p className="font-bold">{token ? 'در حال تأیید پرداخت و آماده‌سازی برنامه شما…' : 'در حال بارگذاری برنامه شما…'}</p>
+        {token && <p className="text-sm text-neutral-500 dark:text-neutral-400">پس از تأیید، خودکار وارد برنامه می‌شوید.</p>}
+      </div>
+    </main>
+  );
+
+  if(active && !token)return <>
+    <div dir="rtl" className="bg-primary-50 px-4 py-2 text-center text-xs text-primary-800 dark:bg-primary-950 dark:text-black">
+      {status!.mode==='sandbox'?'حالت آزمایشی — پرداخت و اشتراک واقعی نیست.':'اشتراک فعال'}
+      {' · تا '}{new Date(status!.active!.expires_at).toLocaleDateString('fa-IR')}
     </div>{children}
   </>;
-  const order=returnedOrder ?? status?.orders.find(o=>o.token===token);
   return <main dir="rtl" className="min-h-screen bg-neutral-50 px-4 py-6 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
     <div className="mx-auto max-w-lg space-y-5">
       <div className="flex items-center justify-between"><strong>اشتراک به‌تن</strong><div className="flex items-center gap-4"><ThemeToggle/><button onClick={()=>void onSignOut()} className="text-sm text-neutral-500">خروج</button></div></div>
@@ -62,6 +88,7 @@ export function BillingAccess({children,onSignOut}:{children:ReactNode;onSignOut
         {order && <p>{order.planName} · {formatSubscriptionPrice(order.priceToman)}{order.priceToman>0?' تومان':''}</p>}
         {order?.refId && <p className="break-all text-sm">شماره پیگیری: <bdi>{order.refId}</bdi></p>}
         {order?.lastCode != null && order.lastCode < 0 && <p className="text-sm">کد آخرین پاسخ درگاه: <bdi>{order.lastCode}</bdi></p>}
+        {order?.status==='paid' && !active && <p className="text-sm leading-7 text-neutral-500">پرداخت تأیید شده؛ فعال‌شدن اشتراک هنوز تأیید نشده است. وضعیت را دوباره بررسی کنید.</p>}
         {order?.status!=='paid' && <p className="text-sm leading-7 text-neutral-500">هنوز پرداخت تأییدشده‌ای برای این سفارش ثبت نشده است. اگر وجه کسر شده، ابتدا وضعیت را دوباره بررسی کنید.</p>}
         <button className="rounded-xl bg-primary-500 px-4 py-3 font-bold text-white" disabled={busy} onClick={()=>void refresh(token)}>بررسی مجدد وضعیت</button>
         <button className="block py-2 text-sm" onClick={closeResult}>{active?'ورود به برنامه':'بازگشت به اشتراک‌ها'}</button>

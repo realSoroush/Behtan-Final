@@ -346,15 +346,6 @@ export function DashboardPage() {
       </header>
 
       <div className="max-w-md mx-auto px-4 py-5 space-y-4">
-        {medicalEligibility?.status === 'eligible_with_caution' && (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/60 dark:bg-amber-950/30">
-            <p className="font-semibold text-amber-800 dark:text-amber-200">محدودیت ایمنی برنامه فعال است</p>
-            <ul className="mt-1 space-y-1 text-xs leading-5 text-amber-700 dark:text-amber-300">
-              {medicalEligibility.cautions.map((caution) => <li key={caution.code}>• {caution.detail}</li>)}
-            </ul>
-          </div>
-        )}
-
         {/* Daily overview carousel */}
         {(targets && consumed) || foodQuality ? (
           <DailyOverviewCarousel

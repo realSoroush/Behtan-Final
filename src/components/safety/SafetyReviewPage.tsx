@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, LogOut, ShieldCheck } from 'lucide-react';
+import { LogOut, ShieldCheck } from 'lucide-react';
 import { APP_LOGO_PATH, APP_NAME_FA } from '@/constants/brand';
 import { Button } from '@/components/ui/Button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
@@ -116,15 +116,6 @@ export function SafetyReviewPage({ profile, onSave, onSignOut }: SafetyReviewPag
                 <li key={blocker.code}><strong>{blocker.title}:</strong> {blocker.detail}</li>
               ))}
             </ul>
-          </div>
-        )}
-
-        {questionnaireComplete && eligibility.cautions.length > 0 && eligibility.status !== 'blocked' && (
-          <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/60 dark:bg-amber-950/30">
-            <AlertTriangle size={20} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
-            <p className="text-sm leading-6 text-amber-700 dark:text-amber-300">
-              برنامه با محدودیت ایمنی ساخته می‌شود و گزینه کاهش وزن سریع در دسترس نخواهد بود.
-            </p>
           </div>
         )}
 
