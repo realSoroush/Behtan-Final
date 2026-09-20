@@ -6,7 +6,7 @@ import { calculateTargetCalories, calculateFullNutritionPlanWithTrace, calculate
 import { MEDICAL_SAFETY_SCREENING_VERSION } from '../src/utils/medicalEligibility.ts';
 import { getNextOnboardingStep, getVisibleOnboardingStep } from '../src/utils/onboardingProgress.ts';
 for (const speed of [undefined, 'mild', 'standard', 'fast']) {
-  for (const [tdee, loss, gain] of [[2000,1560,2440],[4000,3120,4880],[6000,4800,7200],[1400,1200,1708]]) {
+  for (const [tdee, loss, gain] of [[2000,1500,2500],[4000,3000,5000],[6000,4800,7200],[1400,1200,1750]]) {
     assert.equal(calculateTargetCalories(tdee,'weight_loss',speed),loss);
     assert.equal(calculateTargetCalories(tdee,'weight_gain',speed),gain);
     assert.equal(calculateTargetCalories(tdee,'maintenance',speed),tdee);

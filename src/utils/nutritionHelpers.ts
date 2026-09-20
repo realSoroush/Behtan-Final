@@ -203,7 +203,7 @@ export interface CalorieAdjustmentRule {
 
 /** Automatic energy adjustment; legacy speed values no longer affect targets. */
 export const AUTOMATIC_CALORIE_POLICY: Readonly<CalorieAdjustmentRule> = {
-  percentage: 0.22,
+  percentage: 0.25,
   maxAbsoluteKcal: 1200,
 };
 

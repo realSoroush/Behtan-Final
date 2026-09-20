@@ -88,11 +88,11 @@ assert(katchMeasured !== mifflinNoBodyFat, 'Measured body fat did not select Kat
 
 // Legacy speeds all resolve to the automatic policy.
 for (const speed of ['mild', 'standard', 'fast']) {
-  assert(WEIGHT_LOSS_SPEED_POLICY[speed].percentage === 0.22, 'Automatic rate drifted');
-  assert(calculateTargetCalories(2000, 'weight_loss', speed) === 1560, 'Deficit mismatch');
-  assert(calculateTargetCalories(6000, 'weight_loss', speed) === 4800, 'Deficit cap mismatch');
-  assert(calculateTargetCalories(2000, 'weight_gain', speed) === 2440, 'Surplus mismatch');
-  assert(calculateTargetCalories(6000, 'weight_gain', speed) === 7200, 'Surplus cap mismatch');
+  assert(WEIGHT_LOSS_SPEED_POLICY[speed].percentage === 0.25, 'Automatic rate drifted');
+assert(calculateTargetCalories(2000, 'weight_loss', speed) === 1500, 'Deficit mismatch');
+assert(calculateTargetCalories(6000, 'weight_loss', speed) === 4800, 'Deficit cap mismatch');
+assert(calculateTargetCalories(2000, 'weight_gain', speed) === 2500, 'Surplus mismatch');
+assert(calculateTargetCalories(6000, 'weight_gain', speed) === 7200, 'Surplus cap mismatch');
 }
 
 // Obesity-range body weights should not make protein scale linearly forever.
