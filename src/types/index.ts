@@ -330,6 +330,8 @@ export interface DailyMealPlan {
   isWorkoutDay: boolean;
   targets: MacroTargets;
   meals: Meal[];
+  /** Consumed meals stay factual even if today's remaining options cannot meet the new target. */
+  remainingTargetsUnmet?: boolean;
 }
 
 // ============================================================================

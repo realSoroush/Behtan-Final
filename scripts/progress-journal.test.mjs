@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {parseWeight,weightTrend,reviewDue} from '../src/utils/progressJournal.ts';
+import {contentFingerprint,buildPlanProvenance} from '../src/utils/planProvenance.ts';
+assert.equal(parseWeight('۸۴٫۵'),84.5);assert.equal(parseWeight('٨٤.٥'),84.5);assert.equal(parseWeight(''),null);
+for(const value of ['NaN','1e2','-1','۳۵۱','84.55','0'])assert.throws(()=>parseWeight(value));
+const entry=(date,weight)=>({entry_date:date,weight_kg:weight,adherence:null,hunger:null,difficulty:null});
+const rows=[entry('2026-09-21',84),entry('2026-09-15',85),entry('2026-09-20',null)];
+assert.equal(weightTrend(rows).change,-1);assert.equal(weightTrend([rows[0]]).change,null);
+assert(reviewDue(rows,'2026-09-21'));rows[1].hunger='comfortable';assert(!reviewDue(rows,'2026-09-21'));assert(reviewDue(rows,'2026-09-22'));
+assert.equal(contentFingerprint({b:2,a:1}),contentFingerprint({a:1,b:2}));
+assert.notEqual(contentFingerprint({a:1}),contentFingerprint({a:2}));
+assert.equal(buildPlanProvenance({},{}).caloriePolicy.percentage,.25);
+console.log('✅ Persian/Arabic weights, validation, time ordering, review due dates and policy provenance');

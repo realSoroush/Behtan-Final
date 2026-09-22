@@ -1,0 +1,8 @@
+[
+  {"key":"apple_yogurt","name":"ماست کم‌چرب و سیب","foods":["low_fat_yogurt","apple"]},
+  {"key":"banana_oats_milk","name":"شیر کم‌چرب، جو دوسر و موز","foods":["low_fat_milk","oats_dry","banana"]},
+  {"key":"apple_walnut","name":"سیب و گردو","foods":["apple","walnut"]},
+  {"key":"banana_nuts","name":"موز و آجیل بدون بادام‌زمینی","foods":["banana","mixed_nuts"]},
+  {"key":"apple_oats_yogurt","name":"ماست، جو دوسر و سیب","foods":["low_fat_yogurt","oats_dry","apple"]},
+  {"key":"banana_whole_toast","name":"موز و نان تست سبوس‌دار","foods":["banana","whole_grain_toast"]}
+]

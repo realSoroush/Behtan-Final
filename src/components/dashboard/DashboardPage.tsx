@@ -1,4 +1,8 @@
 import { usePlanReporting } from '@/hooks/usePlanReporting';
+import { useMealHistory } from '@/hooks/useMealHistory';
+import { historyOfMeals, mealFingerprint, type MealHistoryItem } from '@/utils/mealExperience';
+import { buildPlanProvenance } from '@/utils/planProvenance';
+import { ProgressJournal } from './ProgressJournal';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { LogOut, RefreshCw, AlertCircle } from 'lucide-react';
 import { MacroSummary } from './MacroSummary';
@@ -17,7 +21,7 @@ import {
   generateDailyMealPlan,
   getSwapOptionsForMeal,
 } from '@/utils/mealPlanEngine';
-import type { DailyMealPlan, FoodSwapOption, MacroTargets, MealComponent } from '@/types';
+import type { DailyMealPlan, FoodSwapOption, MacroTargets, MealComponent, Meal } from '@/types';
 import { APP_LOGO_PATH, APP_NAME_FA } from '@/constants/brand';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { NUTRITION_DEBUG_CONFIG } from '@/config/nutritionConfig';
@@ -31,9 +35,9 @@ import {
 // ============================================================================
 // Helper: compute consumed macros from meal checkboxes
 // ============================================================================
-function computeConsumedMacros(plan: DailyMealPlan): MacroTargets {
+function computeConsumedMacros(plan: DailyMealPlan, consumedOnly = true): MacroTargets {
   return plan.meals
-    .filter((m) => m.consumed)
+    .filter((m) => !consumedOnly || m.consumed)
     .reduce((acc, m) => ({
       targetCalories: acc.targetCalories + m.totalKcal,
       proteinGrams: acc.proteinGrams + m.totalProtein,
@@ -70,6 +74,10 @@ export function DashboardPage() {
 
   const [isWorkoutDay, setIsWorkoutDay] = useState(false);
   const [todayKey, setTodayKey] = useState(() => getLocalDateKey());
+  const history = useMealHistory(user?.id, todayKey);
+  const generationKey = `${user?.id}:${todayKey}`;
+  const [generationContext, setGenerationContext] = useState<{key:string;lockedMeals:Meal[];avoidMeals:MealHistoryItem[];hydrationError:boolean}|null>(null);
+  const avoidMeals = generationContext?.avoidMeals;
 
   useEffect(() => {
     const syncDate = () => setTodayKey(getLocalDateKey());
@@ -89,6 +97,14 @@ export function DashboardPage() {
     setMealConsumed,
     refetch: refetchMealProgress,
   } = useDailyMealProgress(user?.id, todayKey);
+
+  // Hydrate consumed facts once per user/day. A newly checked meal must not
+  // reshuffle the other meals; lock the latest facts again only on regeneration.
+  useEffect(() => {
+    if (mealProgressLoading) return;
+    if (generationContext?.key === generationKey && generationContext.hydrationError === Boolean(mealProgressError)) return;
+    setGenerationContext({key:generationKey,lockedMeals:Object.values(consumedMealSnapshots),avoidMeals:[],hydrationError:Boolean(mealProgressError)});
+  }, [mealProgressLoading, mealProgressError, consumedMealSnapshots, generationKey, generationContext?.key, generationContext?.hydrationError]);
 
   // Swap modal state - identifies which meal + which component within it
   const [swapMealIndex, setSwapMealIndex] = useState<number | null>(null);
@@ -141,7 +157,7 @@ export function DashboardPage() {
   // without violating practical portion limits. Keep that failure local to the
   // dashboard instead of letting it crash the React tree / Error Boundary.
   const mealPlanResult = useMemo<{ plan: DailyMealPlan | null; error: string | null }>(() => {
-    if (!catalog || !targets || !profile?.weight || !profile?.dietary_preferences_json) {
+    if (!catalog || !targets || history.loading || generationContext?.key !== generationKey || !profile?.weight || !profile?.dietary_preferences_json) {
       return { plan: null, error: null };
     }
 
@@ -153,7 +169,8 @@ export function DashboardPage() {
           profile.weight,
           profile.dietary_preferences_json,
           isWorkoutDay,
-          dateKey
+          dateKey,
+          {previousDay: history.meals, avoidMeals:generationContext.avoidMeals,lockedMeals:generationContext.lockedMeals}
         ),
         error: null,
       };
@@ -163,7 +180,7 @@ export function DashboardPage() {
         : 'تولید برنامه غذایی با خطا مواجه شد.';
       return { plan: null, error: message };
     }
-  }, [catalog, targets, profile, isWorkoutDay, planVersion, todayKey]);
+  }, [catalog, targets, profile, isWorkoutDay, planVersion, todayKey, history.loading, history.meals, generationContext, generationKey]);
 
   const mealPlan = mealPlanResult.plan;
 
@@ -175,10 +192,12 @@ export function DashboardPage() {
     [editablePlan, consumedMealSnapshots]
   );
 
+  const provenance = useMemo(() => buildPlanProvenance(catalog, proteinPolicy), [catalog, proteinPolicy]);
   const planReporting = usePlanReporting(todayKey,
     activePlan && targets && profile?.id === user?.id && !profileLoading && !catalogLoading && !proteinPolicyLoading && !mealProgressLoading && !mealProgressError && mealProgressSavingSlots.size === 0
       ? { schemaVersion: 1, plan: activePlan, targets, trace: nutritionResult?.trace,
-          isWorkoutDay, profile, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, engineVersion: 'admin-snapshot-v1' }
+          isWorkoutDay, profile, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          ...provenance, generationSeed: `${todayKey}-v${planVersion}` }
       : null);
 
   const resetSwapped = useCallback(() => setSwappedPlan(null), []);
@@ -189,6 +208,12 @@ export function DashboardPage() {
     setSwapMealIndex(null);
     setSwapComponentIndex(null);
   }, [todayKey]);
+
+  const regenerate = () => {
+    setGenerationContext({key:generationKey,lockedMeals:Object.values(consumedMealSnapshots),avoidMeals:activePlan ? historyOfMeals(activePlan.meals.filter(m => !m.consumed)) : [],hydrationError:Boolean(mealProgressError)});
+    setPlanVersion(v => v + 1);
+    resetSwapped();
+  };
 
   const handleToggleConsumed = (mealIdx: number) => {
     const meal = activePlan?.meals[mealIdx];
@@ -249,6 +274,11 @@ export function DashboardPage() {
   ]);
 
   const consumed = activePlan ? computeConsumedMacros(activePlan) : null;
+  const planned = activePlan ? computeConsumedMacros(activePlan, false) : undefined;
+  const unchangedAfterRegeneration = avoidMeals && avoidMeals.length > 0 && activePlan && avoidMeals.every(previous => {
+    const current = activePlan.meals.find(m => m.slot === previous.slot);
+    return current && mealFingerprint(previous.foodIds) === mealFingerprint(current.components.map(c => c.foodItem.id));
+  });
   const foodQuality = useMemo(
     () => activePlan && targets
       ? evaluateDailyFoodQuality(activePlan.meals, targets.targetCalories)
@@ -257,7 +287,7 @@ export function DashboardPage() {
   );
 
   // ---- Loading / error states ----
-  if (profileLoading || catalogLoading || proteinPolicyLoading || mealProgressLoading) {
+  if (profileLoading || catalogLoading || proteinPolicyLoading || mealProgressLoading || history.loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-3">
@@ -357,6 +387,7 @@ export function DashboardPage() {
                   <MacroSummary
                     targets={targets}
                     consumed={consumed}
+                    planned={planned}
                     isWorkoutDay={isWorkoutDay}
                   />
                 ),
@@ -371,7 +402,7 @@ export function DashboardPage() {
         ) : null}
 
         {/* Workout day toggle */}
-        <WorkoutDayToggle isWorkoutDay={isWorkoutDay} onChange={(v) => { setIsWorkoutDay(v); resetSwapped(); }} />
+        <WorkoutDayToggle isWorkoutDay={isWorkoutDay} onChange={(v) => { setIsWorkoutDay(v); resetSwapped(); setGenerationContext({key:generationKey,lockedMeals:Object.values(consumedMealSnapshots),avoidMeals:[],hydrationError:Boolean(mealProgressError)}); }} />
 
         {planReporting.error && <div role="status" className="text-sm text-amber-600 p-3">
           ذخیرهٔ نسخهٔ برنامه انجام نشد؛ اتصال را بررسی کنید.
@@ -380,12 +411,16 @@ export function DashboardPage() {
         {/* Regenerate plan button */}
         <button
           type="button"
-          onClick={() => { setPlanVersion((v) => v + 1); resetSwapped(); }}
+          onClick={regenerate}
+          disabled={Boolean(activePlan?.meals.every(m => m.consumed)) || mealProgressSavingSlots.size > 0 || Boolean(mealProgressError)}
           className="w-full flex items-center justify-center gap-2 py-2.5 text-sm text-neutral-500 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
         >
           <RefreshCw size={14} />
-          تولید برنامه غذایی جدید
+          تغییر وعده‌های باقی‌مانده
         </button>
+        {unchangedAfterRegeneration && <p role="status" className="text-xs leading-5 text-neutral-500 dark:text-neutral-400">با محدودیت‌های فعلی، ترکیب متفاوت مناسبی پیدا نشد؛ غذاهای پیشنهادی مشابه‌اند.</p>}
+        {activePlan?.remainingTargetsUnmet && <p role="status" className="text-xs leading-5 text-neutral-500 dark:text-neutral-400">وعده‌های مصرف‌شده حفظ شدند؛ با گزینه‌های باقی‌مانده، مجموع امروز کاملاً در محدودهٔ هدف قرار نگرفت. جزئیات را در جدول هدف و برنامه ببین.</p>}
+        {history.error && <p className="text-xs text-neutral-500 dark:text-neutral-400">سابقهٔ دیروز دریافت نشد؛ کنترل تکرار فعلاً فقط برای وعده‌های امروز انجام می‌شود.</p>}
 
         {mealProgressError && (
           <div className="rounded-2xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 flex items-center justify-between gap-3">
@@ -411,7 +446,7 @@ export function DashboardPage() {
             <p className="text-sm leading-6 text-neutral-600 dark:text-neutral-300">{mealPlanResult.error}</p>
             <button
               type="button"
-              onClick={() => { setPlanVersion((v) => v + 1); resetSwapped(); }}
+              onClick={regenerate}
               className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 text-sm font-semibold"
             >
               <RefreshCw size={14} />
@@ -441,6 +476,8 @@ export function DashboardPage() {
           </div>
         )}
       </div>
+
+      {user && <div className="max-w-md mx-auto px-4 mt-4"><ProgressJournal key={`${user.id}:${todayKey}`} userId={user.id} today={todayKey} /></div>}
 
       {/* Swap modal */}
       <FoodSwapModal

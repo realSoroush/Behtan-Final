@@ -41,7 +41,7 @@ assert(
 );
 
 assert(TEST_NUTRITION_CATALOG.foods.length === 31, 'Expected 31 seeded foods');
-assert(TEST_NUTRITION_CATALOG.mealTemplates.length === 43, 'Expected 43 seeded meal templates');
+assert(TEST_NUTRITION_CATALOG.mealTemplates.length === 55, 'Expected 55 seeded meal templates, including 12 balanced snacks');
 assert(Object.keys(TEST_NUTRITION_CATALOG.portionRules).length === 31, 'Every food must have a portion rule');
 for (const food of TEST_NUTRITION_CATALOG.foods) {
   assert(Number.isFinite(food.fiberPerUnit) && food.fiberPerUnit >= 0, `Fiber missing for ${food.id}`);
