@@ -53,7 +53,7 @@ function MacroRing({ label, value, max, unit, color, bgColor, size = 80, strokeW
 
 function CalorieBar({ consumed, target }: { consumed: number; target: number }) {
   const pct = Math.min(100, (consumed / (target || 1)) * 100);
-  const remaining = Math.max(0, target - consumed);
+  const remaining = Math.round(target - consumed);
 
   return (
     <div>
@@ -63,19 +63,19 @@ function CalorieBar({ consumed, target }: { consumed: number; target: number }) 
           <span className="text-sm font-normal text-neutral-500 mr-1">کالری مصرف‌شده</span>
         </span>
         <span className="text-sm text-neutral-500 dark:text-neutral-400">
-          هدف: {toPersianDigits(target)} کالری
+          هدف روزانه: {toPersianDigits(Math.round(target))} کالری
         </span>
       </div>
       <div className="h-3 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
         <div
-          className={`h-full rounded-full transition-all duration-700 ${pct >= 100 ? 'bg-red-500' : 'bg-primary-500'}`}
+          className="h-full rounded-full transition-all duration-700 bg-primary-500"
           style={{ width: `${pct}%` }}
         />
       </div>
       <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1.5">
         {remaining > 0
           ? `${toPersianDigits(Math.round(remaining))} کالری باقی‌مانده`
-          : 'هدف کالری تکمیل شد ✓'}
+          : remaining < 0 ? `${toPersianDigits(Math.abs(remaining))} کالری بیشتر از هدف ثبت شده` : 'به هدف کالری امروز رسیدی'}
       </p>
     </div>
   );
@@ -89,9 +89,10 @@ interface MacroSummaryProps {
   targets: MacroTargets;
   consumed: MacroTargets;
   isWorkoutDay: boolean;
+  planned?: MacroTargets;
 }
 
-export function MacroSummary({ targets, consumed, isWorkoutDay }: MacroSummaryProps) {
+export function MacroSummary({ targets, consumed, isWorkoutDay, planned }: MacroSummaryProps) {
   return (
     <div className="bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-100 dark:border-neutral-800 p-5 space-y-5">
       {/* Title */}
@@ -108,6 +109,7 @@ export function MacroSummary({ targets, consumed, isWorkoutDay }: MacroSummaryPr
       <CalorieBar consumed={consumed.targetCalories} target={targets.targetCalories} />
 
       {/* Macro rings */}
+      <p className="text-xs text-neutral-500 dark:text-neutral-400">حلقه‌ها: مصرف ثبت‌شده نسبت به هدف روزانه</p>
       <div className="grid grid-cols-3 gap-2 pt-1">
         <MacroRing
           label="پروتئین"
@@ -136,19 +138,25 @@ export function MacroSummary({ targets, consumed, isWorkoutDay }: MacroSummaryPr
       </div>
 
       {/* Numeric summary */}
-      <div className="grid grid-cols-3 gap-2 border-t border-neutral-100 dark:border-neutral-800 pt-4">
+      <div className="border-t border-neutral-100 dark:border-neutral-800 pt-4">
+        <table className="w-full text-xs text-right text-neutral-700 dark:text-neutral-300">
+          <caption className="text-right text-xs text-neutral-500 mb-3">هدف محاسبه‌شده، مجموع وعده‌ها و مصرف ثبت‌شده</caption>
+          <thead><tr><th scope="col" className="pb-3">مقدار</th><th scope="col">هدف</th>{planned&&<th scope="col">برنامه</th>}<th scope="col">مصرف</th></tr></thead>
+          <tbody>
         {[
-          { label: 'پروتئین', val: targets.proteinGrams, unit: 'گرم' },
-          { label: 'کربوهیدرات', val: targets.carbGrams, unit: 'گرم' },
-          { label: 'چربی', val: targets.fatGrams, unit: 'گرم' },
+          { label: 'کالری', key: 'targetCalories' as const },
+          { label: 'پروتئین (گرم)', key: 'proteinGrams' as const },
+          { label: 'کربوهیدرات (گرم)', key: 'carbGrams' as const },
+          { label: 'چربی (گرم)', key: 'fatGrams' as const },
         ].map((m) => (
-          <div key={m.label} className="text-center">
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">{m.label}</p>
-            <p className="font-bold text-neutral-900 dark:text-neutral-100 tabular-fa">
-              {toPersianDigits(m.val)}<span className="text-xs font-normal text-neutral-500 mr-0.5">{m.unit}</span>
-            </p>
-          </div>
+          <tr key={m.key}><th scope="row" className="py-2 font-normal">{m.label}</th>
+            <td>{toPersianDigits(Math.round(targets[m.key]))}</td>
+            {planned&&<td>{toPersianDigits(Math.round(planned[m.key]))}</td>}
+            <td>{toPersianDigits(Math.round(consumed[m.key]))}</td></tr>
         ))}
+          </tbody>
+        </table>
+        <p className="text-[11px] leading-5 text-neutral-500 dark:text-neutral-400 mt-3">مقدار مواد غذایی و جایگزین‌ها می‌تواند مجموع برنامه را کمی با هدف متفاوت کند. وعده‌های مصرف‌شده با مقدار زمان ثبت حفظ می‌شوند.</p>
       </div>
     </div>
   );

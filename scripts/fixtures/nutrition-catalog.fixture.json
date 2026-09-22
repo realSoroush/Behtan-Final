@@ -414,7 +414,7 @@
       ],
       "swapGroup": "bread",
       "swapPriority": 20,
-      "fiberPerUnit": 2.0,
+      "fiberPerUnit": 2,
       "qualityTags": [
         "whole_grain"
       ],
@@ -494,7 +494,7 @@
       ],
       "swapGroup": "vegetable",
       "swapPriority": 20,
-      "fiberPerUnit": 3.0,
+      "fiberPerUnit": 3,
       "qualityTags": [
         "non_starchy_vegetable",
         "whole_food"
@@ -547,7 +547,7 @@
       ],
       "swapGroup": "vegetable",
       "swapPriority": 20,
-      "fiberPerUnit": 3.0,
+      "fiberPerUnit": 3,
       "qualityTags": [
         "non_starchy_vegetable",
         "whole_food"
@@ -575,7 +575,7 @@
       ],
       "swapGroup": "vegetable",
       "swapPriority": 30,
-      "fiberPerUnit": 2.0,
+      "fiberPerUnit": 2,
       "qualityTags": [
         "non_starchy_vegetable"
       ],
@@ -689,7 +689,7 @@
       ],
       "swapGroup": "plant_fat",
       "swapPriority": 20,
-      "fiberPerUnit": 5.0,
+      "fiberPerUnit": 5,
       "qualityTags": [
         "whole_fruit",
         "unsaturated_fat",
@@ -2148,6 +2148,266 @@
         {
           "role": "fruit",
           "primaryFoodItemId": "medjool_date",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "balanced_morning_snack_apple_yogurt",
+      "slot": "morning_snack",
+      "displayName": "ماست کم‌چرب و سیب",
+      "slots": [
+        {
+          "role": "dairy",
+          "primaryFoodItemId": "low_fat_yogurt",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "apple",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "balanced_morning_snack_banana_oats_milk",
+      "slot": "morning_snack",
+      "displayName": "شیر کم‌چرب، جو دوسر و موز",
+      "slots": [
+        {
+          "role": "dairy",
+          "primaryFoodItemId": "low_fat_milk",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "oats_dry",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "banana",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "balanced_morning_snack_apple_walnut",
+      "slot": "morning_snack",
+      "displayName": "سیب و گردو",
+      "slots": [
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "apple",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "walnut",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "balanced_morning_snack_banana_nuts",
+      "slot": "morning_snack",
+      "displayName": "موز و آجیل بدون بادام‌زمینی",
+      "slots": [
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "banana",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "mixed_nuts",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "balanced_morning_snack_apple_oats_yogurt",
+      "slot": "morning_snack",
+      "displayName": "ماست، جو دوسر و سیب",
+      "slots": [
+        {
+          "role": "dairy",
+          "primaryFoodItemId": "low_fat_yogurt",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "oats_dry",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "apple",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "balanced_morning_snack_banana_whole_toast",
+      "slot": "morning_snack",
+      "displayName": "موز و نان تست سبوس‌دار",
+      "slots": [
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "banana",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "whole_grain_toast",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "balanced_afternoon_snack_apple_yogurt",
+      "slot": "afternoon_snack",
+      "displayName": "ماست کم‌چرب و سیب",
+      "slots": [
+        {
+          "role": "dairy",
+          "primaryFoodItemId": "low_fat_yogurt",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "apple",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "balanced_afternoon_snack_banana_oats_milk",
+      "slot": "afternoon_snack",
+      "displayName": "شیر کم‌چرب، جو دوسر و موز",
+      "slots": [
+        {
+          "role": "dairy",
+          "primaryFoodItemId": "low_fat_milk",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "oats_dry",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "banana",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "balanced_afternoon_snack_apple_walnut",
+      "slot": "afternoon_snack",
+      "displayName": "سیب و گردو",
+      "slots": [
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "apple",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "walnut",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "balanced_afternoon_snack_banana_nuts",
+      "slot": "afternoon_snack",
+      "displayName": "موز و آجیل بدون بادام‌زمینی",
+      "slots": [
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "banana",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "mixed_nuts",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "balanced_afternoon_snack_apple_oats_yogurt",
+      "slot": "afternoon_snack",
+      "displayName": "ماست، جو دوسر و سیب",
+      "slots": [
+        {
+          "role": "dairy",
+          "primaryFoodItemId": "low_fat_yogurt",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "oats_dry",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "apple",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "balanced_afternoon_snack_banana_whole_toast",
+      "slot": "afternoon_snack",
+      "displayName": "موز و نان تست سبوس‌دار",
+      "slots": [
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "banana",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "whole_grain_toast",
           "dynamicUnits": true
         }
       ],

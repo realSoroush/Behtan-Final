@@ -90,10 +90,10 @@ const mealMassLimit = (slot, slotKcalTarget) => {
 
 const slotKcalShare = {
   breakfast: 0.20,
-  morning_snack: 0.11,
-  lunch: 0.34,
-  afternoon_snack: 0.12,
-  dinner: 0.18,
+  morning_snack: 0.10,
+  lunch: 0.30,
+  afternoon_snack: 0.10,
+  dinner: 0.25,
   night_snack: 0.05,
 };
 

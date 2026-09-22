@@ -36,6 +36,7 @@ import {
   evaluateFoodQualityFromComponents,
   foodQualityPenalty,
 } from './nutritionQuality.ts';
+import { MEAL_SHARES, mealExperiencePenalty, type MealExperienceContext } from './mealExperience.ts';
 // ============================================================================
 // RUNTIME NUTRITION CATALOG
 // ============================================================================
@@ -133,18 +134,9 @@ interface SlotShare {
   fat: number;
 }
 
-const SLOT_DISTRIBUTION: Record<MealSlot, SlotShare> = {
-  // Calories stay on the verified v2 split. Carbs/fats are distributed more
-  // evenly so the optimizer does not try to cram 40% of the day's carbs into
-  // lunch (the main cause of extreme rice portions). Daily macro targets are
-  // unchanged; this is only a meal-allocation policy.
-  breakfast:        { kcal: 0.20, protein: 0.21, carbs: 0.20, fat: 0.25 },
-  morning_snack:    { kcal: 0.11, protein: 0.15, carbs: 0.10, fat: 0.10 },
-  lunch:            { kcal: 0.34, protein: 0.26, carbs: 0.30, fat: 0.30 },
-  afternoon_snack:  { kcal: 0.12, protein: 0.12, carbs: 0.20, fat: 0.10 },
-  dinner:           { kcal: 0.18, protein: 0.22, carbs: 0.15, fat: 0.20 },
-  night_snack:      { kcal: 0.05, protein: 0.04, carbs: 0.05, fat: 0.05 },
-};
+const SLOT_DISTRIBUTION = Object.fromEntries(Object.entries(MEAL_SHARES).map(
+  ([slot, share]) => [slot, {kcal: share, protein: share, carbs: share, fat: share}]
+)) as Record<MealSlot, SlotShare>;
 
 const MEAL_SLOT_LABELS: Record<MealSlot, string> = {
   breakfast: 'صبحانه',
@@ -521,6 +513,7 @@ type ResolvedOption = {
   slot: MealSlot;
   template: MealTemplate;
   resolved: ResolvedTemplate;
+  locked?: Meal;
 };
 
 function getResolvedOptions(
@@ -764,6 +757,7 @@ function refineDailyPortions(
     let changed = false;
 
     for (const option of refined) {
+      if (option.locked) continue;
       const share = SLOT_DISTRIBUTION[option.slot];
       const slotTarget: MacroVector = {
         kcal: dailyTarget.kcal * share.kcal,
@@ -1026,6 +1020,43 @@ function assertDailyPlanFeasible(options: ResolvedOption[], targets: MacroTarget
   throw new MealPlanFeasibilityError(target, actual);
 }
 
+function repairMealExperience(
+  initial: ResolvedOption[], optionsBySlot: ResolvedOption[][],
+  targets: MacroTargets, context: MealExperienceContext, seed: number
+): ResolvedOption[] {
+  const asMeals = (options: ResolvedOption[]) => options.map(o => ({slot: o.slot, components: o.resolved.components}));
+  let best = initial;
+  let bestPenalty = mealExperiencePenalty(asMeals(best), context);
+  const qualityLimit = qualityPenaltyForResolvedDay(initial, targets) + 0.15;
+  const initialDeviation = dailyDeviationSummary(initial, targets);
+  for (let pass = 0; pass < 2; pass++) {
+    let changed = false;
+    for (let index = 0; index < best.length; index++) {
+      // Date affects preference order, but never the eligibility/feasibility gates.
+      const choices = [...optionsBySlot[index]].sort((a,b) =>
+        dateSeed(`${seed}:${a.template.id}`) - dateSeed(`${seed}:${b.template.id}`));
+      let slotBest = best;
+      let slotPenalty = bestPenalty;
+      for (const choice of choices) {
+        if (choice.template.id === best[index].template.id) continue;
+        const candidateBase = best.map((o,i) => i === index ? choice : o);
+        const candidate = refineDailyPortions(candidateBase, targets);
+        if (!isDailyPlanFeasible(candidate, targets)) continue;
+        const deviation = dailyDeviationSummary(candidate, targets);
+        if (deviation.protein > Math.max(.04, initialDeviation.protein + .02) ||
+            deviation.carbs > initialDeviation.carbs + .03 ||
+            deviation.fat > initialDeviation.fat + .03) continue;
+        if (qualityPenaltyForResolvedDay(candidate, targets) > qualityLimit) continue;
+        const penalty = mealExperiencePenalty(asMeals(candidate), context);
+        if (penalty < slotPenalty - 0.01) { slotBest = candidate; slotPenalty = penalty; }
+      }
+      if (slotBest !== best) { best = slotBest; bestPenalty = slotPenalty; changed = true; }
+    }
+    if (!changed) break;
+  }
+  return best;
+}
+
 // ============================================================================
 // 8 - MAIN ENTRY POINT
 // ============================================================================
@@ -1035,11 +1066,17 @@ export function generateDailyMealPlan(
   _weightKg: number,
   preferences: DietaryPreferencesJson,
   isWorkoutDay: boolean,
-  date: string = new Date().toISOString().slice(0, 10)
+  date: string = new Date().toISOString().slice(0, 10),
+  context: MealExperienceContext = {}
 ): DailyMealPlan {
   const seed = dateSeed(date);
 
   const optionsBySlot: ResolvedOption[][] = SLOT_ORDER.map((slot) => {
+    const locked = context.lockedMeals?.find(m => m.slot === slot);
+    if (locked) return [{slot, locked,
+      template: {id:locked.templateId,slot,displayName:locked.templateName,slots:[],isWorkoutDayOnly:false,isRestDayOnly:false,goalTags:[]},
+      resolved: {components:locked.components,totals:{kcal:locked.totalKcal,protein:locked.totalProtein,carbs:locked.totalCarbs,fat:locked.totalFat},score:0,kcalDeviation:0}
+    }];
     const share = SLOT_DISTRIBUTION[slot];
     const slotTargets: MacroVector = {
       kcal: targets.targetCalories * share.kcal,
@@ -1064,11 +1101,13 @@ export function generateDailyMealPlan(
 
   const chosen = chooseDailyCombination(optionsBySlot, targets, seed);
   const macroRefined = refineDailyTemplates(chosen, optionsBySlot, targets);
-  const refined = repairDailyQuality(macroRefined, optionsBySlot, targets);
-  assertDailyPlanFeasible(refined, targets);
-  const meals = refined.map(buildMeal);
+  const qualityRefined = repairDailyQuality(macroRefined, optionsBySlot, targets);
+  const refined = repairMealExperience(qualityRefined, optionsBySlot, targets, context, seed);
+  const remainingTargetsUnmet = !isDailyPlanFeasible(refined, targets);
+  if (!context.lockedMeals?.length) assertDailyPlanFeasible(refined, targets);
+  const meals = refined.map(option => option.locked ? {...option.locked, consumed:true} : buildMeal(option));
 
-  return { date, isWorkoutDay, targets, meals };
+  return { date, isWorkoutDay, targets, meals, remainingTargetsUnmet };
 }
 
 // ============================================================================
