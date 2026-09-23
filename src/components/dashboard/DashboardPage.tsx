@@ -2,9 +2,9 @@ import { usePlanReporting } from '@/hooks/usePlanReporting';
 import { useMealHistory } from '@/hooks/useMealHistory';
 import { historyOfMeals, mealFingerprint, type MealHistoryItem } from '@/utils/mealExperience';
 import { buildPlanProvenance } from '@/utils/planProvenance';
-import { ProgressJournal } from './ProgressJournal';
+import { MemberProfile } from './MemberProfile';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { LogOut, RefreshCw, AlertCircle } from 'lucide-react';
+import { LogOut, RefreshCw, AlertCircle, Utensils, UserRound, Check } from 'lucide-react';
 import { MacroSummary } from './MacroSummary';
 import { NutritionQualitySummary } from './NutritionQualitySummary';
 import { DailyOverviewCarousel } from './DailyOverviewCarousel';
@@ -72,10 +72,17 @@ export function DashboardPage() {
     refetch: refetchProteinPolicy,
   } = useProteinEnginePolicy();
 
-  const [isWorkoutDay, setIsWorkoutDay] = useState(false);
+  const [section,setSection]=useState<'today'|'profile'>(()=>window.location.hash==='#profile'?'profile':'today');
+  const [profileVisited,setProfileVisited]=useState(()=>window.location.hash==='#profile');
+  useEffect(()=>{const sync=()=>{const next=window.location.hash==='#profile'?'profile':'today';setSection(next);if(next==='profile')setProfileVisited(true);};window.addEventListener('hashchange',sync);return()=>window.removeEventListener('hashchange',sync);},[]);
+  const navigate=(next:'today'|'profile')=>{if(next===section)return;window.location.hash=next;setSection(next);if(next==='profile')setProfileVisited(true);window.scrollTo({top:0,behavior:'instant'});};
+  const [workoutChoice,setWorkoutChoice]=useState<{key:string;value:boolean}|null>(null);
   const [todayKey, setTodayKey] = useState(() => getLocalDateKey());
   const history = useMealHistory(user?.id, todayKey);
   const generationKey = `${user?.id}:${todayKey}`;
+  const isWorkoutDay = workoutChoice?.key===generationKey ? workoutChoice.value : false;
+  const setIsWorkoutDay=(value:boolean)=>{setWorkoutChoice({key:generationKey,value});try{localStorage.setItem(`behtan:workout:${generationKey}`,String(value));}catch{/* Storage unavailable; still works in this session. */}};
+  useEffect(()=>{let value=false;try{value=localStorage.getItem(`behtan:workout:${generationKey}`)==='true';}catch{/* optional persistence */}setWorkoutChoice({key:generationKey,value});},[generationKey]);
   const [generationContext, setGenerationContext] = useState<{key:string;lockedMeals:Meal[];avoidMeals:MealHistoryItem[];hydrationError:boolean}|null>(null);
   const avoidMeals = generationContext?.avoidMeals;
 
@@ -97,6 +104,8 @@ export function DashboardPage() {
     setMealConsumed,
     refetch: refetchMealProgress,
   } = useDailyMealProgress(user?.id, todayKey);
+
+  useEffect(()=>{if(!mealProgressLoading && consumedMealSnapshots.post_workout && !isWorkoutDay)setIsWorkoutDay(true);},[mealProgressLoading,consumedMealSnapshots,isWorkoutDay]);
 
   // Hydrate consumed facts once per user/day. A newly checked meal must not
   // reshuffle the other meals; lock the latest facts again only on regeneration.
@@ -157,7 +166,7 @@ export function DashboardPage() {
   // without violating practical portion limits. Keep that failure local to the
   // dashboard instead of letting it crash the React tree / Error Boundary.
   const mealPlanResult = useMemo<{ plan: DailyMealPlan | null; error: string | null }>(() => {
-    if (!catalog || !targets || history.loading || generationContext?.key !== generationKey || !profile?.weight || !profile?.dietary_preferences_json) {
+    if (workoutChoice?.key !== generationKey || !catalog || !targets || history.loading || generationContext?.key !== generationKey || !profile?.weight || !profile?.dietary_preferences_json) {
       return { plan: null, error: null };
     }
 
@@ -170,7 +179,7 @@ export function DashboardPage() {
           profile.dietary_preferences_json,
           isWorkoutDay,
           dateKey,
-          {previousDay: history.meals, avoidMeals:generationContext.avoidMeals,lockedMeals:generationContext.lockedMeals}
+          {previousDay: history.meals, avoidMeals:generationContext.avoidMeals,lockedMeals:generationContext.lockedMeals,proteinBudgetPreference:profile.protein_budget_preference??'performance'}
         ),
         error: null,
       };
@@ -180,7 +189,7 @@ export function DashboardPage() {
         : 'تولید برنامه غذایی با خطا مواجه شد.';
       return { plan: null, error: message };
     }
-  }, [catalog, targets, profile, isWorkoutDay, planVersion, todayKey, history.loading, history.meals, generationContext, generationKey]);
+  }, [catalog, targets, profile, isWorkoutDay, planVersion, todayKey, history.loading, history.meals, generationContext, generationKey, workoutChoice?.key]);
 
   const mealPlan = mealPlanResult.plan;
 
@@ -351,7 +360,7 @@ export function DashboardPage() {
   const today = new Date().toLocaleDateString('fa-IR', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 pb-24">
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 pb-[calc(6rem+env(safe-area-inset-bottom))]">
       {/* Sticky header */}
       <header className="sticky top-0 z-30 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md border-b border-neutral-100 dark:border-neutral-800">
         <div className="max-w-md mx-auto flex items-center justify-between px-5 py-3">
@@ -362,20 +371,20 @@ export function DashboardPage() {
               onClick={signOut}
               aria-label="خروج از حساب"
               title="خروج از حساب"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
             >
               <LogOut size={19} />
             </button>
           </div>
           <div className="text-right">
             <p className="text-xs text-neutral-500 dark:text-neutral-400">{today}</p>
-            <p className="font-bold text-neutral-900 dark:text-neutral-100 text-sm">برنامه غذایی امروز</p>
+            <p className="font-bold text-neutral-900 dark:text-neutral-100 text-sm">{section==='today'?'برنامه غذایی امروز':'حساب و روند من'}</p>
           </div>
           <img src={APP_LOGO_PATH} alt={`لوگوی ${APP_NAME_FA}`} className="h-8 w-8 object-contain" />
         </div>
       </header>
 
-      <div className="max-w-md mx-auto px-4 py-5 space-y-4">
+      <div hidden={section!=='today'} id="today-panel" className="max-w-md mx-auto px-4 py-5 space-y-4">
         {/* Daily overview carousel */}
         {(targets && consumed) || foodQuality ? (
           <DailyOverviewCarousel
@@ -402,7 +411,7 @@ export function DashboardPage() {
         ) : null}
 
         {/* Workout day toggle */}
-        <WorkoutDayToggle isWorkoutDay={isWorkoutDay} onChange={(v) => { setIsWorkoutDay(v); resetSwapped(); setGenerationContext({key:generationKey,lockedMeals:Object.values(consumedMealSnapshots),avoidMeals:[],hydrationError:Boolean(mealProgressError)}); }} />
+        <WorkoutDayToggle disabled={Boolean(consumedMealSnapshots.post_workout) || mealProgressSavingSlots.size>0 || Boolean(mealProgressError)} isWorkoutDay={isWorkoutDay} onChange={(v) => { setIsWorkoutDay(v); resetSwapped(); setGenerationContext({key:generationKey,lockedMeals:Object.values(consumedMealSnapshots),avoidMeals:[],hydrationError:Boolean(mealProgressError)}); }} />
 
         {planReporting.error && <div role="status" className="text-sm text-amber-600 p-3">
           ذخیرهٔ نسخهٔ برنامه انجام نشد؛ اتصال را بررسی کنید.
@@ -419,7 +428,7 @@ export function DashboardPage() {
           تغییر وعده‌های باقی‌مانده
         </button>
         {unchangedAfterRegeneration && <p role="status" className="text-xs leading-5 text-neutral-500 dark:text-neutral-400">با محدودیت‌های فعلی، ترکیب متفاوت مناسبی پیدا نشد؛ غذاهای پیشنهادی مشابه‌اند.</p>}
-        {activePlan?.remainingTargetsUnmet && <p role="status" className="text-xs leading-5 text-neutral-500 dark:text-neutral-400">وعده‌های مصرف‌شده حفظ شدند؛ با گزینه‌های باقی‌مانده، مجموع امروز کاملاً در محدودهٔ هدف قرار نگرفت. جزئیات را در جدول هدف و برنامه ببین.</p>}
+        {activePlan?.remainingTargetsUnmet && <p role="status" className="text-xs leading-5 text-neutral-500 dark:text-neutral-400">وعده‌های مصرف‌شده حفظ شدند؛ با گزینه‌های باقی‌مانده، مجموع امروز کاملاً در محدودهٔ هدف قرار نگرفت. </p>}
         {history.error && <p className="text-xs text-neutral-500 dark:text-neutral-400">سابقهٔ دیروز دریافت نشد؛ کنترل تکرار فعلاً فقط برای وعده‌های امروز انجام می‌شود.</p>}
 
         {mealProgressError && (
@@ -459,6 +468,10 @@ export function DashboardPage() {
             <p className="text-xs text-neutral-500 dark:text-neutral-400">
               هدف: {toPersianDigits(targets?.targetCalories ?? 0)} کالری در {toPersianDigits(activePlan.meals.length)} وعده
             </p>
+            <div className="flex items-center gap-2 pb-2" role="status" aria-label={`${activePlan.meals.filter(m=>m.consumed).length} از ${activePlan.meals.length} وعده ثبت شده`}>
+              {activePlan.meals.map(m=><span key={m.slot} aria-hidden="true" className={`flex h-7 w-7 items-center justify-center rounded-full transition-colors motion-reduce:transition-none ${m.consumed?'bg-primary-600 text-white':'bg-neutral-200 dark:bg-neutral-800 text-neutral-500'}`}>{m.consumed?<Check size={15}/>:<span className="h-1.5 w-1.5 rounded-full bg-current"/>}</span>)}
+              <span className="mr-auto text-xs text-neutral-600 dark:text-neutral-400">{toPersianDigits(activePlan.meals.filter(m=>m.consumed).length)} از {toPersianDigits(activePlan.meals.length)}</span>
+            </div>
             {activePlan.meals.map((meal, mealIdx) => (
               <MealCard
                 key={meal.slot}
@@ -477,7 +490,12 @@ export function DashboardPage() {
         )}
       </div>
 
-      {user && <div className="max-w-md mx-auto px-4 mt-4"><ProgressJournal key={`${user.id}:${todayKey}`} userId={user.id} today={todayKey} /></div>}
+      {profileVisited && profile && <div hidden={section!=='profile'} id="profile-panel" className="max-w-md mx-auto px-4 py-6"><MemberProfile key={`${profile.id}:${todayKey}`} profile={profile} today={todayKey}/></div>}
+      <nav aria-label="منوی اصلی" className="fixed bottom-0 inset-x-0 z-30 border-t border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900 pb-[env(safe-area-inset-bottom)]">
+        <div className="max-w-md mx-auto grid grid-cols-2 gap-2 px-5 py-2">
+          {([{id:'today',label:'برنامهٔ امروز',icon:Utensils},{id:'profile',label:'پروفایل و روند',icon:UserRound}] as const).map(item=><a key={item.id} href={`#${item.id}`} onClick={e=>{e.preventDefault();navigate(item.id);}} aria-current={section===item.id?'page':undefined} className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl text-xs font-semibold transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600 ${section===item.id?'bg-primary-50 text-primary-800 dark:bg-primary-900/30 dark:text-primary-200':'text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800'}`}><item.icon size={21} aria-hidden="true"/><span>{item.label}</span></a>)}
+        </div>
+      </nav>
 
       {/* Swap modal */}
       <FoodSwapModal

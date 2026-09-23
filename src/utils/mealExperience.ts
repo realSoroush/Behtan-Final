@@ -1,17 +1,18 @@
-import type { Meal, MealComponent, MealSlot } from '../types/index.ts';
+import type { Meal, MealComponent, MealSlot, ProteinBudgetPreference } from '../types/index.ts';
 
-export const MEAL_POLICY_VERSION = 'meal-balance-variety-v1';
+export const MEAL_POLICY_VERSION = 'mobile-meals-v2';
 // Product allocation, not a clinical prescription. Each macro uses the same
 // split so the energy assigned to a slot is consistent with its macro budget.
 export const MEAL_SHARES: Record<MealSlot, number> = {
   breakfast: .20, morning_snack: .10, lunch: .30,
-  afternoon_snack: .10, dinner: .25, night_snack: .05,
+  afternoon_snack: .10, dinner: .25, night_snack: .05, post_workout: 0,
 };
 export interface MealHistoryItem { slot: MealSlot; foodIds: string[] }
 export interface MealExperienceContext {
   previousDay?: MealHistoryItem[];
   avoidMeals?: MealHistoryItem[];
   lockedMeals?: Meal[];
+  proteinBudgetPreference?: ProteinBudgetPreference;
 }
 interface ExperienceMeal { slot: MealSlot; components: MealComponent[] }
 export const mealFingerprint = (ids: string[]) => [...new Set(ids)].sort().join('|');

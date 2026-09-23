@@ -11,6 +11,7 @@ const MEAL_LABELS: Record<MealSlot, string> = {
   afternoon_snack: 'میان‌وعده عصر',
   dinner: 'شام',
   night_snack: 'میان‌وعده شب',
+  post_workout: 'پس از تمرین',
 };
 
 const MEAL_SLOTS: MealSlot[] = [

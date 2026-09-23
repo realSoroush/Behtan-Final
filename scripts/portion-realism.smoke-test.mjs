@@ -48,7 +48,7 @@ const HARD_GRAMS = {
   low_fat_milk: 300,
   low_fat_yogurt: 250,
   low_fat_cheese: 60,
-  medjool_date: 72,
+  dates_small: 34,
 };
 
 const SOFT_GRAMS = {
@@ -66,7 +66,7 @@ const SOFT_GRAMS = {
   low_fat_milk: 250,
   low_fat_yogurt: 200,
   low_fat_cheese: 45,
-  medjool_date: 48,
+  dates_small: 25,
 };
 
 const MEAL_MASS_BASE = {
@@ -76,6 +76,7 @@ const MEAL_MASS_BASE = {
   afternoon_snack: 500,
   dinner: 800,
   night_snack: 350,
+  post_workout: 350,
 };
 
 const mealMassLimit = (slot, slotKcalTarget) => {
@@ -95,6 +96,7 @@ const slotKcalShare = {
   afternoon_snack: 0.10,
   dinner: 0.25,
   night_snack: 0.05,
+  post_workout: 0,
 };
 
 const weights = [60, 100, 150, 200];

@@ -41,7 +41,8 @@
     "build:admin": "tsc -b && vite build --config vite.admin.config.ts",
     "test:admin": "node scripts/admin-database.test.mjs",
     "test:experience": "node --experimental-strip-types scripts/meal-experience.test.mjs",
-    "test:progress": "node --experimental-strip-types scripts/progress-journal.test.mjs && node --experimental-strip-types scripts/progress-database.test.mjs"
+    "test:progress": "node --experimental-strip-types scripts/progress-journal.test.mjs && node --experimental-strip-types scripts/progress-database.test.mjs",
+    "test:mobile-meals": "node --experimental-strip-types scripts/mobile-meals.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

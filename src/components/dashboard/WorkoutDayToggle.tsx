@@ -2,13 +2,17 @@ import { Dumbbell } from 'lucide-react';
 
 interface WorkoutDayToggleProps {
   isWorkoutDay: boolean;
+  disabled?: boolean;
   onChange: (v: boolean) => void;
 }
 
-export function WorkoutDayToggle({ isWorkoutDay, onChange }: WorkoutDayToggleProps) {
+export function WorkoutDayToggle({ isWorkoutDay, onChange, disabled }: WorkoutDayToggleProps) {
   return (
     <button
       type="button"
+      role="switch"
+      aria-checked={isWorkoutDay}
+      disabled={disabled}
       onClick={() => onChange(!isWorkoutDay)}
       className={`
         w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all duration-300
@@ -28,7 +32,7 @@ export function WorkoutDayToggle({ isWorkoutDay, onChange }: WorkoutDayTogglePro
             امروز روز ورزشی است؟
           </p>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            {isWorkoutDay ? '+۱۵۰ کالری به هدف روزانه اضافه شد' : 'برای روزهای ورزشی کالری بیشتری نیاز دارید'}
+            {disabled && isWorkoutDay ? 'برای تغییر روز، تیک پس از تمرین را بردار' : isWorkoutDay ? 'وعدهٔ پس از تمرین در برنامه قرار گرفت' : 'تقسیم وعده‌ها متناسب با روز تمرین'}
           </p>
         </div>
       </div>

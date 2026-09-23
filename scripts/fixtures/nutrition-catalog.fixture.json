@@ -802,7 +802,7 @@
         "afternoon_snack",
         "night_snack"
       ],
-      "swapGroup": "fruit",
+      "swapGroup": "fresh_fruit",
       "swapPriority": 10,
       "fiberPerUnit": 3.6,
       "qualityTags": [
@@ -830,7 +830,7 @@
         "afternoon_snack",
         "night_snack"
       ],
-      "swapGroup": "fruit",
+      "swapGroup": "fresh_fruit",
       "swapPriority": 20,
       "fiberPerUnit": 3.1,
       "qualityTags": [
@@ -840,16 +840,16 @@
       "fruitVegGramsPerUnit": 120
     },
     {
-      "id": "medjool_date",
-      "name": "خرمای مدجول",
+      "id": "dates_small",
+      "name": "خرمای معمولی کوچک",
       "role": "fruit",
       "emoji": "🌴",
       "unitLabel": "عدد",
-      "gramsPerUnit": 24,
-      "kcalPerUnit": 67,
-      "proteinPerUnit": 0.4,
-      "carbsPerUnit": 18,
-      "fatPerUnit": 0.04,
+      "gramsPerUnit": 8.3,
+      "kcalPerUnit": 23.41,
+      "proteinPerUnit": 0.2,
+      "carbsPerUnit": 6.23,
+      "fatPerUnit": 0.03,
       "allergyFlags": [],
       "excludedForVegetarian": [],
       "swapAllowedMeals": [
@@ -858,14 +858,14 @@
         "afternoon_snack",
         "night_snack"
       ],
-      "swapGroup": "fruit",
+      "swapGroup": "dried_fruit",
       "swapPriority": 30,
-      "fiberPerUnit": 1.6,
+      "fiberPerUnit": 0.66,
       "qualityTags": [
         "whole_fruit",
         "whole_food"
       ],
-      "fruitVegGramsPerUnit": 24
+      "fruitVegGramsPerUnit": 8.3
     }
   ],
   "FOOD_SUBSTITUTES": [
@@ -1003,18 +1003,18 @@
       "foodItemId": "apple",
       "substituteIds": [
         "banana",
-        "medjool_date"
+        "dates_small"
       ]
     },
     {
       "foodItemId": "banana",
       "substituteIds": [
         "apple",
-        "medjool_date"
+        "dates_small"
       ]
     },
     {
-      "foodItemId": "medjool_date",
+      "foodItemId": "dates_small",
       "substituteIds": [
         "banana",
         "apple"
@@ -1082,7 +1082,7 @@
     {
       "id": "bk_mixed_eggs_sangak",
       "slot": "breakfast",
-      "displayName": "تخم‌مرغ و سفیده با نان سنگک",
+      "displayName": "تخم‌مرغ، پنیر و نان سنگک",
       "slots": [
         {
           "role": "protein",
@@ -1092,6 +1092,11 @@
         {
           "role": "protein",
           "primaryFoodItemId": "egg_white",
+          "dynamicUnits": true
+        },
+        {
+          "role": "dairy",
+          "primaryFoodItemId": "low_fat_cheese",
           "dynamicUnits": true
         },
         {
@@ -1305,7 +1310,7 @@
       "slots": [
         {
           "role": "fruit",
-          "primaryFoodItemId": "medjool_date",
+          "primaryFoodItemId": "dates_small",
           "dynamicUnits": true
         },
         {
@@ -1325,7 +1330,7 @@
       "slots": [
         {
           "role": "fruit",
-          "primaryFoodItemId": "medjool_date",
+          "primaryFoodItemId": "dates_small",
           "dynamicUnits": true
         }
       ],
@@ -1345,7 +1350,7 @@
         },
         {
           "role": "fruit",
-          "primaryFoodItemId": "medjool_date",
+          "primaryFoodItemId": "dates_small",
           "dynamicUnits": true
         }
       ],
@@ -1607,178 +1612,6 @@
         {
           "role": "fat",
           "primaryFoodItemId": "olive_oil",
-          "dynamicUnits": true
-        }
-      ],
-      "isWorkoutDayOnly": false,
-      "isRestDayOnly": false,
-      "goalTags": []
-    },
-    {
-      "id": "as_potato_chicken",
-      "slot": "afternoon_snack",
-      "displayName": "سیب‌زمینی و فیله مرغ",
-      "slots": [
-        {
-          "role": "starch",
-          "primaryFoodItemId": "boiled_potato",
-          "dynamicUnits": true
-        },
-        {
-          "role": "protein",
-          "primaryFoodItemId": "chicken_breast",
-          "dynamicUnits": true
-        }
-      ],
-      "isWorkoutDayOnly": true,
-      "isRestDayOnly": false,
-      "goalTags": []
-    },
-    {
-      "id": "as_whey_nuts",
-      "slot": "afternoon_snack",
-      "displayName": "پروتئین وی و آجیل",
-      "slots": [
-        {
-          "role": "protein",
-          "primaryFoodItemId": "whey_protein",
-          "dynamicUnits": true
-        },
-        {
-          "role": "fat",
-          "primaryFoodItemId": "mixed_nuts",
-          "dynamicUnits": false,
-          "fixedUnits": 0.5
-        }
-      ],
-      "isWorkoutDayOnly": false,
-      "isRestDayOnly": true,
-      "goalTags": []
-    },
-    {
-      "id": "as_potato_lentil",
-      "slot": "afternoon_snack",
-      "displayName": "سیب‌زمینی و عدسی",
-      "slots": [
-        {
-          "role": "starch",
-          "primaryFoodItemId": "boiled_potato",
-          "dynamicUnits": true
-        },
-        {
-          "role": "protein",
-          "primaryFoodItemId": "lentils_cooked",
-          "dynamicUnits": true
-        },
-        {
-          "role": "fat",
-          "primaryFoodItemId": "olive_oil",
-          "dynamicUnits": false,
-          "fixedUnits": 0.25
-        }
-      ],
-      "isWorkoutDayOnly": false,
-      "isRestDayOnly": false,
-      "goalTags": []
-    },
-    {
-      "id": "as_pea_potato",
-      "slot": "afternoon_snack",
-      "displayName": "پروتئین نخود و سیب‌زمینی",
-      "slots": [
-        {
-          "role": "protein",
-          "primaryFoodItemId": "pea_protein",
-          "dynamicUnits": true
-        },
-        {
-          "role": "starch",
-          "primaryFoodItemId": "boiled_potato",
-          "dynamicUnits": true
-        }
-      ],
-      "isWorkoutDayOnly": false,
-      "isRestDayOnly": false,
-      "goalTags": []
-    },
-    {
-      "id": "as_potato_dates",
-      "slot": "afternoon_snack",
-      "displayName": "سیب‌زمینی و خرما",
-      "slots": [
-        {
-          "role": "starch",
-          "primaryFoodItemId": "boiled_potato",
-          "dynamicUnits": true
-        },
-        {
-          "role": "fruit",
-          "primaryFoodItemId": "medjool_date",
-          "dynamicUnits": true
-        }
-      ],
-      "isWorkoutDayOnly": false,
-      "isRestDayOnly": false,
-      "goalTags": []
-    },
-    {
-      "id": "as_banana_dates",
-      "slot": "afternoon_snack",
-      "displayName": "موز و خرما",
-      "slots": [
-        {
-          "role": "fruit",
-          "primaryFoodItemId": "banana",
-          "dynamicUnits": true
-        },
-        {
-          "role": "fruit",
-          "primaryFoodItemId": "medjool_date",
-          "dynamicUnits": true
-        }
-      ],
-      "isWorkoutDayOnly": false,
-      "isRestDayOnly": false,
-      "goalTags": []
-    },
-    {
-      "id": "as_banana_dates_avocado",
-      "slot": "afternoon_snack",
-      "displayName": "موز، خرما و آووکادو",
-      "slots": [
-        {
-          "role": "fruit",
-          "primaryFoodItemId": "banana",
-          "dynamicUnits": true
-        },
-        {
-          "role": "fruit",
-          "primaryFoodItemId": "medjool_date",
-          "dynamicUnits": true
-        },
-        {
-          "role": "fat",
-          "primaryFoodItemId": "avocado_half",
-          "dynamicUnits": true
-        }
-      ],
-      "isWorkoutDayOnly": false,
-      "isRestDayOnly": false,
-      "goalTags": []
-    },
-    {
-      "id": "as_toast_dates",
-      "slot": "afternoon_snack",
-      "displayName": "نان تست سبوس‌دار و خرما",
-      "slots": [
-        {
-          "role": "starch",
-          "primaryFoodItemId": "whole_grain_toast",
-          "dynamicUnits": true
-        },
-        {
-          "role": "fruit",
-          "primaryFoodItemId": "medjool_date",
           "dynamicUnits": true
         }
       ],
@@ -2107,7 +1940,7 @@
       "slots": [
         {
           "role": "fruit",
-          "primaryFoodItemId": "medjool_date",
+          "primaryFoodItemId": "dates_small",
           "dynamicUnits": true
         }
       ],
@@ -2127,7 +1960,7 @@
         },
         {
           "role": "fruit",
-          "primaryFoodItemId": "medjool_date",
+          "primaryFoodItemId": "dates_small",
           "dynamicUnits": true
         }
       ],
@@ -2147,7 +1980,7 @@
         },
         {
           "role": "fruit",
-          "primaryFoodItemId": "medjool_date",
+          "primaryFoodItemId": "dates_small",
           "dynamicUnits": true
         }
       ],
@@ -2396,22 +2229,251 @@
       "goalTags": []
     },
     {
-      "id": "balanced_afternoon_snack_banana_whole_toast",
-      "slot": "afternoon_snack",
-      "displayName": "موز و نان تست سبوس‌دار",
+      "id": "bk_mixed_eggs_dairy_free",
+      "slot": "breakfast",
+      "displayName": "تخم‌مرغ و سفیده با نان سنگک",
       "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "egg_whole",
+          "dynamicUnits": true
+        },
+        {
+          "role": "protein",
+          "primaryFoodItemId": "egg_white",
+          "dynamicUnits": true
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "sangak_bread",
+          "dynamicUnits": true
+        },
+        {
+          "role": "vegetable",
+          "primaryFoodItemId": "fresh_cucumber_tomato",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": [],
+      "restrictedDietOnly": true
+    },
+    {
+      "id": "as_restricted_fruit_avocado",
+      "slot": "afternoon_snack",
+      "displayName": "کاسهٔ میوه و آووکادو",
+      "slots": [
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "apple",
+          "dynamicUnits": true
+        },
         {
           "role": "fruit",
           "primaryFoodItemId": "banana",
           "dynamicUnits": true
         },
         {
-          "role": "starch",
-          "primaryFoodItemId": "whole_grain_toast",
+          "role": "fat",
+          "primaryFoodItemId": "avocado_half",
           "dynamicUnits": true
         }
       ],
       "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": [],
+      "restrictedDietOnly": true
+    },
+    {
+      "id": "as_fruit_salad",
+      "slot": "afternoon_snack",
+      "displayName": "سالاد میوهٔ سیب و موز",
+      "slots": [
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "apple",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "banana",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "as_apple_oats",
+      "slot": "afternoon_snack",
+      "displayName": "جو دوسر پخته با آب و سیب",
+      "slots": [
+        {
+          "role": "starch",
+          "primaryFoodItemId": "oats_dry",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "apple",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "as_cheese_walnut_sangak",
+      "slot": "afternoon_snack",
+      "displayName": "نان، پنیر و گردو با خیار و گوجه",
+      "slots": [
+        {
+          "role": "starch",
+          "primaryFoodItemId": "sangak_bread",
+          "dynamicUnits": true
+        },
+        {
+          "role": "dairy",
+          "primaryFoodItemId": "low_fat_cheese",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "walnut",
+          "dynamicUnits": true
+        },
+        {
+          "role": "vegetable",
+          "primaryFoodItemId": "fresh_cucumber_tomato",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "as_yogurt_banana_walnut",
+      "slot": "afternoon_snack",
+      "displayName": "ماست، موز و گردو",
+      "slots": [
+        {
+          "role": "dairy",
+          "primaryFoodItemId": "low_fat_yogurt",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "banana",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fat",
+          "primaryFoodItemId": "walnut",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "as_milk_small_dates",
+      "slot": "afternoon_snack",
+      "displayName": "شیر کم‌چرب و خرمای کوچک",
+      "slots": [
+        {
+          "role": "dairy",
+          "primaryFoodItemId": "low_fat_milk",
+          "dynamicUnits": true
+        },
+        {
+          "role": "fruit",
+          "primaryFoodItemId": "dates_small",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "pw_whey_water",
+      "slot": "post_workout",
+      "displayName": "یک اسکوپ وی با یک لیوان آب",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "whey_protein",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        }
+      ],
+      "isWorkoutDayOnly": true,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "pw_chicken_potato",
+      "slot": "post_workout",
+      "displayName": "مرغ پخته و سیب‌زمینی آب‌پز",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "chicken_breast",
+          "dynamicUnits": false,
+          "fixedUnits": 0.75
+        },
+        {
+          "role": "starch",
+          "primaryFoodItemId": "boiled_potato",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        }
+      ],
+      "isWorkoutDayOnly": true,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "pw_plant_bowl",
+      "slot": "post_workout",
+      "displayName": "عدسی و سویا",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "lentils_cooked",
+          "dynamicUnits": false,
+          "fixedUnits": 1.5
+        },
+        {
+          "role": "protein",
+          "primaryFoodItemId": "soy_chunks",
+          "dynamicUnits": false,
+          "fixedUnits": 0.25
+        }
+      ],
+      "isWorkoutDayOnly": true,
+      "isRestDayOnly": false,
+      "goalTags": []
+    },
+    {
+      "id": "pw_pea_water",
+      "slot": "post_workout",
+      "displayName": "یک اسکوپ پروتئین نخود با آب",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "pea_protein",
+          "dynamicUnits": false,
+          "fixedUnits": 1
+        }
+      ],
+      "isWorkoutDayOnly": true,
       "isRestDayOnly": false,
       "goalTags": []
     }
@@ -2627,11 +2689,11 @@
       "hardMaxUnits": 2,
       "step": 0.5
     },
-    "medjool_date": {
+    "dates_small": {
       "minUnits": 1,
       "typicalUnits": 2,
-      "softMaxUnits": 2,
-      "hardMaxUnits": 3,
+      "softMaxUnits": 3,
+      "hardMaxUnits": 4,
       "step": 1
     }
   }

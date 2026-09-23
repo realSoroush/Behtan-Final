@@ -1,7 +1,7 @@
 import {useEffect,useState} from 'react';
 import {supabase} from '@/lib/supabaseClient';
 import type {MealHistoryItem} from '@/utils/mealExperience';
-const slots=['breakfast','morning_snack','lunch','afternoon_snack','dinner','night_snack'];
+const slots=['breakfast','morning_snack','lunch','afternoon_snack','dinner','night_snack','post_workout'];
 export function useMealHistory(userId: string | undefined, date: string) {
   const key=`${userId}:${date}`;
   const [state,setState]=useState<{key:string;meals:MealHistoryItem[];error:boolean}>({key:'',meals:[],error:false});

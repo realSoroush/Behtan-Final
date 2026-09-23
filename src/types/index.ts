@@ -34,7 +34,8 @@ export type MealSlot =
   | 'lunch'
   | 'afternoon_snack'
   | 'dinner'
-  | 'night_snack';
+  | 'night_snack'
+  | 'post_workout';
 
 /** Stable database code for a runtime-managed subscription plan. */
 export type SubscriptionTier = string;
@@ -480,6 +481,7 @@ export const createEmptyOnboardingData = (): OnboardingData => ({
       afternoon_snack: '16:30',
       dinner: '19:30',
       night_snack: '22:00',
+      post_workout: '',
     },
   },
   medicalConditions: [],

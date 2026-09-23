@@ -41,7 +41,7 @@ assert(
 );
 
 assert(TEST_NUTRITION_CATALOG.foods.length === 31, 'Expected 31 seeded foods');
-assert(TEST_NUTRITION_CATALOG.mealTemplates.length === 55, 'Expected 55 seeded meal templates, including 12 balanced snacks');
+assert(TEST_NUTRITION_CATALOG.mealTemplates.length === 57, 'Expected 57 active templates after mobile meal migration');
 assert(Object.keys(TEST_NUTRITION_CATALOG.portionRules).length === 31, 'Every food must have a portion rule');
 for (const food of TEST_NUTRITION_CATALOG.foods) {
   assert(Number.isFinite(food.fiberPerUnit) && food.fiberPerUnit >= 0, `Fiber missing for ${food.id}`);
@@ -58,7 +58,7 @@ const migrationSource = readFileSync(
   resolve(projectRoot, 'supabase/migrations/20260825_001_nutrition_catalog.sql'),
   'utf8'
 );
-const seedSource = readFileSync(resolve(projectRoot, 'supabase/seed_nutrition_catalog.sql'), 'utf8');
+const seedSource = readFileSync(resolve(projectRoot, 'supabase/seed_nutrition_catalog.sql'), 'utf8') + readFileSync(resolve(projectRoot, 'supabase/migrations/20260923_020_mobile_meal_catalog.sql'),'utf8');
 const mealAwareMigrationSource = readFileSync(
   resolve(projectRoot, 'supabase/migrations/20260831_003_meal_aware_food_swaps.sql'),
   'utf8'

@@ -13,7 +13,7 @@ const schema=await read('schema.sql');await db.exec(schema.replace('create exten
 if(!schema.includes('create table public.billing_settings'))await db.exec(await read('migrations/20260907_014_zarinpal_billing.sql'));
 await db.exec(await read('migrations/20260915_016_admin_console.sql'));
 await db.exec(await read('seed_nutrition_catalog.sql'));
-for(const name of ['20260921_017_balanced_snacks.sql','20260921_018_progress_journal.sql','20260921_019_plan_revision_history.sql'])await db.exec(await read('migrations/'+name));
+for(const name of ['20260921_017_balanced_snacks.sql','20260921_018_progress_journal.sql','20260921_019_plan_revision_history.sql','20260923_020_mobile_meal_catalog.sql','20260923_021_member_profile_history.sql'])await db.exec(await read('migrations/'+name));
 const templates=(await db.query('select id,slot,display_name from meal_templates')).rows;
 for(const t of TEST_NUTRITION_CATALOG.mealTemplates.filter(t=>t.id.startsWith('balanced_'))){
  const actual=templates.find(a=>a.id===t.id);assert.equal(actual?.slot,t.slot);
@@ -43,4 +43,27 @@ await as(user);assert.deepEqual((await db.query('select previous_day_meals($1) a
 await assert.rejects(()=>db.exec('select * from daily_plan_revisions'),/permission denied/);
 await as(other);assert.deepEqual((await db.query('select previous_day_meals($1) as r',[today])).rows[0].r,[]);
 await db.exec('reset role;set role anon');await assert.rejects(()=>db.exec('select * from user_progress_entries'),/permission denied/);
+// Checkout history is captured once and exposed only to its owner after payment.
+await db.exec('reset role');
+await db.query('insert into user_profiles(id,weight,height) values($1,85,155) on conflict(id) do update set weight=85,height=155',[user]);
+const createOrder=async(uid,status='paid')=>(await db.query(`insert into payment_orders(user_id,plan_code,plan_name,price_toman,duration_days,mode,status,verified_at)
+values($1,'silver','Silver',100,30,'sandbox',$2,case when $2='paid' then now() else null end) returning id`,[uid,status])).rows[0].id;
+const order=await createOrder(user);await createOrder(user,'pending');await createOrder(other);
+await db.query('update user_profiles set weight=80 where id=$1',[user]);
+await as(user);
+const history=(await db.query('select my_membership_history() as r')).rows[0].r;
+assert.equal(history.orders.length,1);assert.equal(history.orders[0].id,order);assert.equal(history.orders[0].profile.weight,85);
+await assert.rejects(()=>db.exec('select * from order_profile_snapshots'),/permission denied/);
+await as(other);assert.equal((await db.query('select my_membership_history() as r')).rows[0].r.orders.length,1);
+await db.exec('reset role');
+await db.query('delete from order_profile_snapshots where order_id=$1',[order]);
+await as(user);assert.equal((await db.query('select my_membership_history() as r')).rows[0].r.orders[0].profile,null);
+await db.exec('reset role;set role anon');await assert.rejects(()=>db.exec('select my_membership_history()'),/permission denied/);
+await db.exec('reset role');
+await db.query("insert into daily_meal_checkins(user_id,plan_date,meal_slot,template_id,meal_snapshot) values($1,$2,'post_workout','pw_whey_water','{}')",[user,today]);
+// Re-running these catalog/history migrations is safe and keeps immutable history.
+await db.exec(await read('migrations/20260923_020_mobile_meal_catalog.sql'));
+await db.exec(await read('migrations/20260923_021_member_profile_history.sql'));
+assert.equal((await db.query("select is_active from food_items where id='medjool_date'")).rows[0].is_active,false);
+assert.equal((await db.query("select count(*)::int as n from meal_templates where slot='post_workout' and is_active")).rows[0].n,4);
 await db.close();console.log('✅ SQL migrations, seed parity, own-row RLS, validation, admin-only reviews, previous-day ownership and preserved revisions');
