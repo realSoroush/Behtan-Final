@@ -5,7 +5,7 @@ import { OptionCard } from '@/components/ui/Card';
 import { useOnboardingStore } from '@/hooks/useOnboardingStore';
 import type { Gender } from '@/types';
 
-const PROVINCES = [
+export const PROVINCES = [
   'تهران', 'اصفهان', 'فارس', 'خراسان رضوی', 'مازندران',
   'آذربایجان شرقی', 'آذربایجان غربی', 'کرمانشاه', 'البرز', 'گیلان',
   'خوزستان', 'کرمان', 'گلستان', 'قم', 'هرمزگان',
@@ -14,7 +14,7 @@ const PROVINCES = [
   'سمنان', 'ایلام', 'خراسان شمالی', 'خراسان جنوبی', 'قزوین', 'یزد', 'گلستان'
 ];
 
-const CITIES_BY_PROVINCE: Record<string, string[]> = {
+export const CITIES_BY_PROVINCE: Record<string, string[]> = {
   تهران: ['تهران', 'ری', 'شهریار', 'اسلامشهر', 'پردیس', 'دماوند', 'ورامین', 'رباط‌کریم'],
   اصفهان: ['اصفهان', 'کاشان', 'خمینی‌شهر', 'نجف‌آباد', 'شاهین‌شهر', 'فلاورجان', 'زرین‌شهر'],
   'خراسان رضوی': ['مشهد', 'نیشابور', 'سبزوار', 'قوچان', 'تربت‌حیدریه', 'کاشمر'],
@@ -24,7 +24,7 @@ const CITIES_BY_PROVINCE: Record<string, string[]> = {
   مازندران: ['ساری', 'بابل', 'آمل', 'قائم‌شهر', 'نوشهر', 'چالوس', 'تنکابن'],
 };
 
-const DEFAULT_CITIES = ['مرکز استان', 'شهرهای دیگر'];
+export const DEFAULT_CITIES = ['مرکز استان', 'شهرهای دیگر'];
 
 export function Step1Gender() {
   const { data, updateData, nextStep, currentStep, prevStep } = useOnboardingStore();

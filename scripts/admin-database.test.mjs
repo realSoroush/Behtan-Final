@@ -11,6 +11,7 @@ let schema = await readFile(new URL('../supabase/schema.sql',import.meta.url),'u
 await db.exec(schema.replace('create extension if not exists "uuid-ossp";',''));
 if (!schema.includes('create table public.billing_settings')) await db.exec(await readFile(new URL('../supabase/migrations/20260907_014_zarinpal_billing.sql', import.meta.url),'utf8'));
 await db.exec(await readFile(new URL('../supabase/migrations/20260915_016_admin_console.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../supabase/migrations/20261015_022_admin_test_scenarios.sql',import.meta.url),'utf8'));
 const admin=randomUUID(),user=randomUUID(),other=randomUUID();
 await db.query('insert into auth.users(id,phone,phone_confirmed_at) values($1,\'989111111111\',now()),($2,\'989122222222\',now()),($3,\'989133333333\',null)',[admin,user,other]);
 await db.query('insert into admin_members(user_id) values($1),($2)',[admin,other]);
@@ -19,11 +20,19 @@ const asUser = async id => { await db.exec('reset role'); await db.query("select
 const rpc = async (name,args=[]) => (await db.query(`select public.${name}(${args.map((_,i)=>`$${i+1}`).join(',')}) as result`,args)).rows[0].result;
 await asUser(user);
 assert.equal(await rpc('admin_allowed'),false);
+assert.equal((await db.query('select * from admin_test_scenarios')).rows.length,0);
+await assert.rejects(()=>db.query("insert into admin_test_scenarios(label,answers) values('not admin','{}')"),/row-level security/);
 for(const [name,args] of [['admin_overview',[]],['admin_user_detail',[user]],['admin_payments',[]],['admin_change_subscription',[randomUUID(),user,'grant',null,'gold',new Date(Date.now()+86400000).toISOString(),null,'testing']]]) await assert.rejects(()=>rpc(name,args),/ADMIN_REQUIRED/);
 for(const table of ['admin_members','admin_audit_log','daily_plan_snapshots','user_subscriptions']) await assert.rejects(()=>db.exec(`select * from ${table}`),/permission denied/);
 await assert.rejects(()=>db.query('insert into admin_members(user_id) values($1)',[user]),/permission denied/);
 await asUser(other); assert.equal(await rpc('admin_allowed'),false,'Unverified allowlisted user denied');
 await asUser(admin); assert.equal(await rpc('admin_allowed'),true);
+const testScenarioId=randomUUID();
+await db.query('insert into admin_test_scenarios(id,label,answers) values($1,$2,$3::jsonb)',[testScenarioId,'سناریوی تست',JSON.stringify({goal:'weight_loss'})]);
+assert.equal((await db.query('select * from admin_test_scenarios')).rows.length,1);
+assert.equal((await rpc('admin_overview')).stats.users,3,'Test persona is not a real user');
+await asUser(user); assert.equal((await db.query('select * from admin_test_scenarios')).rows.length,0);
+await asUser(admin);
 assert.equal((await rpc('admin_overview')).stats.users,3);
 const expiry=new Date(Date.now()+86400000).toISOString(),request=randomUUID();
 const args=[request,user,'grant',null,'gold',expiry,null,'هدیه پشتیبانی'];
@@ -63,6 +72,7 @@ await asUser(admin); assert.equal((await rpc('admin_overview')).stats.revenue_to
 assert.equal((await rpc('admin_payments')).length,1);
 await db.exec('reset role'); await db.query('delete from admin_members where user_id=$1',[admin]);
 await asUser(admin); await assert.rejects(()=>rpc('admin_overview'),/ADMIN_REQUIRED/);
+assert.equal((await db.query('select * from admin_test_scenarios')).rows.length,0,'Revoked admin loses saved scenario access');
 await db.exec('reset role;set role anon'); await assert.rejects(()=>rpc('admin_allowed'),/permission denied/);
 await db.close();
-console.log('✅ Admin SQL: allowlist + verified phone, denied non-admin/anonymous access, no self-promotion, manual grant, idempotency, stale edit guard, audit, snapshot ownership, expiry/revocation and revenue isolation');
+console.log('✅ Admin SQL: allowlist, RLS-isolated test personas, grants, snapshots, subscriptions and revenue isolation');
