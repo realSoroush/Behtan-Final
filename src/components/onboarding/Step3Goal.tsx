@@ -11,7 +11,7 @@ interface GoalOption {
   description: string;
 }
 
-const GOALS: GoalOption[] = [
+export const GOALS: GoalOption[] = [
   {
     value: 'weight_loss',
     icon: '🔥',

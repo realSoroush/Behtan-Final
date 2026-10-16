@@ -4,7 +4,7 @@ import { OptionCard, CheckboxCard } from '@/components/ui/Card';
 import { useOnboardingStore } from '@/hooks/useOnboardingStore';
 import type { Allergy, ProteinBudgetPreference, VegetarianStatus } from '@/types';
 
-const VEGETARIAN_OPTIONS: { value: VegetarianStatus; icon: string; label: string; description: string }[] = [
+export const VEGETARIAN_OPTIONS: { value: VegetarianStatus; icon: string; label: string; description: string }[] = [
   { value: 'none', icon: '🍖', label: 'همه‌چیزخوار', description: 'هیچ محدودیتی ندارم' },
   { value: 'lacto_ovo', icon: '🥚', label: 'گیاه‌خوار (لاکتو-اوو)', description: 'لبنیات و تخم‌مرغ مجاز' },
   { value: 'pescatarian', icon: '🐟', label: 'ماهی‌خوار', description: 'ماهی و غذاهای دریایی مجاز' },
@@ -12,7 +12,7 @@ const VEGETARIAN_OPTIONS: { value: VegetarianStatus; icon: string; label: string
   { value: 'raw', icon: '🥦', label: 'خام‌خواری', description: 'غذاهای خام و فرآوری‌نشده' },
 ];
 
-const ALLERGIES: { value: Allergy; icon: string; label: string }[] = [
+export const ALLERGIES: { value: Allergy; icon: string; label: string }[] = [
   { value: 'dairy', icon: '🥛', label: 'لبنیات' },
   { value: 'gluten', icon: '🌾', label: 'گلوتن' },
   { value: 'peanut', icon: '🥜', label: 'بادام زمینی' },
@@ -21,7 +21,7 @@ const ALLERGIES: { value: Allergy; icon: string; label: string }[] = [
   { value: 'seafood', icon: '🦐', label: 'غذاهای دریایی' },
 ];
 
-const PROTEIN_BUDGET_OPTIONS: {
+export const PROTEIN_BUDGET_OPTIONS: {
   value: ProteinBudgetPreference;
   icon: string;
   label: string;

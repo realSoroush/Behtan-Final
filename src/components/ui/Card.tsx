@@ -42,6 +42,7 @@ export function OptionCard({ selected, onClick, icon, label, description, classN
       type="button"
       onClick={onClick}
       disabled={disabled}
+      aria-pressed={selected}
       className={`
         relative w-full flex items-center gap-4 border-2 rounded-2xl p-4 text-right
         transition-all duration-200 cursor-pointer
@@ -98,6 +99,7 @@ export function CheckboxCard({ checked, onChange, icon, label, description }: Ch
     <button
       type="button"
       onClick={() => onChange(!checked)}
+      aria-pressed={checked}
       className={`
         w-full flex items-center gap-4 border-2 rounded-2xl p-4 text-right
         transition-all duration-200
