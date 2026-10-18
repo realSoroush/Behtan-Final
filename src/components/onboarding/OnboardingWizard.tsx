@@ -1,5 +1,7 @@
+import { CompanionCard } from '@/components/companion/CompanionCard';
+import { getOnboardingCompanion } from '@/components/companion/companionState';
 import { APP_LOGO_PATH, APP_NAME_FA } from '@/constants/brand';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useOnboardingStore } from '@/hooks/useOnboardingStore';
@@ -238,6 +240,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     }
   };
 
+  const companionMessage = getOnboardingCompanion(currentStep);
+  const [companionFocus, setCompanionFocus] = useState<{step: number; nonce: number} | null>(null);
+
   const isReadyForCurrentUser = !!user && isHydrated && hydratedUserId === user.id;
 
   if (!isReadyForCurrentUser) {
@@ -261,6 +266,9 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
       <div className="flex-1 overflow-hidden">
         <div className="max-w-md mx-auto px-5 py-6">
+          {companionMessage && !submitError && (
+            <CompanionCard message={isSubmitting ? {mood:'thinking',title:'داریم اطلاعاتت را ذخیره می‌کنیم.',body:'تا پایان ذخیره‌سازی همین‌جا بمان.'} : companionFocus?.step === currentStep && currentStep !== 6 ? {...companionMessage, mood:'listening'} : companionMessage} compact reactionKey={`${currentStep}:${companionFocus?.nonce ?? 0}`} />
+          )}
           {submitError && (
             <div
               role="alert"
@@ -271,7 +279,12 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             </div>
           )}
 
-          <div className={isSubmitting ? 'pointer-events-none select-none opacity-70' : ''}>
+          <div className={isSubmitting ? 'pointer-events-none select-none opacity-70' : ''}
+            onFocusCapture={event => {
+              if ((event.target as HTMLElement).matches('input, select, textarea')) {
+                setCompanionFocus({step:currentStep,nonce:Date.now()});
+              }
+            }}>
             <AnimatePresence mode="wait" custom={currentStep}>
               <motion.div
                 key={currentStep}
