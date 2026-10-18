@@ -1,3 +1,4 @@
+import { BehtanMascot } from '@/components/companion/BehtanMascot';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft,
@@ -75,7 +76,7 @@ function DailyPlanPreview() {
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
             <span className="text-xs font-semibold text-primary-600 dark:text-primary-400">نمونه برنامه روزانه</span>
-            <h2 className="mt-1 text-xl font-black text-neutral-950 dark:text-white">امروزت را کامل کن</h2>
+            <h2 className="mt-1 text-xl font-black text-neutral-950 dark:text-white">یک نگاه به برنامهٔ امروز</h2>
           </div>
           <span className="rounded-full bg-primary-50 px-3 py-1.5 text-xs font-bold text-primary-700 dark:bg-primary-950/60 dark:text-primary-300">
             روز ۱
@@ -160,7 +161,7 @@ export function LandingPage({ onStart }: LandingPageProps) {
       </header>
 
       <main>
-        <section className="relative border-b border-neutral-100 px-5 pb-20 pt-16 dark:border-neutral-900 sm:px-8 sm:pb-28 sm:pt-24">
+        <section className="relative border-b border-neutral-100 px-5 pb-20 pt-8 dark:border-neutral-900 sm:px-8 sm:pb-28 sm:pt-12">
           <div className="pointer-events-none absolute inset-x-0 top-0 -z-0 mx-auto h-[560px] max-w-5xl bg-[radial-gradient(circle_at_70%_20%,rgba(16,185,129,0.13),transparent_42%)] dark:bg-[radial-gradient(circle_at_70%_20%,rgba(16,185,129,0.09),transparent_42%)]" />
           <div className="relative mx-auto grid max-w-6xl items-center gap-14 lg:grid-cols-[1.05fr_0.95fr] lg:gap-20">
             <motion.div
@@ -169,9 +170,13 @@ export function LandingPage({ onStart }: LandingPageProps) {
               transition={{ duration: 0.5 }}
               className="text-center lg:text-right"
             >
+              <div className="companion-hero">
+                <BehtanMascot size="hero" mood="welcome" priority />
+                <p className="companion-hero__note">قدم‌به‌قدم،<br /><strong>به سبک زندگی خودت.</strong></p>
+              </div>
               <span className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-3.5 py-2 text-xs font-bold text-primary-700 dark:border-primary-900 dark:bg-primary-950/50 dark:text-primary-300">
                 <Sparkles size={15} />
-                تغذیه شخصی؛ نه یک نسخه عمومی
+                برنامهٔ غذایی شخصی برای مدیریت وزن
               </span>
               <h1 className="mx-auto mt-6 max-w-2xl text-4xl font-black leading-[1.25] tracking-tight text-neutral-950 dark:text-white sm:text-6xl sm:leading-[1.2] lg:mx-0">
                 برنامه غذایی‌ای که با

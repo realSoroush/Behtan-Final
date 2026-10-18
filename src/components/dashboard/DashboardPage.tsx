@@ -1,3 +1,6 @@
+import { CompanionCard } from '@/components/companion/CompanionCard';
+import { getDailyCompanion } from '@/components/companion/companionState';
+import { BehtanMascot } from '@/components/companion/BehtanMascot';
 import { usePlanReporting } from '@/hooks/usePlanReporting';
 import { useMealHistory } from '@/hooks/useMealHistory';
 import { historyOfMeals, mealFingerprint, type MealHistoryItem } from '@/utils/mealExperience';
@@ -80,6 +83,12 @@ export function DashboardPage() {
   const [todayKey, setTodayKey] = useState(() => getLocalDateKey());
   const history = useMealHistory(user?.id, todayKey);
   const generationKey = `${user?.id}:${todayKey}`;
+  const [companionEvent, setCompanionEvent] = useState<{ key: string; type: 'recorded' | 'swapped'; nonce: number } | null>(null);
+  useEffect(() => {
+    if (!companionEvent) return;
+    const timeout = window.setTimeout(() => setCompanionEvent(null), 6000);
+    return () => window.clearTimeout(timeout);
+  }, [companionEvent]);
   const isWorkoutDay = workoutChoice?.key===generationKey ? workoutChoice.value : false;
   const setIsWorkoutDay=(value:boolean)=>{setWorkoutChoice({key:generationKey,value});try{localStorage.setItem(`behtan:workout:${generationKey}`,String(value));}catch{/* Storage unavailable; still works in this session. */}};
   useEffect(()=>{let value=false;try{value=localStorage.getItem(`behtan:workout:${generationKey}`)==='true';}catch{/* optional persistence */}setWorkoutChoice({key:generationKey,value});},[generationKey]);
@@ -219,6 +228,7 @@ export function DashboardPage() {
   }, [todayKey]);
 
   const regenerate = () => {
+    setCompanionEvent(null);
     setGenerationContext({key:generationKey,lockedMeals:Object.values(consumedMealSnapshots),avoidMeals:activePlan ? historyOfMeals(activePlan.meals.filter(m => !m.consumed)) : [],hydrationError:Boolean(mealProgressError)});
     setPlanVersion(v => v + 1);
     resetSwapped();
@@ -227,7 +237,11 @@ export function DashboardPage() {
   const handleToggleConsumed = (mealIdx: number) => {
     const meal = activePlan?.meals[mealIdx];
     if (!meal || mealProgressError || mealProgressSavingSlots.has(meal.slot)) return;
-    void setMealConsumed(meal, !meal.consumed).catch(() => {});
+    setCompanionEvent(null);
+    void setMealConsumed(meal, !meal.consumed).then(() => {
+      // Celebrate only after the database confirms a newly consumed meal.
+      if (!meal.consumed) setCompanionEvent({ key: generationKey, type: 'recorded', nonce: Date.now() });
+    }).catch(() => {});
   };
 
   const handleSwapComponent = (mealIdx: number, componentIdx: number) => {
@@ -243,6 +257,7 @@ export function DashboardPage() {
       meals: editablePlan.meals.map((m, i) => (i === swapMealIndex ? option.updatedMeal : m)),
     };
     setSwappedPlan(updated);
+    setCompanionEvent({ key: generationKey, type: 'swapped', nonce: Date.now() });
   };
 
   const swapCurrentComponent: MealComponent | null =
@@ -295,13 +310,30 @@ export function DashboardPage() {
     [activePlan, targets]
   );
 
+  const currentCompanionEvent = companionEvent?.key === generationKey ? companionEvent : null;
+  const companionMessage = getDailyCompanion({
+    total: activePlan?.meals.length ?? 0,
+    consumed: activePlan?.meals.filter(meal => meal.consumed).length ?? 0,
+    saving: mealProgressSavingSlots.size > 0,
+    error: Boolean(mealProgressError || planReporting.error),
+    planError: Boolean(mealPlanResult.error),
+    event: currentCompanionEvent?.type,
+  });
+  const showMeals = () => {
+    const firstRemaining = activePlan?.meals.find(meal => !meal.consumed);
+    const destination = document.getElementById(firstRemaining ? `meal-${firstRemaining.slot}` : 'daily-meals');
+    destination?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    destination?.focus({ preventScroll: true });
+  };
+
   // ---- Loading / error states ----
   if (profileLoading || catalogLoading || proteinPolicyLoading || mealProgressLoading || history.loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-3">
           <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-neutral-500 dark:text-neutral-400">در حال بارگذاری برنامه و تنظیمات موتور تغذیه...</p>
+          <BehtanMascot mood="thinking" />
+          <p className="text-neutral-500 dark:text-neutral-400">در حال دریافت برنامه‌ات…</p>
         </div>
       </div>
     );
@@ -385,6 +417,7 @@ export function DashboardPage() {
       </header>
 
       <div hidden={section!=='today'} id="today-panel" className="max-w-md mx-auto px-4 py-5 space-y-4">
+        <CompanionCard message={companionMessage} reactionKey={currentCompanionEvent?.nonce ?? todayKey} onAction={showMeals} />
         {/* Daily overview carousel */}
         {(targets && consumed) || foodQuality ? (
           <DailyOverviewCarousel
@@ -464,7 +497,7 @@ export function DashboardPage() {
           </div>
         ) : activePlan ? (
           <div className="space-y-3">
-            <h2 className="font-bold text-neutral-900 dark:text-neutral-100">وعده‌های غذایی امروز</h2>
+            <h2 id="daily-meals" tabIndex={-1} className="scroll-mt-24 font-bold text-neutral-900 dark:text-neutral-100">وعده‌های غذایی امروز</h2>
             <p className="text-xs text-neutral-500 dark:text-neutral-400">
               هدف: {toPersianDigits(targets?.targetCalories ?? 0)} کالری در {toPersianDigits(activePlan.meals.length)} وعده
             </p>
@@ -473,14 +506,15 @@ export function DashboardPage() {
               <span className="mr-auto text-xs text-neutral-600 dark:text-neutral-400">{toPersianDigits(activePlan.meals.filter(m=>m.consumed).length)} از {toPersianDigits(activePlan.meals.length)}</span>
             </div>
             {activePlan.meals.map((meal, mealIdx) => (
+              <div key={meal.slot} id={`meal-${meal.slot}`} tabIndex={-1} className="scroll-mt-24 rounded-3xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500">
               <MealCard
-                key={meal.slot}
                 meal={meal}
                 isConsumedSaving={mealProgressSavingSlots.has(meal.slot)}
                 consumedToggleDisabled={Boolean(mealProgressError)}
                 onToggleConsumed={() => handleToggleConsumed(mealIdx)}
                 onSwapComponent={(componentIdx) => handleSwapComponent(mealIdx, componentIdx)}
               />
+              </div>
             ))}
           </div>
         ) : (

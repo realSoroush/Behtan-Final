@@ -3,6 +3,7 @@ import {Activity,ChevronDown,ReceiptText,UserRound} from 'lucide-react';
 import {supabase} from '@/lib/supabaseClient';
 import type {UserProfile} from '@/types';
 import {ProgressJournal} from './ProgressJournal';
+import {CompanionCard} from '@/components/companion/CompanionCard';
 
 const n=(value:number|null|undefined)=>value==null?'—':value.toLocaleString('fa-IR');
 const goals:Record<string,string>={weight_loss:'کاهش وزن',weight_gain:'افزایش وزن',maintenance:'حفظ وزن'};
@@ -40,6 +41,7 @@ export function MemberProfile({profile,today}:{profile:UserProfile;today:string}
     </details>)}</div>}
    </>}
   </section>
+  <CompanionCard compact message={{mood:'calm',title:'روندت را در طول زمان ببین.',body:'یک عدد، همهٔ مسیر را نشان نمی‌دهد. ثبت‌های وزن را کنار هم مرور کن.'}}/>
   <ProgressJournal userId={profile.id} today={today}/>
  </div>;
 }
