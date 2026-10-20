@@ -1,0 +1,244 @@
+.pro-app {
+  min-height: 100vh;
+  background: #f6f8f7;
+  color: #152e27;
+  font-family: inherit;
+  padding: 0 24px 64px;
+}
+.dark .pro-app {
+  background: #101714;
+  color: #edf5f0;
+}
+.pro-app main,
+.pro-header {
+  max-width: 1100px;
+  margin: auto;
+}
+.pro-header {
+  min-height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #ccd8d0;
+  gap: 16px;
+}
+.pro-brand,
+.pro-actions,
+.pro-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.pro-brand span {
+  font-size: 12px;
+  border: 1px solid #84998b;
+  border-radius: 20px;
+  padding: 4px 10px;
+}
+.pro-intro {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 44px 0 28px;
+  gap: 20px;
+}
+.pro-intro h1 {
+  font-size: clamp(28px, 4vw, 42px);
+  font-weight: 750;
+  line-height: 1.6;
+}
+.pro-intro p {
+  color: #536b60;
+}
+.dark .pro-intro p {
+  color: #b3c6ba;
+}
+.pro-eyebrow {
+  font-size: 13px;
+}
+.pro-notice {
+  border-inline-start: 3px solid #1a8863;
+  background: #e7f0e9;
+  padding: 18px 22px;
+  border-radius: 8px;
+  margin-bottom: 32px;
+}
+.dark .pro-notice {
+  background: #1b3026;
+}
+.pro-notice p {
+  font-size: 14px;
+  line-height: 2;
+  margin-top: 5px;
+}
+.pro-app button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 9px 15px;
+  border: 1px solid #8ca598;
+  border-radius: 12px;
+  font: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.pro-app button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.pro-app button:focus-visible,
+.pro-app select:focus-visible {
+  outline: 3px solid #209c75;
+  outline-offset: 3px;
+}
+.pro-app button.pro-primary {
+  background: #14684e;
+  color: white;
+  border-color: #14684e;
+}
+.dark .pro-app button.pro-primary {
+  background: #8de1b8;
+  color: #0e3020;
+}
+.pro-toolbar {
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.pro-toolbar h2 {
+  font-size: 20px;
+  font-weight: 700;
+}
+.pro-toolbar small {
+  font-size: 14px;
+  color: #647c70;
+}
+.pro-select {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+}
+.pro-select select {
+  padding: 12px;
+  border: 1px solid #8ca598;
+  border-radius: 10px;
+  background: inherit;
+  color: inherit;
+  max-width: 100%;
+}
+.pro-role {
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+.pro-role span {
+  display: block;
+  color: #687e72;
+  font-size: 12px;
+  margin-top: 6px;
+}
+.dark .pro-role span {
+  color: #b3c6ba;
+}
+.pro-panel,
+.pro-empty {
+  border: 1px solid #ccd8d0;
+  border-radius: 20px;
+  padding: 26px;
+  background: #fff;
+}
+.dark .pro-panel,
+.dark .pro-empty {
+  background: #15211b;
+  border-color: #34483c;
+}
+.pro-empty {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 16px;
+  padding: 48px 24px;
+}
+.pro-empty h2 {
+  font-size: 24px;
+  font-weight: 700;
+}
+.pro-cases {
+  list-style: none;
+  padding: 0;
+}
+.pro-cases li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 0;
+  border-top: 1px solid #ccd8d0;
+  gap: 12px;
+}
+.pro-cases code {
+  display: block;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+  color: #536b60;
+  margin-top: 6px;
+}
+.dark .pro-cases code {
+  color: #b3c6ba;
+}
+.pro-cases time {
+  font-size: 13px;
+  white-space: nowrap;
+}
+.pro-error {
+  background: #fbe9e6;
+  color: #7b2218;
+  border: 1px solid #c78f88;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 16px 0;
+}
+.pro-muted {
+  color: #647c70;
+  padding: 20px 0;
+}
+@media (max-width: 600px) {
+  .pro-app {
+    padding: 0 16px 40px;
+  }
+  .pro-header {
+    flex-wrap: wrap;
+    padding: 18px 0;
+  }
+  .pro-brand {
+    gap: 8px;
+  }
+  .pro-intro {
+    margin-top: 28px;
+  }
+  .pro-intro > svg {
+    display: none;
+  }
+  .pro-panel {
+    padding: 18px;
+  }
+  .pro-select {
+    display: block;
+  }
+  .pro-select select {
+    display: block;
+    width: 100%;
+    margin-top: 8px;
+  }
+}
+
+.pro-app button.pro-theme {
+  padding: 0;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+}
+.pro-app button svg {
+  flex-shrink: 0;
+}
