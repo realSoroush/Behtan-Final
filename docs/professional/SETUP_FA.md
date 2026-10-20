@@ -1,5 +1,7 @@
 # نصب و بررسی فاز اول به‌تن حرفه‌ای
 
+> Historical phase-1 baseline. Current phase-2a implementation and limits: [PHASE_2A.md](PHASE_2A.md); setup: [PHASE_2A_SETUP_FA.md](PHASE_2A_SETUP_FA.md); current verification: [PHASE_2A_TEST_REPORT.md](PHASE_2A_TEST_REPORT.md). The prior protein regression is repaired in this slice.
+
 این بسته **زیرساخت آزمایش داخلی** است؛ هنوز نسخهٔ آمادهٔ استفاده با بیمار واقعی نیست. هیچ تغییر خودکار در Supabase یا Vercel انجام نشده است. مایگریشن ۰۲۳ افزایشی است و کد B2C، تعرفه‌ها، موتور تغذیه و جدول‌های مصرف‌کننده را تغییر نمی‌دهد.
 
 ## ۱. اعمال پچ در Codespaces

@@ -4,7 +4,7 @@ import type {
   ProOrganization,
   SandboxPatient,
 } from "./contracts";
-async function rpc<T>(
+export async function rpc<T>(
   name: string,
   params?: Record<string, unknown>,
 ): Promise<T> {

@@ -1,5 +1,7 @@
 # Target data model and access contract
 
+> Historical phase-1 baseline. Current phase-2a implementation and limits: [PHASE_2A.md](PHASE_2A.md); setup: [PHASE_2A_SETUP_FA.md](PHASE_2A_SETUP_FA.md); current verification: [PHASE_2A_TEST_REPORT.md](PHASE_2A_TEST_REPORT.md). The prior protein regression is repaired in this slice.
+
 Status: architectural specification. Only the `pro_*` tables in migration 023 exist in this delivery. All tables below are subsequent-phase work unless marked P1. Do not build clients against unimplemented RPCs.
 
 ## Identity and tenants

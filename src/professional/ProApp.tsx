@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   Building2,
   FlaskConical,
@@ -10,6 +17,9 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { PhoneAuth } from "@/components/PhoneAuth";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+const CaseWorkspace = lazy(() =>
+  import("./CaseWorkspace").then((m) => ({ default: m.CaseWorkspace })),
+);
 import { proApi } from "./api";
 import { requestKey, clearRequestKey } from "./requestKeys";
 import {
@@ -86,6 +96,7 @@ function ProWorkspace({ userId }: { userId: string }) {
   const [organizations, setOrganizations] = useState<ProOrganization[]>([]);
   const [memberships, setMemberships] = useState<ProMembership[]>([]);
   const [selectedId, setSelectedId] = useState("");
+  const [showRecords, setShowRecords] = useState(false);
   const [patients, setPatients] = useState<SandboxPatient[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -200,15 +211,15 @@ function ProWorkspace({ userId }: { userId: string }) {
         <div>
           <p className="pro-eyebrow">یک زیرساخت، تجربه‌ای مشترک</p>
           <h1>محیط کاری شما</h1>
-          <p>پایهٔ امن همکاری، پیش از ورود به اطلاعات سلامت.</p>
+          <p>پروندهٔ آزمایشی، مجوز روشن و اطلاعات نسخه‌بندی‌شده.</p>
         </div>
         <FlaskConical size={44} />
       </section>
       <aside className="pro-notice">
         <strong>فقط دادهٔ مصنوعی</strong>
         <p>
-          پرونده‌ها خودکار و بدون نام، شماره یا اطلاعات سلامت ساخته می‌شوند.
-          تولید رژیم، دعوت بیمار و ارسال پیامک در این فاز فعال نیست.
+          فقط اطلاعات ساختگی ثبت کنید؛ نام و شمارهٔ فرد واقعی وارد نشود. تولید
+          رژیم، دعوت بیمار و ارسال پیامک در این فاز فعال نیست.
         </p>
       </aside>
       {error && (
@@ -267,39 +278,64 @@ function ProWorkspace({ userId }: { userId: string }) {
             نقش شما: {roles.map((r) => rolesFa[r]).join("، ")}
             <span>مالکیت به‌تنهایی مجوز درمان یا تأیید برنامه نیست.</span>
           </p>
-          <section className="pro-panel">
-            <div className="pro-toolbar">
-              <h2>
-                پرونده‌های مصنوعی{" "}
-                <small>({patients.length.toLocaleString("fa-IR")})</small>
-              </h2>
-              {canCreateSandboxPatient(roles) && (
-                <button
-                  className="pro-primary"
-                  disabled={busy}
-                  onClick={() => void create("patient")}
-                >
-                  <Plus size={18} /> پروندهٔ آزمایشی
-                </button>
+          <div className="pro-tabs" role="group" aria-label="بخش‌های محیط کاری">
+            <button
+              aria-pressed={showRecords}
+              onClick={() => setShowRecords(true)}
+            >
+              پرونده‌ها و اطلاعات ورودی
+            </button>
+            <button
+              aria-pressed={!showRecords}
+              onClick={() => setShowRecords(false)}
+            >
+              آزمایش سریع فاز اول
+            </button>
+          </div>
+          {showRecords ? (
+            <Suspense fallback={<p role="status">در حال بازکردن پرونده‌ها…</p>}>
+              <CaseWorkspace
+                key={selectedId}
+                org={selectedId}
+                userId={userId}
+                roles={roles}
+              />
+            </Suspense>
+          ) : (
+            <section className="pro-panel">
+              <div className="pro-toolbar">
+                <h2>
+                  پرونده‌های مصنوعی{" "}
+                  <small>({patients.length.toLocaleString("fa-IR")})</small>
+                </h2>
+                {canCreateSandboxPatient(roles) && (
+                  <button
+                    className="pro-primary"
+                    disabled={busy}
+                    onClick={() => void create("patient")}
+                  >
+                    <Plus size={18} /> پروندهٔ آزمایشی
+                  </button>
+                )}
+              </div>
+              {patients.length === 0 && !busy && (
+                <p className="pro-muted">پروندهٔ قابل دسترسی ندارید.</p>
               )}
-            </div>
-            {patients.length === 0 && !busy && (
-              <p className="pro-muted">پروندهٔ قابل دسترسی ندارید.</p>
-            )}
-            <ul className="pro-cases">
-              {patients.map((p) => (
-                <li key={p.id}>
-                  <div>
-                    <strong>مراجع مصنوعی</strong>
-                    <code dir="ltr">{p.case_code}</code>
-                  </div>
-                  <time dateTime={p.created_at}>
-                    {new Date(p.created_at).toLocaleDateString("fa-IR")}
-                  </time>
-                </li>
-              ))}
-            </ul>
-          </section>
+              <ul className="pro-cases">
+                {patients.map((p) => (
+                  <li key={p.id}>
+                    <div>
+                      <strong>مراجع مصنوعی</strong>
+                      <code dir="ltr">{p.case_code}</code>
+                    </div>
+                    <time dateTime={p.created_at}>
+                      {new Date(p.created_at).toLocaleDateString("fa-IR")}
+                    </time>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </>
       )}
     </main>
