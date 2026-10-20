@@ -44,7 +44,12 @@
     "test:admin": "node scripts/admin-database.test.mjs && node --experimental-strip-types scripts/admin-test-scenarios.test.mjs",
     "test:experience": "node --experimental-strip-types scripts/meal-experience.test.mjs",
     "test:progress": "node --experimental-strip-types scripts/progress-journal.test.mjs && node --experimental-strip-types scripts/progress-database.test.mjs",
-    "test:mobile-meals": "node --experimental-strip-types scripts/mobile-meals.test.mjs"
+    "test:mobile-meals": "node --experimental-strip-types scripts/mobile-meals.test.mjs",
+    "dev:pro": "vite --config vite.pro.config.ts",
+    "build:pro": "tsc -b && vite build --config vite.pro.config.ts",
+    "test:pro": "node scripts/pro-database.test.mjs && node --experimental-strip-types scripts/pro-contracts.test.mjs",
+    "test:pro:browser": "playwright test --config playwright.pro.config.ts",
+    "test:pro:native": "node scripts/pro-database.test.mjs --native"
   },
   "dependencies": {
     "@rive-app/canvas": "2.44.2",
@@ -57,6 +62,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
+    "@playwright/test": "^1.64.1",
     "@types/node": "^26.1.2",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
@@ -67,6 +73,7 @@
     "eslint": "^9.12.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.12",
+    "pg": "^8.23.1",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.13",
     "typescript": "^5.6.3",

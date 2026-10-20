@@ -38,3 +38,10 @@ yarn-error.log*
 dist-admin/
 .vercel/
 preview-export/
+
+# Professional build output
+dist-pro/
+
+# Browser verification output
+test-results/
+playwright-report/
