@@ -737,7 +737,8 @@ function addVector(a: MacroVector, b: MacroVector): MacroVector {
  */
 function refineDailyPortions(
   chosen: ResolvedOption[],
-  targets: MacroTargets
+  targets: MacroTargets,
+  feasibilityFirst = false
 ): ResolvedOption[] {
   const dailyTarget: MacroVector = {
     kcal: targets.targetCalories,
@@ -775,6 +776,7 @@ function refineDailyPortions(
     }
     return (
       scoreDailyTotals(candidateDaily, dailyTarget) +
+      (feasibilityFirst ? 1000 * feasibilityViolation(candidateDaily, dailyTarget) : 0) +
       0.035 * scoreTotals(candidateMeal, slotTarget) +
       0.05 * mealRealismPenalty(components)
     );
@@ -884,7 +886,8 @@ function scoreResolvedDay(options: ResolvedOption[], dailyTarget: MacroVector): 
 function refineDailyTemplates(
   initial: ResolvedOption[],
   optionsBySlot: ResolvedOption[][],
-  targets: MacroTargets
+  targets: MacroTargets,
+  feasibilityFirst = false
 ): ResolvedOption[] {
   const dailyTarget: MacroVector = {
     kcal: targets.targetCalories,
@@ -892,9 +895,10 @@ function refineDailyTemplates(
     carbs: targets.carbGrams,
     fat: targets.fatGrams,
   };
-
-  let best = refineDailyPortions(initial, targets);
-  let bestScore = scoreResolvedDay(best, dailyTarget);
+  const objective = (day: ResolvedOption[]) => scoreResolvedDay(day, dailyTarget) +
+    (feasibilityFirst ? 1000 * feasibilityViolation(totalResolvedOptions(day), dailyTarget) : 0);
+  let best = refineDailyPortions(initial, targets, feasibilityFirst);
+  let bestScore = objective(best);
 
   for (let pass = 0; pass < 2; pass++) {
     let changed = false;
@@ -908,8 +912,8 @@ function refineDailyTemplates(
         const candidateBase = best.map((option, index) =>
           index === slotIndex ? replacement : option
         );
-        const candidate = refineDailyPortions(candidateBase, targets);
-        const candidateScore = scoreResolvedDay(candidate, dailyTarget);
+        const candidate = refineDailyPortions(candidateBase, targets, feasibilityFirst);
+        const candidateScore = objective(candidate);
 
         if (candidateScore + 1e-9 < slotBestScore) {
           slotBest = candidate;
@@ -950,6 +954,18 @@ function dailyDeviationSummary(options: ResolvedOption[], targets: MacroTargets)
     carbs: normalizedDeviation(actual.carbs, targets.carbGrams),
     fat: normalizedDeviation(actual.fat, targets.fatGrams),
   };
+}
+
+// Distance outside the existing feasibility envelope. This changes search
+// priority only; the final acceptance thresholds and portion caps stay intact.
+function feasibilityViolation(actual: MacroVector, target: MacroVector): number {
+  const protein = normalizedDeviation(actual.protein, target.protein);
+  const carbs = normalizedDeviation(actual.carbs, target.carbs);
+  const fat = normalizedDeviation(actual.fat, target.fat);
+  const kcal = (actual.kcal - target.kcal) / Math.max(1, target.kcal);
+  const minimum = protein <= 0.03 && carbs <= 0.03 && fat <= 0.03 ? -0.06 : -0.05;
+  return Math.max(0, kcal - 0.03) + Math.max(0, minimum - kcal) +
+    Math.max(0, protein - 0.10) + Math.max(0, carbs - 0.10) + Math.max(0, fat - 0.10);
 }
 
 function isDailyPlanFeasible(options: ResolvedOption[], targets: MacroTargets): boolean {
@@ -1147,7 +1163,13 @@ export function generateDailyMealPlan(
   });
 
   const chosen = chooseDailyCombination(optionsBySlot, targets, seed);
-  const macroRefined = refineDailyTemplates(chosen, optionsBySlot, targets);
+  let macroRefined = refineDailyTemplates(chosen, optionsBySlot, targets);
+  if (!isDailyPlanFeasible(macroRefined, targets) && !context.lockedMeals?.length) {
+    // Normal optimization can settle just outside an acceptance boundary because
+    // realism/local meal scores outweigh a tiny daily shortfall. Retry once,
+    // with bounded search that prioritizes satisfying the unchanged constraints.
+    macroRefined = refineDailyTemplates(macroRefined, optionsBySlot, targets, true);
+  }
   const qualityRefined = repairDailyQuality(macroRefined, optionsBySlot, targets);
   const refined = repairMealExperience(qualityRefined, optionsBySlot, targets, context, seed);
   const remainingTargetsUnmet = !isDailyPlanFeasible(refined, targets);

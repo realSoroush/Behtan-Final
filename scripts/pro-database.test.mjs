@@ -475,6 +475,8 @@ try {
       await Promise.all(clients.map((c) => c.end()));
     }
   }
+  const { testCaseDatabase } = await import('./pro-case-database.test.mjs');
+  await testCaseDatabase({ db, asUser, rpc, equal, denied });
   console.log(
     `PASS: ${checks} Professional database assertions (${process.env.PRO_TEST_DATABASE_URL ? "native PostgreSQL" : "PGlite"}); tenant isolation, grants, RLS, OTP, retries, assignments, revocation, caps, B2C separation`,
   );

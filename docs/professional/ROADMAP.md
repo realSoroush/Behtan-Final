@@ -1,5 +1,7 @@
 # Development roadmap — dependency order
 
+> Historical phase-1 baseline. Current phase-2a implementation and limits: [PHASE_2A.md](PHASE_2A.md); setup: [PHASE_2A_SETUP_FA.md](PHASE_2A_SETUP_FA.md); current verification: [PHASE_2A_TEST_REPORT.md](PHASE_2A_TEST_REPORT.md). The prior protein regression is repaired in this slice.
+
 This is the implementation order for Production-Ready V1, not an estimate of calendar delivery. Every phase needs runnable artifacts, a test report and staging review before live deployment. Market interviews are optional research, never a development gate.
 
 | Phase / priority | Depends on | Work packages | Acceptance / tests |

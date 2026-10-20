@@ -242,3 +242,158 @@
 .pro-app button svg {
   flex-shrink: 0;
 }
+.pro-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 24px 0;
+}
+.pro-tabs [aria-selected="true"],
+.pro-tabs [aria-pressed="true"] {
+  background: #14684e;
+  color: #fff;
+}
+.dark .pro-tabs [aria-selected="true"],
+.dark .pro-tabs [aria-pressed="true"] {
+  background: #8de1b8;
+  color: #0e3020;
+}
+.pro-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin: 20px 0;
+}
+.pro-record-workspace label {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+}
+.pro-record-workspace select,
+.pro-record-workspace input[type="number"] {
+  width: 100%;
+  min-width: 0;
+  background: transparent;
+  color: inherit;
+  border: 1px solid #8ca598;
+  border-radius: 10px;
+  padding: 12px;
+  min-height: 44px;
+}
+.pro-record-workspace input:focus-visible {
+  outline: 3px solid #209c75;
+  outline-offset: 2px;
+}
+.pro-record-workspace input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: #14684e;
+  flex-shrink: 0;
+}
+.pro-check-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding: 16px 0;
+}
+.pro-record-workspace .pro-check-grid label,
+.pro-record-workspace .pro-confirm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pro-confirm {
+  padding: 20px 0;
+}
+.pro-intake h4 {
+  font-weight: 700;
+  margin-top: 20px;
+}
+.pro-intake fieldset {
+  min-width: 0;
+}
+.pro-permissions {
+  margin: 24px 0;
+  border: 1px solid #8ca598;
+  border-radius: 12px;
+  padding: 20px;
+}
+.pro-permissions summary {
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 40px;
+}
+.pro-permission-list {
+  list-style: none;
+  padding: 0;
+}
+.pro-permission-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid #8ca598;
+  padding: 18px 0;
+}
+.pro-permission-list span {
+  display: block;
+  font-size: 12px;
+  margin-top: 6px;
+}
+.pro-record-workspace .pro-actions {
+  flex-wrap: wrap;
+}
+.pro-case-code {
+  display: block;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+  margin: 10px 0;
+}
+.pro-success {
+  padding: 14px;
+  background: #e7f0e9;
+  color: #155639;
+  border-radius: 10px;
+  margin: 16px 0;
+}
+.dark .pro-success {
+  background: #1b3026;
+  color: #b3e8ca;
+}
+.pro-save-row {
+  border-top: 1px solid #8ca598;
+  padding-top: 24px;
+  margin-top: 24px;
+}
+.pro-save-row p {
+  font-size: 12px;
+}
+.pro-record-workspace h3 {
+  font-weight: 700;
+  font-size: 18px;
+}
+@media (max-width: 600px) {
+  .pro-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .pro-permissions {
+    padding: 14px;
+  }
+  .pro-permission-list li {
+    align-items: start;
+    flex-direction: column;
+  }
+  .pro-check-grid {
+    grid-template-columns: 1fr;
+  }
+  .pro-record-workspace .pro-cases li {
+    align-items: start;
+    flex-direction: column;
+  }
+  .pro-record-workspace .pro-toolbar > div {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+.dark .pro-record-workspace .pro-muted { color: #b3c6ba; }

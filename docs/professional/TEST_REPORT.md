@@ -1,5 +1,7 @@
 # Phase 1 verification report — 2026-10-19
 
+> Historical phase-1 baseline. Current phase-2a implementation and limits: [PHASE_2A.md](PHASE_2A.md); setup: [PHASE_2A_SETUP_FA.md](PHASE_2A_SETUP_FA.md); current verification: [PHASE_2A_TEST_REPORT.md](PHASE_2A_TEST_REPORT.md). The prior protein regression is repaired in this slice.
+
 Base main: `61f0d1905542e2a2d827e6d4e4f925bc74e0aed4` (remote main rechecked after implementation).
 Branch: `feature/pro-phase-1-foundation`. No push, deploy, production SQL, real patient intake or SMS was performed.
 
