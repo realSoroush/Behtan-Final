@@ -53,7 +53,9 @@
     "test:feasibility": "node --experimental-strip-types scripts/nutrition-feasibility-repair.test.mjs",
     "test:pro:menus": "node --experimental-strip-types scripts/pro-real-plan.test.mjs",
     "typecheck:pro:server": "tsc -p tsconfig.pro-server.json",
-    "test:pro:server": "node --experimental-strip-types scripts/pro-server-plan.test.mjs"
+    "test:pro:server": "node --experimental-strip-types scripts/pro-server-plan.test.mjs",
+    "test:pro:recovery": "node scripts/pro-recovery.test.mjs",
+    "test:pro:admin:browser": "playwright test --config playwright.pro-admin.config.ts"
   },
   "dependencies": {
     "@rive-app/canvas": "2.44.2",

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CaseIntakeForm } from "./CaseIntakeForm";
 import {
   realCaseApi,
-  type RealCase,
+  type CaseSummary,
+  type WorkspaceStatus,
   type RealRevision,
   type SavedRealPlan,
 } from "./realCaseApi";
@@ -14,10 +15,15 @@ import {
 import { printSavedPlan } from "./printPlan";
 import { PlanPreview } from "./PlanPreview";
 import { proErrorMessage, type ProRole } from "./contracts";
-const message = (e: unknown) =>
+const baseMessage = (e: unknown) =>
   e instanceof Error && !e.message.startsWith("PRO_")
     ? e.message
     : proErrorMessage(e);
+const message = (e: unknown) => {
+  const text = baseMessage(e);
+  const id = e instanceof Error ? /\[([0-9a-f-]{36})\]/.exec(e.message)?.[1] : null;
+  return text + (id ? ' · کد پیگیری: ' + id : '');
+};
 const today = () =>
   new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Tehran",
@@ -32,25 +38,26 @@ export function RealCaseWorkspace({
   org: string;
   roles: ProRole[];
 }) {
-  const [rows, setRows] = useState<RealCase[]>([]),
+  const [rows, setRows] = useState<CaseSummary[]>([]),
     [selected, setSelected] = useState<string | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
-    [search, setSearch] = useState("");
+    [search, setSearch] = useState(""), [query,setQuery] = useState(''), [page,setPage] = useState(0),
+    [total,setTotal] = useState(0), [access,setAccess] = useState<WorkspaceStatus|null>(null);
   const seq = useRef(0);
   const load = useCallback(async () => {
     const n = ++seq.current;
     setBusy(true);
     setError("");
     try {
-      const data = await realCaseApi.list(org);
-      if (seq.current === n) setRows(data);
+      const [data,status] = await Promise.all([realCaseApi.list(org,query,page),realCaseApi.status(org)]);
+      if (seq.current === n) {setRows(data.rows);setTotal(data.total);setAccess(status);}
     } catch (e) {
       if (seq.current === n) setError(message(e));
     } finally {
       if (seq.current === n) setBusy(false);
     }
-  }, [org]);
+  }, [org,query,page]);
   useEffect(() => {
     void load();
     return () => {
@@ -86,19 +93,16 @@ export function RealCaseWorkspace({
           <button disabled={busy} onClick={() => void load()}>
             دریافت مجدد
           </button>
-          <button className="pro-primary" onClick={() => setSelected("new")}>
+          <button className="pro-primary" disabled={busy||!access?.can_write||(access.case_limit!==null&&access.case_count>=access.case_limit)} onClick={() => setSelected("new")}>
             پرونده جدید
           </button>
         </div>
       </div>
-      <label>
-        جست‌وجوی نام یا شماره
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </label>
+      {access && <p className="pro-muted">{access.can_write ? 'دسترسی ساخت برنامه فعال است' : 'اعتبار ساخت برنامه پایان یافته؛ سوابق و PDF همچنان در دسترس‌اند.'} · {access.case_count.toLocaleString('fa-IR')} پرونده{access.case_limit !== null ? ' از '+access.case_limit.toLocaleString('fa-IR') : ''}{access.expires_at ? ' · تا '+new Date(access.expires_at).toLocaleDateString('fa-IR') : ''}</p>}
+      <form className="pro-toolbar" onSubmit={e=>{e.preventDefault();setPage(0);setQuery(search.trim().replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/^\+/, '').replace(/^0(?=9\d{9}$)/,'98'));}}>
+        <label>جست‌وجوی نام یا شماره<input aria-label="جست‌وجوی پرونده" type="search" value={search} onChange={e=>setSearch(e.target.value)} maxLength={100}/></label>
+        <button disabled={busy}>جستجو</button>
+      </form>
       {error && (
         <p role="alert" className="pro-error">
           {error}
@@ -109,11 +113,7 @@ export function RealCaseWorkspace({
         <p className="pro-empty">اولین مراجع را با «پرونده جدید» ثبت کنید.</p>
       )}
       <ul className="pro-cases">
-        {rows
-          .filter((r) =>
-            (r.display_name + " " + r.phone).includes(search.trim()),
-          )
-          .map((r) => (
+        {rows.map((r) => (
             <li key={r.id}>
               <div>
                 <strong>{r.display_name}</strong>
@@ -124,9 +124,7 @@ export function RealCaseWorkspace({
             </li>
           ))}
       </ul>
-      {rows.length === 200 && (
-        <p className="pro-muted">۲۰۰ پرونده اخیر نمایش داده می‌شود.</p>
-      )}
+      <div className="pro-actions"><button disabled={busy||page===0} onClick={()=>setPage(p=>p-1)}>صفحه قبل</button><span>صفحه {(page+1).toLocaleString('fa-IR')} · {total.toLocaleString('fa-IR')} پرونده</span><button disabled={busy||(page+1)*25>=total} onClick={()=>setPage(p=>p+1)}>صفحه بعد</button></div>
     </section>
   );
 }
@@ -156,7 +154,10 @@ function RealCaseDetail({
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [locked, setLocked] = useState(false),
-    [stale, setStale] = useState(false);
+    [stale, setStale] = useState(false),
+    [access,setAccess] = useState<WorkspaceStatus|null>(null),
+    [historyPage,setHistoryPage] = useState(0),[historyTotal,setHistoryTotal] = useState(0),
+    [plansPage,setPlansPage] = useState(0),[plansTotal,setPlansTotal] = useState(0);
   const pending = useRef(false),
     mounted = useRef(true),
     saveRequest = useRef<{
@@ -169,18 +170,19 @@ function RealCaseDetail({
   const dirty = !saved || JSON.stringify(form) !== saved;
   const hydrate = useCallback(
     async (record: string) => {
-      const [c, h, p] = await Promise.all([
+      const [c, h, p, status] = await Promise.all([
         realCaseApi.get(org, record),
         realCaseApi.history(org, record),
         realCaseApi.plans(org, record),
+        realCaseApi.status(org),
       ]);
       if (!mounted.current) return;
       setId(c.id);
       setRevision(c.revision);
       setForm(c.answers);
       setSaved(JSON.stringify(c.answers));
-      setHistory(h);
-      setPlans(p);
+      setHistory(h.rows);setHistoryTotal(h.total);setHistoryPage(0);
+      setPlans(p.rows);setPlansTotal(p.total);setPlansPage(0);setAccess(status);
       setLocked(false);
       setConnectionWarning(false);
       setStale(false);
@@ -190,6 +192,7 @@ function RealCaseDetail({
   );
   useEffect(() => {
     mounted.current = true;
+    if (!initialId) void realCaseApi.status(org).then(x=>{if(mounted.current)setAccess(x);}).catch(e=>{if(mounted.current)setError(message(e));});
     if (initialId) {
       setBusy(true);
       void hydrate(initialId)
@@ -213,8 +216,9 @@ function RealCaseDetail({
     const check = async () => {
       if (pending.current || document.hidden) return;
       try {
-        const c = await realCaseApi.get(org, id);
+        const [c,status] = await Promise.all([realCaseApi.get(org,id),realCaseApi.status(org)]);
         if (active) {
+          setAccess(status);
           setConnectionWarning(false);
           if (c.revision !== revision) setStale(true);
         }
@@ -317,7 +321,7 @@ function RealCaseDetail({
   }
   async function generate() {
     await run(async () => {
-      if (dirty || !id || stale || connectionWarning)
+      if (dirty || !id || stale || connectionWarning || !access?.can_write)
         throw new Error('ابتدا اطلاعات پرونده را ذخیره و اتصال را بررسی کنید.');
       const result = await realCaseApi.generatePlan(org, id, revision, count, date, notes, generationKey.current);
       setPlan(result.plan);
@@ -338,7 +342,7 @@ function RealCaseDetail({
         planKey.current,
       );
       setPlanId(key);
-      setPlans(await realCaseApi.plans(org, id));
+      const list=await realCaseApi.plans(org,id);setPlans(list.rows);setPlansTotal(list.total);setPlansPage(0);
       setNotice("برنامه ذخیره شد و برای خروجی PDF آماده است.");
     });
   }
@@ -400,7 +404,7 @@ function RealCaseDetail({
         <>
           <CaseIntakeForm
             value={form}
-            disabled={busy || Boolean(saveRequest.current)}
+            disabled={busy || Boolean(saveRequest.current) || !access?.can_write}
             onChange={(a) => {
               setForm({ ...form, ...a });
               setNotice("");
@@ -451,7 +455,7 @@ function RealCaseDetail({
                 busy ||
                 stale ||
                 !form.display_name.trim() ||
-                !form.safety_confirmed
+                !access?.can_write || !form.safety_confirmed
               }
               onClick={() => void save()}
             >
@@ -463,7 +467,7 @@ function RealCaseDetail({
             <>
               <details className="pro-permissions">
                 <summary>
-                  تاریخچه اطلاعات ({history.length.toLocaleString("fa-IR")})
+                  تاریخچه اطلاعات ({historyTotal.toLocaleString("fa-IR")})
                 </summary>
                 {history.map((h) => (
                   <details key={h.revision}>
@@ -484,7 +488,9 @@ function RealCaseDetail({
                     />
                   </details>
                 ))}
+                <div className="pro-actions"><button disabled={busy||historyPage===0} onClick={()=>void run(async()=>{const r=await realCaseApi.history(org,id,historyPage-1);setHistory(r.rows);setHistoryPage(p=>p-1);})}>نسخه‌های جدیدتر</button><span>صفحه {(historyPage+1).toLocaleString('fa-IR')}</span><button disabled={busy||(historyPage+1)*10>=historyTotal} onClick={()=>void run(async()=>{const r=await realCaseApi.history(org,id,historyPage+1);setHistory(r.rows);setHistoryPage(p=>p+1);})}>نسخه‌های قدیمی‌تر</button></div>
               </details>
+              {!access?.can_write && <p role="status" className="pro-muted">اعتبار ساخت و ویرایش برنامه پایان یافته است؛ مشاهده سوابق و خروجی PDF فعال است.</p>}
               <section className="pro-generation">
                 <h3>ساخت برنامه غذایی</h3>
                 <p>
@@ -534,7 +540,7 @@ function RealCaseDetail({
                     busy ||
                     dirty ||
                     stale ||
-                    !date || connectionWarning
+                    !date || connectionWarning || !access?.can_write
                   }
                   onClick={() => void generate()}
                 >
@@ -550,7 +556,7 @@ function RealCaseDetail({
                     <PlanPreview plan={plan} />
                     <div className="pro-actions">
                       <button
-                        disabled={busy || Boolean(planId) || dirty || stale}
+                        disabled={busy || Boolean(planId) || dirty || stale || !access?.can_write}
                         onClick={() => void savePlan()}
                       >
                         {planId ? "برنامه ذخیره شده" : "ذخیره این برنامه"}
@@ -593,6 +599,7 @@ function RealCaseDetail({
                     </li>
                   ))}
                 </ul>
+                <div className="pro-actions"><button disabled={busy||plansPage===0} onClick={()=>void run(async()=>{const r=await realCaseApi.plans(org,id,plansPage-1);setPlans(r.rows);setPlansPage(p=>p-1);})}>برنامه‌های جدیدتر</button><span>صفحه {(plansPage+1).toLocaleString('fa-IR')} · {plansTotal.toLocaleString('fa-IR')} برنامه</span><button disabled={busy||(plansPage+1)*10>=plansTotal} onClick={()=>void run(async()=>{const r=await realCaseApi.plans(org,id,plansPage+1);setPlans(r.rows);setPlansPage(p=>p+1);})}>برنامه‌های قدیمی‌تر</button></div>
               </section>
             </>
           )}

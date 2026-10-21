@@ -142,6 +142,7 @@ export async function setup(
   const plans: any[] = [];
   const requests: any[] = [];
   const committed = new Map();
+  let writable = true;
   let offline = false, failPlan = false, failGeneration = false;
   const draftMap = new Map<string, any>();
   const planMap = new Map<string, any>();
@@ -199,6 +200,16 @@ export async function setup(
           status: "active",
         },
       ];
+    else if(path.endsWith('/pro_workspace_status')) {
+      if(!active){await route.fulfill({status:403,json:{message:'PRO_ACCESS_DENIED'}});return;}
+      data={can_write:writable,source:'pilot',expires_at:'2026-11-19T00:00:00Z',case_limit:null,case_count:cases.length};
+    } else if(path.endsWith('/pro_browse_cases')) {
+      const found=cases.filter(c=>!b.p_search||(c.display_name+' '+c.phone).includes(b.p_search));
+      data={rows:found.slice(b.p_page*25,b.p_page*25+25),total:found.length};
+    } else if(path.endsWith('/pro_browse_case_history')) {
+      const items=b.p_kind==='intakes'?versions:plans;
+      data={rows:items.slice(b.p_page*10,b.p_page*10+10),total:items.length};
+    }
     else if (path.endsWith("/pro_real_cases")) {
       if (u.searchParams.has("id")) {
         if (!active) {
@@ -279,6 +290,7 @@ export async function setup(
   });
   await page.route('**/api/pro-plan', async route => {
     if (offline) { await route.abort('failed'); return; }
+    if(route.request().method()==='GET'){await route.fulfill({json:{ready:true,missing:[],scope:'configuration-only'}});return;}
     const b = route.request().postDataJSON();
     if (!active) { await route.fulfill({status:403,json:{error:'PRO_ACCESS_DENIED'}}); return; }
     if (b.action === 'generate') {
@@ -302,6 +314,7 @@ export async function setup(
   });
   return {
     cases,
+    expire: () => {writable=false;},
     draftMap,
     network: (value: boolean) => { offline = !value; },
     failPlanNext: () => { failPlan = true; },

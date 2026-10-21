@@ -1,6 +1,8 @@
 import { supabase } from "@/lib/supabaseClient";
 import { rpc } from "./api";
 import type { PrintedPlan, RealIntake } from "./menuPlan";
+export type CaseSummary = Pick<RealCase,'id'|'display_name'|'phone'|'revision'|'updated_at'>;
+export interface WorkspaceStatus { can_write:boolean; source:string; expires_at:string|null; case_limit:number|null; case_count:number }
 export interface RealCase {
   id: string;
   organization_id: string;
@@ -22,16 +24,8 @@ export interface RealRevision {
   recorded_at: string;
 }
 export const realCaseApi = {
-  async list(org: string): Promise<RealCase[]> {
-    const { data, error } = await supabase
-      .from("pro_real_cases")
-      .select("*")
-      .eq("organization_id", org)
-      .order("updated_at", { ascending: false })
-      .limit(200);
-    if (error) throw new Error(error.message);
-    return data;
-  },
+  list: (org: string, search = '', page = 0) => rpc<{rows: CaseSummary[];total:number}>('pro_browse_cases',{p_org:org,p_search:search,p_page:page}),
+  status: (org: string) => rpc<WorkspaceStatus>('pro_workspace_status',{p_org:org}),
   async get(org: string, id: string): Promise<RealCase> {
     const { data, error, status } = await supabase
       .from("pro_real_cases").select("*").eq("organization_id", org).eq("id", id).abortSignal(AbortSignal.timeout(10000)).retry(false).single();
@@ -43,28 +37,8 @@ export const realCaseApi = {
     if (!data) throw new Error('PRO_ACCESS_DENIED');
     return data;
   },
-  async history(org: string, id: string): Promise<RealRevision[]> {
-    const { data, error } = await supabase
-      .from("pro_real_intake_versions")
-      .select("revision,answers,recorded_at")
-      .eq("organization_id", org)
-      .eq("record_id", id)
-      .order("revision", { ascending: false })
-      .limit(100);
-    if (error) throw new Error(error.message);
-    return data;
-  },
-  async plans(org: string, id: string): Promise<SavedRealPlan[]> {
-    const { data, error } = await supabase
-      .from("pro_real_plans")
-      .select("id,intake_revision,recorded_at,plan")
-      .eq("organization_id", org)
-      .eq("record_id", id)
-      .order("recorded_at", { ascending: false })
-      .limit(100);
-    if (error) throw new Error(error.message);
-    return data;
-  },
+  history: async (org: string, id: string, page = 0) => rpc<{rows:RealRevision[];total:number}>('pro_browse_case_history',{p_org:org,p_record:id,p_kind:'intakes',p_page:page}),
+  plans: async (org: string, id: string, page = 0) => rpc<{rows:SavedRealPlan[];total:number}>('pro_browse_case_history',{p_org:org,p_record:id,p_kind:'plans',p_page:page}),
   save: (
     org: string,
     id: string | null,
@@ -95,7 +69,12 @@ async function planRequest<T>(body: Record<string, unknown>): Promise<T> {
     });
   } catch { throw new Error('PRO_CONNECTION_ERROR'); }
   let value: {error?: string};
-  try { value = await response.json(); } catch { throw new Error('PRO_SERVER_NOT_CONFIGURED'); }
-  if (!response.ok) throw new Error(value.error || 'PRO_CONNECTION_ERROR');
+  try { value = await response.json(); } catch {
+    throw new Error(response.status === 404 || response.ok ? 'PRO_API_NOT_DEPLOYED' : 'PRO_API_UNAVAILABLE');
+  }
+  if (!response.ok) {
+    const id=response.headers.get('X-Request-Id');
+    throw new Error((value.error || 'PRO_CONNECTION_ERROR') + (id ? ' ['+id+']' : ''));
+  }
   return value as T;
 }

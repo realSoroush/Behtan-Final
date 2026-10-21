@@ -479,6 +479,8 @@ try {
   await testCaseDatabase({ db, asUser, rpc, equal, denied });
   const { testRealDatabase } = await import('./pro-real-database.test.mjs');
   await testRealDatabase({ db, asUser, rpc, equal, denied });
+  const {testOperationsDatabase}=await import('./pro-operations-database.test.mjs');
+  await testOperationsDatabase({db,asUser,rpc,equal,denied});
   console.log(
     `PASS: ${checks} Professional database assertions (${process.env.PRO_TEST_DATABASE_URL ? "native PostgreSQL" : "PGlite"}); tenant isolation, grants, RLS, OTP, retries, assignments, revocation, caps, B2C separation`,
   );

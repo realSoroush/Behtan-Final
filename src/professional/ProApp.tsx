@@ -1,3 +1,4 @@
+import { ProServiceCheck } from './ProServiceCheck';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { PhoneAuth } from "@/components/PhoneAuth";
@@ -124,6 +125,7 @@ function Workspace({ userId }: { userId: string }) {
           <p>ثبت پرونده، ویرایش پاسخ‌ها، تولید منو و خروجی PDF.</p>
         </div>
       </section>
+      <ProServiceCheck />
       {error && (
         <p className="pro-error" role="alert">
           {error}

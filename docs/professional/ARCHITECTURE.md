@@ -1,3 +1,5 @@
+> Current PDF-workflow update: real-cases-v2 plus operations (Migration 026) uses server generation and immutable confirmed snapshots. Manual organization licenses add capacity and read-only expiry; explicit suspension denies access. The reduced PDF path permits owners and assigned practitioners. Earlier sandbox-only/clinical-credential descriptions below apply to the older synthetic path. See OPERATIONS_SETUP_FA.md and RECOVERY_RUNBOOK_FA.md for deployment and operating boundaries. Pro paid checkout and patient linking are not implemented by this update.
+
 # Behtan Professional — architecture baseline / 2026-10-19
 
 > Historical phase-1 baseline. Current phase-2a implementation and limits: [PHASE_2A.md](PHASE_2A.md); setup: [PHASE_2A_SETUP_FA.md](PHASE_2A_SETUP_FA.md); current verification: [PHASE_2A_TEST_REPORT.md](PHASE_2A_TEST_REPORT.md). The prior protein regression is repaired in this slice.
