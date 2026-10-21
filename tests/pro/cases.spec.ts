@@ -214,3 +214,37 @@ test('server generation and publish response loss retries do not duplicate snaps
   await expect(page.getByText('برنامه ذخیره شد و برای خروجی PDF آماده است.',{exact:true})).toBeVisible();
   expect(state.plans).toHaveLength(1);
 });
+
+
+test('server search and pagination find a case beyond the first page',async({page})=>{
+ const state=await setup(page);
+ for(let i=0;i<31;i++)state.cases.push({id:crypto.randomUUID(),organization_id:'20000000-0000-4000-8000-000000000001',display_name:'مراجع '+i,phone:'',revision:1,updated_at:'2026-10-21T00:00:00Z'});
+ await page.goto('/');
+ await expect(page.getByRole('button',{name:'بازکردن پرونده',exact:true})).toHaveCount(25);
+ await page.getByRole('button',{name:'صفحه بعد',exact:true}).click();
+ await expect(page.getByRole('button',{name:'بازکردن پرونده',exact:true})).toHaveCount(6);
+ await page.getByLabel('جست‌وجوی پرونده').fill('مراجع 30');
+ await page.getByRole('button',{name:'جستجو',exact:true}).click();
+ await expect(page.getByRole('button',{name:'بازکردن پرونده',exact:true})).toHaveCount(1);
+ await expect(page.getByText('مراجع 30',{exact:true})).toBeVisible();
+});
+
+test('expired license preserves case access while disabling edits',async({page})=>{
+ const state=await setup(page,{existing:true});state.expire();
+ await page.goto('/');
+ await expect(page.getByRole('button',{name:'پرونده جدید',exact:true})).toBeDisabled();
+ await page.getByRole('button',{name:'بازکردن پرونده',exact:true}).click();
+ await expect(page.getByRole('textbox',{name:'نام مراجع',exact:true})).toBeDisabled();
+ await expect(page.getByRole('button',{name:'تولید و پیش‌نمایش برنامه',exact:true})).toBeDisabled();
+ await expect(page.getByText(/اعتبار ساخت و ویرایش برنامه پایان یافته/)).toBeVisible();
+});
+
+test('service diagnostic distinguishes missing configuration from missing API',async({page})=>{
+ await setup(page);await page.goto('/');
+ await page.route('**/api/pro-plan',r=>r.fulfill({json:{ready:false,missing:['SUPABASE_SERVICE_ROLE_KEY']}}));
+ await page.getByRole('button',{name:'بررسی سرویس ساخت برنامه',exact:true}).click();
+ await expect(page.getByRole('status').filter({hasText:'SUPABASE_SERVICE_ROLE_KEY'})).toBeVisible();
+ await page.route('**/api/pro-plan',r=>r.fulfill({status:404,body:'Not found'}));
+ await page.getByRole('button',{name:'بررسی سرویس ساخت برنامه',exact:true}).click();
+ await expect(page.getByText(/API این انتشار موجود نیست/)).toBeVisible();
+});

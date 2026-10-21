@@ -12,6 +12,7 @@ export class ProServerError extends Error {
 export interface DraftRequest { date: string; count: number; notes: string }
 export interface ServerDraft { draft_id: string; plan: PrintedPlan }
 export interface PlanDependencies {
+  reportFailure?(input:{id:string;actor:string;org:string;operation:'generate'|'save';code:string}):Promise<void>;
   verifyToken(token: string): Promise<string>;
   readCase(token: string, org: string, record: string): Promise<{ revision: number; answers: RealIntake }>;
   loadNutrition(token: string): Promise<{ catalog: NutritionCatalog; policy: ProteinEnginePolicy }>;
