@@ -91,7 +91,7 @@ try{
   assert.equal(new Headers(init.headers).get('apikey'),'private-test-never-expose');
   if(healthMode==='bad-key')return new Response(JSON.stringify({message:'invalid api key'}),{status:401});
   if(healthMode==='migration')return new Response(JSON.stringify({message:'missing function',code:'PGRST202'}),{status:404});
-  return new Response(JSON.stringify('operations-v1'),{headers:{'Content-Type':'application/json'}});
+  return new Response(JSON.stringify('operations-v2'),{headers:{'Content-Type':'application/json'}});
  };
  const healthy=await proHealth('valid-token');equal(healthy.ready,true);equal(healthy.scope,'server-and-migration');equal(JSON.stringify(healthy).includes('private-test-never-expose'),false);
  process.env.PRO_SERVER_PLANS_ENABLED='false';equal((await proHealth('valid-token')).missing,['PRO_SERVER_PLANS_ENABLED']);process.env.PRO_SERVER_PLANS_ENABLED='true';

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ElementType } from 'react';
 import { isoToJalali, jalaliMonthLength, jalaliToIso } from '@/utils/jalaliDate';
 import { MIN_SUPPORTED_AGE, MAX_SUPPORTED_AGE } from '@/utils/nutritionHelpers';
 
@@ -10,8 +10,8 @@ const read = (iso: string) => {
     ? date : { year: 0, month: 0, day: 0 };
 };
 
-export function JalaliBirthDate({ value, onChange, invalid }: {
-  value: string; onChange: (iso: string) => void; invalid: boolean;
+export function JalaliBirthDate({ value, onChange, invalid, selectComponent: Select = 'select' }: {
+  value: string; onChange: (iso: string) => void; invalid: boolean; selectComponent?: ElementType;
 }) {
   const [draft, setDraft] = useState(() => read(value));
   const emitted = useRef(value);
@@ -45,22 +45,22 @@ export function JalaliBirthDate({ value, onChange, invalid }: {
       <legend className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2">تاریخ تولد (شمسی)</legend>
       <div className="grid grid-cols-[1fr_1.4fr_1fr] gap-2">
         <label className="min-w-0"><span className="sr-only">روز تولد</span>
-          <select className={classes} value={draft.day} onChange={e => change('day', Number(e.target.value))} aria-invalid={invalid}>
+          <Select className={classes} value={draft.day} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => change('day', Number(e.target.value))} aria-invalid={invalid}>
             <option value={0}>روز</option>
             {Array.from({ length: dayCount }, (_, i) => i + 1).map(day => <option key={day} value={day}>{fa(day)}</option>)}
-          </select>
+          </Select>
         </label>
         <label className="min-w-0"><span className="sr-only">ماه تولد</span>
-          <select className={classes} value={draft.month} onChange={e => change('month', Number(e.target.value))} aria-invalid={invalid}>
+          <Select className={classes} value={draft.month} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => change('month', Number(e.target.value))} aria-invalid={invalid}>
             <option value={0}>ماه</option>
             {months.map((month, i) => <option key={month} value={i + 1}>{month}</option>)}
-          </select>
+          </Select>
         </label>
         <label className="min-w-0"><span className="sr-only">سال تولد</span>
-          <select className={classes} value={draft.year} onChange={e => change('year', Number(e.target.value))} aria-invalid={invalid}>
+          <Select className={classes} value={draft.year} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => change('year', Number(e.target.value))} aria-invalid={invalid}>
             <option value={0}>سال</option>
             {years.map(year => <option key={year} value={year}>{fa(year)}</option>)}
-          </select>
+          </Select>
         </label>
       </div>
     </fieldset>

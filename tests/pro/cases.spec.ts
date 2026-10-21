@@ -53,7 +53,7 @@ test("new record starts without mock identity or measurements", async ({
   ).toHaveValue("");
   await expect(
     page.getByRole("combobox", { name: "سال تولد", exact: true }),
-  ).toHaveValue("0");
+  ).toContainText("سال");
   await expect(
     page.getByRole("button", { name: "ذخیره اطلاعات پرونده", exact: true }),
   ).toBeDisabled();

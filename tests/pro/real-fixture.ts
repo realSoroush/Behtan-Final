@@ -143,6 +143,7 @@ export async function setup(
   const requests: any[] = [];
   const committed = new Map();
   let writable = true;
+  let renewal: {id:string;created_at:string}|null=null;
   let offline = false, failPlan = false, failGeneration = false;
   const draftMap = new Map<string, any>();
   const planMap = new Map<string, any>();
@@ -203,9 +204,13 @@ export async function setup(
     else if(path.endsWith('/pro_workspace_status')) {
       if(!active){await route.fulfill({status:403,json:{message:'PRO_ACCESS_DENIED'}});return;}
       data={can_write:writable,source:'pilot',expires_at:'2026-11-19T00:00:00Z',case_limit:null,case_count:cases.length};
-    } else if(path.endsWith('/pro_browse_cases')) {
-      const found=cases.filter(c=>!b.p_search||(c.display_name+' '+c.phone).includes(b.p_search));
+    } else if(path.endsWith('/pro_browse_case_directory')) {
+      const found=cases.filter(c=>Boolean(c.archived_at)===Boolean(b.p_archived)&&(!b.p_search||(c.display_name+' '+c.phone).includes(b.p_search)));
       data={rows:found.slice(b.p_page*25,b.p_page*25+25),total:found.length};
+    } else if(path.endsWith('/pro_duplicate_cases')){data=[];
+    } else if(path.endsWith('/pro_set_case_archived')){const c=cases.find(c=>c.id===b.p_record);c.archived_at=b.p_archived?'2026-10-21T12:00:00Z':null;c.archive_revision=(c.archive_revision??0)+1;data={archived_at:c.archived_at,archive_revision:c.archive_revision};
+    } else if(path.endsWith('/pro_subscription_details')){data={can_write:writable,source:'admin',expires_at:'2026-11-19T00:00:00Z',case_limit:200,case_count:cases.length,can_request_renewal:true,history:[],renewal};
+    } else if(path.endsWith('/pro_request_renewal')){renewal={id:b.p_key,created_at:'2026-10-21T12:00:00Z'};data=b.p_key;
     } else if(path.endsWith('/pro_browse_case_history')) {
       const items=b.p_kind==='intakes'?versions:plans;
       data={rows:items.slice(b.p_page*10,b.p_page*10+10),total:items.length};
@@ -345,15 +350,7 @@ export async function fillNew(page: Page) {
   await page
     .getByRole("spinbutton", { name: "وزن (کیلوگرم)", exact: true })
     .fill("75");
-  await page
-    .getByRole("combobox", { name: "سال تولد", exact: true })
-    .selectOption("1371");
-  await page
-    .getByRole("combobox", { name: "ماه تولد", exact: true })
-    .selectOption("2");
-  await page
-    .getByRole("combobox", { name: "روز تولد", exact: true })
-    .selectOption("3");
+  for(const [name,label] of [['سال تولد','۱۳۷۱'],['ماه تولد','اردیبهشت'],['روز تولد','۳']]){await page.getByRole('combobox',{name,exact:true}).click();await page.getByRole('option',{name:label,exact:true}).click();}
   await page.getByRole("tab", { name: "ایمنی پزشکی" }).click();
   await page
     .getByText("پاسخ‌های ثبت‌شده را با مراجع بررسی کردم.", { exact: true })

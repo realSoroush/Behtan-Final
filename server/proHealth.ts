@@ -20,6 +20,6 @@ export async function proHealth(token:string){
   if(probe.error.code==='PGRST202')throw new ProServerError('PRO_MIGRATION_REQUIRED',503);
   throw new ProServerError('PRO_CONNECTION_ERROR',503);
  }
- if(probe.data!=='operations-v1')throw new ProServerError('PRO_MIGRATION_REQUIRED',503);
+ if(probe.data!=='operations-v2')throw new ProServerError('PRO_MIGRATION_REQUIRED',503);
  return {ready:true,missing:[],scope:'server-and-migration'};
 }

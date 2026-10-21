@@ -53,7 +53,7 @@
     "test:feasibility": "node --experimental-strip-types scripts/nutrition-feasibility-repair.test.mjs",
     "test:pro:menus": "node --experimental-strip-types scripts/pro-real-plan.test.mjs",
     "typecheck:pro:server": "tsc -p tsconfig.pro-server.json",
-    "test:pro:server": "node --experimental-strip-types scripts/pro-server-plan.test.mjs && node scripts/pro-runtime.test.mjs",
+    "test:pro:server": "node --experimental-strip-types scripts/pro-server-plan.test.mjs && node --experimental-strip-types scripts/pro-account.test.mjs && node scripts/pro-runtime.test.mjs",
     "test:pro:recovery": "node scripts/pro-recovery.test.mjs",
     "test:pro:recovery:schema": "node scripts/pro-recovery-schema.test.mjs",
     "test:pro:admin:browser": "playwright test --config playwright.pro-admin.config.ts"
