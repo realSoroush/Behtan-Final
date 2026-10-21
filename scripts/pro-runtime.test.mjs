@@ -37,14 +37,16 @@ async function emit(source){
 }
 try{
  await emit('api/pro-plan.ts');
+ await emit('api/pro-account.ts');
+ await emit('scripts/pro-account.test.mjs');
  await emit('scripts/pro-server-plan.test.mjs');
  await mkdir(resolve(output,'scripts/fixtures'),{recursive:true});
  await copyFile(resolve(root,'scripts/fixtures/nutrition-catalog.fixture.json'),resolve(output,'scripts/fixtures/nutrition-catalog.fixture.json'));
  await writeFile(resolve(output,'package.json'),JSON.stringify({type:'module'}));
  await symlink(await realpath(resolve(root,'node_modules')),resolve(output,'node_modules'),'junction');
  const env={...process.env};
- for(const key of ['VITE_SUPABASE_URL','VITE_SUPABASE_ANON_KEY','SUPABASE_SERVICE_ROLE_KEY','PRO_SERVER_PLANS_ENABLED'])delete env[key];
- for(const entry of ['api/pro-plan.js','scripts/pro-server-plan.test.mjs']){
+ for(const key of ['VITE_SUPABASE_URL','VITE_SUPABASE_ANON_KEY','SUPABASE_SERVICE_ROLE_KEY','PRO_SERVER_PLANS_ENABLED','PRO_ADMIN_ACCOUNTS_ENABLED'])delete env[key];
+ for(const entry of ['api/pro-plan.js','api/pro-account.js','scripts/pro-server-plan.test.mjs','scripts/pro-account.test.mjs']){
   const run=spawnSync(process.execPath,[resolve(output,entry)],{cwd:output,env,encoding:'utf8',timeout:120000});
   if(run.error)throw run.error;
   assert.equal(run.status,0,`${entry} failed after compilation:\n${run.stdout}\n${run.stderr}`);

@@ -1,3 +1,4 @@
+import { PanelSelect } from "@/components/ui/PanelSelect";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { JalaliBirthDate } from "@/components/ui/JalaliBirthDate";
@@ -74,7 +75,7 @@ export function CaseIntakeForm({
             {identity}
             <label>
               جنسیت
-              <select
+              <PanelSelect
                 value={a.gender}
                 onChange={(e) =>
                   patch({
@@ -92,9 +93,10 @@ export function CaseIntakeForm({
               >
                 <option value="female">زن</option>
                 <option value="male">مرد</option>
-              </select>
+              </PanelSelect>
             </label>
             <JalaliBirthDate
+              selectComponent={PanelSelect}
               value={a.birth_date}
               onChange={(birth_date) => patch({ birth_date })}
               invalid={Boolean(a.birth_date && result.age === null)}
@@ -129,7 +131,7 @@ export function CaseIntakeForm({
           <div className="pro-form-grid">
             <label>
               هدف
-              <select
+              <PanelSelect
                 value={a.goal}
                 onChange={(e) =>
                   patch({ goal: e.target.value as CaseIntake["goal"] })
@@ -138,11 +140,11 @@ export function CaseIntakeForm({
                 <option value="weight_loss">کاهش وزن</option>
                 <option value="weight_gain">افزایش وزن</option>
                 <option value="maintenance">حفظ وزن</option>
-              </select>
+              </PanelSelect>
             </label>
             <label>
               تحرک روزانه
-              <select
+              <PanelSelect
                 value={a.activity_level}
                 onChange={(e) =>
                   patch({
@@ -155,7 +157,7 @@ export function CaseIntakeForm({
                 <option value="lightly_active">فعالیت سبک</option>
                 <option value="moderate">فعالیت متوسط</option>
                 <option value="active">فعالیت زیاد</option>
-              </select>
+              </PanelSelect>
             </label>
             <label>
               جلسات ورزش در هفته
@@ -181,7 +183,7 @@ export function CaseIntakeForm({
             </label>
             <label>
               نوع تمرین
-              <select
+              <PanelSelect
                 value={a.training_type}
                 disabled={a.workout_days === 0}
                 onChange={(e) =>
@@ -200,7 +202,7 @@ export function CaseIntakeForm({
                     <option value="mixed">ترکیبی</option>
                   </>
                 )}
-              </select>
+              </PanelSelect>
             </label>
           </div>
         )}
@@ -209,7 +211,7 @@ export function CaseIntakeForm({
             <div className="pro-form-grid">
               <label>
                 ترجیح منابع پروتئین
-                <select
+                <PanelSelect
                   value={a.protein_budget}
                   onChange={(e) =>
                     patch({
@@ -221,11 +223,11 @@ export function CaseIntakeForm({
                   <option value="economic">اقتصادی</option>
                   <option value="balanced">متعادل</option>
                   <option value="performance">عملکردی</option>
-                </select>
+                </PanelSelect>
               </label>
               <label>
                 الگوی غذایی
-                <select
+                <PanelSelect
                   value={a.vegetarian_status}
                   onChange={(e) =>
                     patch({
@@ -241,7 +243,7 @@ export function CaseIntakeForm({
                   </option>
                   <option value="pescatarian">گیاه‌خواری با ماهی</option>
                   <option value="raw">خام‌گیاه‌خواری</option>
-                </select>
+                </PanelSelect>
               </label>
             </div>
             <h4>حساسیت غذایی</h4>
@@ -291,7 +293,7 @@ export function CaseIntakeForm({
             <div className="pro-form-grid">
               <label>
                 بارداری و شیردهی
-                <select
+                <PanelSelect
                   value={a.pregnancy_status}
                   disabled={a.gender === "male"}
                   onChange={(e) =>
@@ -310,11 +312,11 @@ export function CaseIntakeForm({
                       <option value="breastfeeding">شیرده</option>
                     </>
                   )}
-                </select>
+                </PanelSelect>
               </label>
               <label>
                 وضعیت اختلال خوردن
-                <select
+                <PanelSelect
                   value={a.eating_disorder_status}
                   onChange={(e) =>
                     patch({
@@ -326,7 +328,7 @@ export function CaseIntakeForm({
                   <option value="none">گزارش نشده</option>
                   <option value="history">سابقه در گذشته</option>
                   <option value="active_or_treatment">فعال یا تحت درمان</option>
-                </select>
+                </PanelSelect>
               </label>
             </div>
             <div className="pro-check-grid">

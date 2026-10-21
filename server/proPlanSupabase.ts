@@ -42,10 +42,11 @@ export function supabasePlanDependencies(): PlanDependencies {
       return data.user.id;
     },
     async readCase(token, org, record) {
-      const { data, error, status } = await userClient(token).from('pro_real_cases').select('answers,revision')
+      const { data, error, status } = await userClient(token).from('pro_real_cases').select('answers,revision,archived_at')
         .eq('organization_id', org).eq('id',record).single();
       if (error) databaseError(error,status);
       if (!data) throw new ProServerError('PRO_ACCESS_DENIED',403);
+      if(data.archived_at)throw new ProServerError('PRO_CASE_ARCHIVED',409);
       const access=await userClient(token).rpc('pro_workspace_status',{p_org:org});
       if(access.error)databaseError(access.error,access.status);
       if(!access.data?.can_write)throw new ProServerError('PRO_SUBSCRIPTION_EXPIRED',403);

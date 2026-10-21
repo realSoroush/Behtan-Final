@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabaseClient";
 import { rpc } from "./api";
 import type { PrintedPlan, RealIntake } from "./menuPlan";
-export type CaseSummary = Pick<RealCase,'id'|'display_name'|'phone'|'revision'|'updated_at'>;
+export type CaseSummary = Pick<RealCase,'id'|'display_name'|'phone'|'revision'|'updated_at'|'archived_at'|'archive_revision'>;
 export interface WorkspaceStatus { can_write:boolean; source:string; expires_at:string|null; case_limit:number|null; case_count:number }
 export interface RealCase {
   id: string;
@@ -11,6 +11,8 @@ export interface RealCase {
   answers: RealIntake;
   revision: number;
   updated_at: string;
+  archived_at: string | null;
+  archive_revision: number;
 }
 export interface SavedRealPlan {
   id: string;
@@ -24,7 +26,9 @@ export interface RealRevision {
   recorded_at: string;
 }
 export const realCaseApi = {
-  list: (org: string, search = '', page = 0) => rpc<{rows: CaseSummary[];total:number}>('pro_browse_cases',{p_org:org,p_search:search,p_page:page}),
+  list: (org: string, search = '', page = 0, archived = false) => rpc<{rows: CaseSummary[];total:number}>('pro_browse_case_directory',{p_org:org,p_search:search,p_page:page,p_archived:archived}),
+  archive: (org:string,record:string,expected:number,archived:boolean,key:string)=>rpc('pro_set_case_archived',{p_org:org,p_record:record,p_expected:expected,p_archived:archived,p_key:key}),
+  duplicates:(org:string,phone:string)=>rpc<{id:string;display_name:string;archived_at:string|null}[]>('pro_duplicate_cases',{p_org:org,p_phone:phone}),
   status: (org: string) => rpc<WorkspaceStatus>('pro_workspace_status',{p_org:org}),
   async get(org: string, id: string): Promise<RealCase> {
     const { data, error, status } = await supabase

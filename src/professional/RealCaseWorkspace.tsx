@@ -1,4 +1,5 @@
-import { ArrowRight, Check, ChevronLeft, FileText, FolderHeart, Plus, RefreshCw, Save, Search, Sparkles, UserRound, Users } from "lucide-react";
+import { PanelSelect } from "@/components/ui/PanelSelect";
+import { Archive, ArchiveRestore, ArrowRight, Check, ChevronLeft, FileText, FolderHeart, Plus, RefreshCw, Save, Search, Sparkles, UserRound, Users } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CaseIntakeForm } from "./CaseIntakeForm";
 import {
@@ -43,28 +44,38 @@ export function RealCaseWorkspace({
     [selected, setSelected] = useState<string | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
+    [archivedOnly,setArchivedOnly]=useState(false),
     [search, setSearch] = useState(""), [query,setQuery] = useState(''), [page,setPage] = useState(0),
     [total,setTotal] = useState(0), [access,setAccess] = useState<WorkspaceStatus|null>(null);
   const seq = useRef(0);
+  const archiveKeys=useRef(new Map<string,string>());
   const load = useCallback(async () => {
     const n = ++seq.current;
     setBusy(true);
     setError("");
     try {
-      const [data,status] = await Promise.all([realCaseApi.list(org,query,page),realCaseApi.status(org)]);
+      const [data,status] = await Promise.all([realCaseApi.list(org,query,page,archivedOnly),realCaseApi.status(org)]);
       if (seq.current === n) {setRows(data.rows);setTotal(data.total);setAccess(status);}
     } catch (e) {
       if (seq.current === n) setError(message(e));
     } finally {
       if (seq.current === n) setBusy(false);
     }
-  }, [org,query,page]);
+  }, [org,query,page,archivedOnly]);
   useEffect(() => {
     void load();
     return () => {
       seq.current++;
     };
   }, [load]);
+  async function archiveRow(row:CaseSummary){
+    if(busy||!access?.can_write)return;
+    const next=!row.archived_at;
+    if(!window.confirm(next?'پرونده بایگانی شود؟ تمام برنامه‌ها و PDFهای قبلی حفظ می‌شوند.':'پرونده از بایگانی بازگردد؟'))return;
+    const request=row.id+':'+(row.archive_revision??0)+':'+next;
+    if(!archiveKeys.current.has(request))archiveKeys.current.set(request,crypto.randomUUID());
+    setBusy(true);setError('');try{await realCaseApi.archive(org,row.id,row.archive_revision??0,next,archiveKeys.current.get(request)!);await load();}catch(e){setError(message(e));}finally{setBusy(false);}
+  }
   if (!roles.some((r) => r === "owner" || r === "practitioner"))
     return (
       <section className="pro-panel">
@@ -104,6 +115,7 @@ export function RealCaseWorkspace({
         <div><span className={'pro-license-dot '+(!access.can_write?'is-paused':'')} /><span><small>وضعیت دسترسی</small><strong className="pro-stat-caption">{access.can_write ? 'آمادهٔ ساخت برنامه' : 'مشاهدهٔ سوابق'}<em>{access.expires_at ? 'تا '+new Date(access.expires_at).toLocaleDateString('fa-IR') : 'فضای کاری فعال'}</em></strong></span></div>
       </div>}
       {access && !access.can_write && <p className="pro-muted">اعتبار ساخت برنامه پایان یافته؛ سوابق و PDF همچنان در دسترس‌اند.</p>}
+      <div className="pro-directory-filter"><button aria-pressed={!archivedOnly} onClick={()=>{setArchivedOnly(false);setPage(0);}}>پرونده‌های فعال</button><button aria-pressed={archivedOnly} onClick={()=>{setArchivedOnly(true);setPage(0);}}><Archive size={16}/>بایگانی</button></div>
       <form className="pro-search-bar" onSubmit={e=>{e.preventDefault();setPage(0);setQuery(search.trim().replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/^\+/, '').replace(/^0(?=9\d{9}$)/,'98'));}}>
         <label><span className="sr-only">جست‌وجوی نام یا شماره</span><Search size={19} aria-hidden="true" /><input placeholder="نام یا شماره تماس مراجع…" aria-label="جست‌وجوی پرونده" type="search" value={search} onChange={e=>setSearch(e.target.value)} maxLength={100}/></label>
         <button disabled={busy}>جستجو</button><span className="pro-result-count">{total.toLocaleString("fa-IR")} نتیجه</span>
@@ -123,7 +135,7 @@ export function RealCaseWorkspace({
             <li key={r.id}>
               <div className="pro-person"><span className="pro-avatar" aria-hidden="true">{r.display_name.trim().slice(0,1)}</span><div><strong>{r.display_name}</strong><span dir="ltr">{r.phone || '—'}</span></div></div>
               <div className="pro-record-meta"><time>{new Date(r.updated_at).toLocaleDateString('fa-IR')}</time><small>نسخه {r.revision.toLocaleString("fa-IR")}</small></div>
-              <button className="pro-open-case" onClick={() => setSelected(r.id)}>بازکردن پرونده<ChevronLeft size={16} /></button>
+              <div className="pro-case-row-actions"><button className="pro-open-case" onClick={() => setSelected(r.id)}>بازکردن پرونده<ChevronLeft size={16} /></button><button className="pro-archive-action" aria-label={r.archived_at?'بازگرداندن پرونده':'بایگانی پرونده'} disabled={busy||!access?.can_write} onClick={()=>void archiveRow(r)}>{r.archived_at?<ArchiveRestore size={16}/>:<Archive size={16}/>}</button></div>
             </li>
           ))}
       </ul>
@@ -140,6 +152,7 @@ function RealCaseDetail({
   initialId: string | null;
   onBack: () => void;
 }) {
+  const [archived,setArchived]=useState(false),[duplicates,setDuplicates]=useState<{id:string;display_name:string}[]>([]);
   const [id, setId] = useState(initialId),
     [revision, setRevision] = useState(0),
     [form, setForm] = useState<RealIntake>(emptyRealIntake),
@@ -180,7 +193,7 @@ function RealCaseDetail({
         realCaseApi.status(org),
       ]);
       if (!mounted.current) return;
-      setId(c.id);
+      setId(c.id);setArchived(Boolean(c.archived_at));
       setRevision(c.revision);
       setForm(c.answers);
       setSaved(JSON.stringify(c.answers));
@@ -221,7 +234,7 @@ function RealCaseDetail({
       try {
         const [c,status] = await Promise.all([realCaseApi.get(org,id),realCaseApi.status(org)]);
         if (active) {
-          setAccess(status);
+          setAccess(status);setArchived(Boolean(c.archived_at));
           setConnectionWarning(false);
           if (c.revision !== revision) setStale(true);
         }
@@ -295,8 +308,9 @@ function RealCaseDetail({
       if (mounted.current) setBusy(false);
     }
   }
-  async function save() {
+  async function save(allowDuplicate=false) {
     await run(async () => {
+      if(!id&&!saveRequest.current&&form.phone.trim()&&!allowDuplicate){const matches=await realCaseApi.duplicates(org,form.phone);if(matches.length){setDuplicates(matches);return;}}
       const request = saveRequest.current ?? {
         answers: {
           ...structuredClone(form),
@@ -413,7 +427,7 @@ function RealCaseDetail({
           <div id="pro-intake-editor" className="pro-intake-editor">
           <CaseIntakeForm
             value={form}
-            disabled={busy || Boolean(saveRequest.current) || !access?.can_write}
+            disabled={busy || archived || Boolean(saveRequest.current) || !access?.can_write}
             onChange={(a) => {
               setForm({ ...form, ...a });
               setNotice("");
@@ -441,7 +455,7 @@ function RealCaseDetail({
                     maxLength={20}
                     value={form.phone}
                     onChange={(e) =>
-                      setForm({
+                      (setDuplicates([]),setForm({
                         ...form,
                         phone: e.target.value
                           .replace(/[۰-۹]/g, (d) =>
@@ -450,18 +464,20 @@ function RealCaseDetail({
                           .replace(/[٠-٩]/g, (d) =>
                             String("٠١٢٣٤٥٦٧٨٩".indexOf(d)),
                           ),
-                      })
+                      }))
                     }
                   />
                 </label>
               </>
             }
           />
+          {archived&&<p role="status" className="pro-muted">این پرونده بایگانی شده است؛ مشاهده سوابق و PDFهای قبلی فعال است. برای ویرایش، از فهرست بایگانی بازگردانید.</p>}
+          {duplicates.length>0&&<div className="pro-duplicate-notice" role="alert"><strong>با این شماره پرونده ثبت شده است.</strong><p>{duplicates.map(x=>x.display_name).join('، ')}</p><button disabled={busy} onClick={()=>void save(true)}>این مراجع جدید است؛ ادامه ثبت</button><button disabled={busy} onClick={()=>setDuplicates([])}>بازبینی اطلاعات</button></div>}
           <div className="pro-actions pro-save-bar">
             <button
               className="pro-primary"
               disabled={
-                busy ||
+                busy || archived ||
                 stale ||
                 !form.display_name.trim() ||
                 !access?.can_write || !form.safety_confirmed
@@ -510,7 +526,7 @@ function RealCaseDetail({
                 <div className="pro-form-grid">
                   <label>
                     تعداد منو برای هر وعده
-                    <select
+                    <PanelSelect
                       aria-label="تعداد منو"
                       value={count}
                       disabled={busy}
@@ -521,7 +537,7 @@ function RealCaseDetail({
                           {n.toLocaleString("fa-IR")}
                         </option>
                       ))}
-                    </select>
+                    </PanelSelect>
                   </label>
                   <label>
                     تاریخ برنامه
@@ -547,7 +563,7 @@ function RealCaseDetail({
                 <button
                   className="pro-primary pro-generate-button"
                   disabled={
-                    busy ||
+                    busy || archived ||
                     dirty ||
                     stale ||
                     !date || connectionWarning || !access?.can_write
@@ -566,7 +582,7 @@ function RealCaseDetail({
                     <PlanPreview plan={plan} />
                     <div className="pro-actions">
                       <button
-                        disabled={busy || Boolean(planId) || dirty || stale || !access?.can_write}
+                        disabled={busy || archived || Boolean(planId) || dirty || stale || !access?.can_write}
                         onClick={() => void savePlan()}
                       >
                         {planId ? "برنامه ذخیره شده" : "ذخیره این برنامه"}
