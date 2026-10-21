@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {Client} from 'pg';
+import {constraintMetadataSql} from './pro-recovery-schema.mjs';
 // Read-only verification of two disposable databases created by CI. No restore,
 // migration, SQL write or production connection is performed by this script.
 const sourceUrl=process.env.PRO_TEST_DATABASE_URL, restoredUrl=process.env.PRO_RESTORE_DATABASE_URL;
@@ -23,7 +24,7 @@ try{
   "select schemaname,tablename,policyname,permissive,roles,cmd,qual,with_check from pg_policies where schemaname in ('public','pro_private') order by schemaname,tablename,policyname",
   "select n.nspname,c.relname,c.relrowsecurity,c.relforcerowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname in ('public','auth','pro_private') and c.relkind='r' order by 1,2",
   "select n.nspname,p.proname,pg_get_function_identity_arguments(p.oid) args,pg_get_functiondef(p.oid) def from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname in ('public','auth','pro_private') order by 1,2,3",
-  "select conrelid::regclass::text rel,conname,pg_get_constraintdef(oid) def,convalidated from pg_constraint where connamespace in ('public'::regnamespace,'auth'::regnamespace,'pro_private'::regnamespace) order by 1,2",
+  constraintMetadataSql,
  ])assert.deepEqual((await restored.query(sql)).rows,(await source.query(sql)).rows,'Restored security/schema metadata differ');
  console.log(`PASS: restored ${tables.length} synthetic tables match source rows; RLS, policies, functions and constraints match`);
 }finally{await Promise.all([source.end(),restored.end()]);}
