@@ -98,6 +98,7 @@ export function useUserProfile(userId: string | undefined): UseUserProfileReturn
       .upsert(
         {
           id: userId,
+          ...(draft.displayName?.trim() ? { display_name: draft.displayName.trim() } : {}),
           onboarding_step: step,
           // Raw body photos are volatile UI state and must never cross this
           // persistence boundary into user_profiles.

@@ -22,10 +22,12 @@ export function CaseIntakeForm({
   value: a,
   onChange,
   disabled = false,
+  identity,
 }: {
   value: CaseIntake;
   onChange: (a: CaseIntake) => void;
   disabled?: boolean;
+  identity?: React.ReactNode;
 }) {
   const [step, setStep] = useState(0);
   const patch = (p: Partial<CaseIntake>) =>
@@ -38,7 +40,7 @@ export function CaseIntakeForm({
         role="tablist"
         aria-label="بخش‌های اطلاعات مراجع"
       >
-        {["مشخصات جسمی", "فعالیت و هدف", "ترجیحات غذایی", "ایمنی پزشکی"].map(
+        {["مشخصات اولیه", "فعالیت و هدف", "ترجیحات غذایی", "ایمنی پزشکی"].map(
           (x, i) => (
             <button
               key={x}
@@ -55,6 +57,7 @@ export function CaseIntakeForm({
       <fieldset disabled={disabled}>
         {step === 0 && (
           <div className="pro-form-grid">
+            {identity}
             <label>
               جنسیت
               <select
@@ -342,7 +345,7 @@ export function CaseIntakeForm({
                   onChange({ ...a, safety_confirmed: e.target.checked })
                 }
               />
-              پاسخ‌های ایمنی این سناریوی مصنوعی را بررسی کردم.
+              پاسخ‌های ثبت‌شده را با مراجع بررسی کردم.
             </label>
             {a.safety_confirmed && result.status === "blocked" && (
               <div className="pro-error" role="status">

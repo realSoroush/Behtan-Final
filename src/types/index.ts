@@ -98,6 +98,7 @@ export interface BodyScanConsentJson {
 export type BodyFatSource = 'ai_visual' | 'measured';
 
 export interface UserProfile {
+  display_name?: string | null;
   id: string;
   phone: string;
   gender: Gender | null;
@@ -411,6 +412,7 @@ export interface BodyScanResult {
 // ============================================================================
 
 export interface OnboardingData {
+  displayName?: string;
   gender: Gender | null;
   province: string;
   city: string;
@@ -452,6 +454,7 @@ export interface OnboardingData {
 }
 
 export const createEmptyOnboardingData = (): OnboardingData => ({
+  displayName: '',
   gender: null,
   province: '',
   city: '',

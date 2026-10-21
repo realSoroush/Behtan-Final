@@ -45,3 +45,6 @@ dist-pro/
 # Browser verification output
 test-results/
 playwright-report/
+
+# Generated Pro sample artifacts
+/output/
