@@ -36,7 +36,7 @@ jobs:
         run: |
           docker exec "$PRO_CONTAINER" pg_dump -U postgres -Fc behtan_pro_test > /tmp/behtan-pro-ci.dump
           docker exec "$PRO_CONTAINER" createdb -U postgres behtan_pro_restore_test
-          docker exec "$PRO_CONTAINER" psql -U postgres -d behtan_pro_restore_test -c 'drop schema public;'
+          # Keep public: this dump does not recreate PostgreSQL's default schema.
           docker exec -i "$PRO_CONTAINER" pg_restore -U postgres --dbname=behtan_pro_restore_test --exit-on-error < /tmp/behtan-pro-ci.dump
           npm run test:pro:recovery
       - run: npm run build && npm run build:admin && npm run build:pro
