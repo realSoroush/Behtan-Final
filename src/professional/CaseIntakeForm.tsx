@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
+import { useId, useRef, useState } from "react";
 import { JalaliBirthDate } from "@/components/ui/JalaliBirthDate";
 import { intakeEligibility, type CaseIntake } from "./intake";
 const conditions = [
@@ -30,31 +31,44 @@ export function CaseIntakeForm({
   identity?: React.ReactNode;
 }) {
   const [step, setStep] = useState(0);
+  const instance = useId();
+  const tabs = useRef<HTMLDivElement>(null);
+  const sections = ["مشخصات اولیه", "فعالیت و هدف", "ترجیحات غذایی", "ایمنی پزشکی"];
+  const hints = ["مشخصات پایه برای شروع یک برنامه شخصی.", "هدف و سبک زندگی مراجع را مشخص کنید.", "برنامه‌ای هماهنگ با سلیقه و شرایط مراجع.", "پاسخ‌ها را بررسی و برای ذخیره تأیید کنید."];
   const patch = (p: Partial<CaseIntake>) =>
     onChange({ ...a, ...p, safety_confirmed: p.safety_confirmed ?? false });
   const result = intakeEligibility(a);
   return (
     <div className="pro-intake">
+      <div className="pro-intake-title"><div><span className="pro-section-kicker">اطلاعات مراجع</span><h3>{sections[step]}</h3><p>{hints[step]}</p></div><span className="pro-step-count">{(step + 1).toLocaleString('fa-IR')} / ۴</span></div>
       <div
+        ref={tabs}
         className="pro-tabs"
         role="tablist"
         aria-label="بخش‌های اطلاعات مراجع"
       >
-        {["مشخصات اولیه", "فعالیت و هدف", "ترجیحات غذایی", "ایمنی پزشکی"].map(
+        {sections.map(
           (x, i) => (
             <button
               key={x}
               role="tab"
               aria-selected={step === i}
+              id={`${instance}-tab-${i}`}
+              aria-controls={`${instance}-panel`}
+              tabIndex={step === i ? 0 : -1}
+              onKeyDown={(e) => {
+                const next = e.key === 'ArrowLeft' ? (i + 1) % 4 : e.key === 'ArrowRight' ? (i + 3) % 4 : e.key === 'Home' ? 0 : e.key === 'End' ? 3 : null;
+                if (next !== null) { e.preventDefault(); setStep(next); (tabs.current?.children[next] as HTMLButtonElement)?.focus(); }
+              }}
               onClick={() => setStep(i)}
               type="button"
             >
-              {x}
+              <span className="pro-step-number" aria-hidden="true">{(i + 1).toLocaleString('fa-IR')}</span>{x}
             </button>
           ),
         )}
       </div>
-      <fieldset disabled={disabled}>
+      <fieldset disabled={disabled} id={`${instance}-panel`} role="tabpanel" aria-labelledby={`${instance}-tab-${step}`} tabIndex={0}>
         {step === 0 && (
           <div className="pro-form-grid">
             {identity}
@@ -361,6 +375,7 @@ export function CaseIntakeForm({
           </>
         )}
       </fieldset>
+      <div className="pro-intake-navigation"><button type="button" disabled={step === 0} onClick={() => setStep(s => s - 1)}><ArrowRight size={16} />بخش قبل</button><span>{sections[step]}</span>{step < 3 ? <button type="button" onClick={() => setStep(s => s + 1)}>بخش بعد<ArrowLeft size={16} /></button> : <span className="pro-last-step">آمادهٔ بررسی و ذخیره</span>}</div>
     </div>
   );
 }

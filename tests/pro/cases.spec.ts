@@ -241,6 +241,7 @@ test('expired license preserves case access while disabling edits',async({page})
 
 test('service diagnostic distinguishes missing configuration from missing API',async({page})=>{
  await setup(page);await page.goto('/');
+ await page.getByText('بررسی فنی سرویس ساخت برنامه',{exact:true}).click();
  await page.route('**/api/pro-plan',r=>r.fulfill({json:{ready:false,missing:['SUPABASE_SERVICE_ROLE_KEY']}}));
  await page.getByRole('button',{name:'بررسی سرویس ساخت برنامه',exact:true}).click();
  await expect(page.getByRole('status').filter({hasText:'SUPABASE_SERVICE_ROLE_KEY'})).toBeVisible();
