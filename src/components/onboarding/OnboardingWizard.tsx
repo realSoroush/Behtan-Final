@@ -150,6 +150,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     setSubmitError(null);
 
     const profilePayload: Partial<UserProfile> = {
+      ...(data.displayName?.trim() ? { display_name: data.displayName.trim() } : {}),
       gender: data.gender,
       province: data.province,
       city: data.city,

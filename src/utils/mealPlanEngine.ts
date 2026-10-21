@@ -1435,3 +1435,11 @@ export function getSlotTargets(slot: MealSlot, targets: MacroTargets): MacroVect
     fat: targets.fatGrams * share.fat,
   };
 }
+
+/** Options for a printed Pro menu, solved with the same catalog, portions and
+ * eligibility rules as the daily engine. Existing B2C generation is unchanged. */
+export function getProfessionalMealOptions(base: Meal, preferences: DietaryPreferencesJson, workout: boolean): Meal[] {
+  const templates = requireNutritionCatalog().mealTemplates.filter(t => t.slot === base.slot && isTemplateEligible(t, preferences, workout));
+  const target = {kcal:base.totalKcal, protein:base.totalProtein, carbs:base.totalCarbs, fat:base.totalFat};
+  return getResolvedOptions(base.slot, templates, target).map(buildMeal);
+}

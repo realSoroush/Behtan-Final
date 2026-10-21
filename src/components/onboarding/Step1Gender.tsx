@@ -30,7 +30,7 @@ export function Step1Gender() {
   const { data, updateData, nextStep, currentStep, prevStep } = useOnboardingStore();
   const cities = CITIES_BY_PROVINCE[data.province] ?? DEFAULT_CITIES;
 
-  const canContinue = !!data.gender && !!data.province && !!data.city;
+  const canContinue = Boolean(data.displayName?.trim()) && !!data.gender && !!data.province && !!data.city;
 
   const handleGender = (g: Gender) => updateData({
     gender: g,
@@ -53,6 +53,12 @@ export function Step1Gender() {
         onBack={prevStep}
       />
 
+      <label className="block space-y-2">
+        <span className="text-sm font-semibold">چه اسمی صدات کنیم؟</span>
+        <input aria-label="چه اسمی صدات کنیم؟" autoComplete="given-name" maxLength={80}
+          className="w-full rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent px-4 py-3"
+          value={data.displayName ?? ''} onChange={(e) => updateData({ displayName: e.target.value })} />
+      </label>
       {/* Gender */}
       <div>
         <p className="text-sm font-semibold text-neutral-600 dark:text-neutral-400 mb-3">جنسیت</p>

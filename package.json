@@ -46,11 +46,14 @@
     "test:progress": "node --experimental-strip-types scripts/progress-journal.test.mjs && node --experimental-strip-types scripts/progress-database.test.mjs",
     "test:mobile-meals": "node --experimental-strip-types scripts/mobile-meals.test.mjs",
     "dev:pro": "vite --config vite.pro.config.ts",
-    "build:pro": "tsc -b && vite build --config vite.pro.config.ts",
-    "test:pro": "node scripts/pro-database.test.mjs && node --experimental-strip-types scripts/pro-contracts.test.mjs && node --experimental-strip-types scripts/pro-intake.test.mjs",
+    "build:pro": "npm run typecheck:pro:server && tsc -b && vite build --config vite.pro.config.ts",
+    "test:pro": "node --experimental-strip-types scripts/pro-real-plan.test.mjs && node --experimental-strip-types scripts/pro-database.test.mjs && node --experimental-strip-types scripts/pro-contracts.test.mjs && node --experimental-strip-types scripts/pro-intake.test.mjs && npm run test:pro:server",
     "test:pro:browser": "playwright test --config playwright.pro.config.ts",
-    "test:pro:native": "node scripts/pro-database.test.mjs --native",
-    "test:feasibility": "node --experimental-strip-types scripts/nutrition-feasibility-repair.test.mjs"
+    "test:pro:native": "node --experimental-strip-types scripts/pro-real-plan.test.mjs && node --experimental-strip-types scripts/pro-database.test.mjs --native",
+    "test:feasibility": "node --experimental-strip-types scripts/nutrition-feasibility-repair.test.mjs",
+    "test:pro:menus": "node --experimental-strip-types scripts/pro-real-plan.test.mjs",
+    "typecheck:pro:server": "tsc -p tsconfig.pro-server.json",
+    "test:pro:server": "node --experimental-strip-types scripts/pro-server-plan.test.mjs"
   },
   "dependencies": {
     "@rive-app/canvas": "2.44.2",

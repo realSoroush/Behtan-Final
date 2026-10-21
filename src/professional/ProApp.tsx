@@ -1,62 +1,26 @@
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
-import {
-  Building2,
-  FlaskConical,
-  Plus,
-  RefreshCw,
-  LogOut,
-  ShieldCheck,
-} from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { PhoneAuth } from "@/components/PhoneAuth";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
-const CaseWorkspace = lazy(() =>
-  import("./CaseWorkspace").then((m) => ({ default: m.CaseWorkspace })),
-);
 import { proApi } from "./api";
-import { requestKey, clearRequestKey } from "./requestKeys";
 import {
-  canCreateSandboxPatient,
   proErrorMessage,
-  type ProOrganization,
   type ProMembership,
-  type SandboxPatient,
+  type ProOrganization,
 } from "./contracts";
-function safeStorage(): Storage | undefined {
-  try {
-    return window.sessionStorage;
-  } catch {
-    return undefined;
-  }
-}
-const rolesFa = { owner: "مالک", assistant: "پذیرش", practitioner: "متخصص" };
-
+import { RealCaseWorkspace } from "./RealCaseWorkspace";
 export function ProApp() {
+  const { user, loading, signOut } = useAuth();
   if (import.meta.env.VITE_PRO_SANDBOX_ENABLED !== "true")
     return (
       <main className="pro-app" dir="rtl">
-        <div className="pro-empty">
-          <ShieldCheck size={40} />
-          <h1>به‌تن حرفه‌ای</h1>
-          <p>این محیط هنوز برای دسترسی عمومی فعال نشده است.</p>
-        </div>
+        <h1>به‌تن حرفه‌ای</h1>
+        <p>این محیط فعال نشده است.</p>
       </main>
     );
-  return <ProSession />;
-}
-function ProSession() {
-  const { user, loading, signOut } = useAuth();
-  const [error, setError] = useState("");
   if (loading)
     return (
-      <main className="pro-app" dir="rtl" aria-busy="true">
+      <main className="pro-app" dir="rtl">
         <p role="status">در حال بررسی ورود…</p>
       </main>
     );
@@ -65,132 +29,78 @@ function ProSession() {
     <div className="pro-app" dir="rtl">
       <header className="pro-header">
         <div className="pro-brand">
-          <Building2 />
           <strong>به‌تن حرفه‌ای</strong>
-          <span>آزمایش داخلی</span>
+          <span>پرونده و برنامه غذایی</span>
         </div>
         <div className="pro-actions">
           <ThemeToggle className="pro-theme" />
-          <button
-            aria-label="خروج از حساب"
-            onClick={() => {
-              setError("");
-              void signOut().catch((e) => setError(proErrorMessage(e)));
-            }}
-          >
-            <LogOut size={18} /> خروج
-          </button>
+          <button onClick={() => void signOut()}>خروج</button>
         </div>
       </header>
-      {error && (
-        <p role="alert" className="pro-error">
-          {error}
-        </p>
-      )}
-      <ProWorkspace key={user.id} userId={user.id} />
+      <Workspace key={user.id} userId={user.id} />
     </div>
   );
 }
-function ProWorkspace({ userId }: { userId: string }) {
-  const [allowed, setAllowed] = useState<boolean | null>(null);
-  const [organizations, setOrganizations] = useState<ProOrganization[]>([]);
-  const [memberships, setMemberships] = useState<ProMembership[]>([]);
-  const [selectedId, setSelectedId] = useState("");
-  const [showRecords, setShowRecords] = useState(false);
-  const [patients, setPatients] = useState<SandboxPatient[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [orgRequest] = useState(() =>
-    requestKey(`${userId}.organization`, safeStorage()),
-  );
-  const patientRequests = useRef<Record<string, string>>({});
-  const generation = useRef(0);
-  const pending = useRef(false);
-  const selectedRef = useRef(selectedId);
-  selectedRef.current = selectedId;
-  const refresh = useCallback(async () => {
-    const version = ++generation.current;
+function Workspace({ userId }: { userId: string }) {
+  const [orgs, setOrgs] = useState<ProOrganization[]>([]),
+    [members, setMembers] = useState<ProMembership[]>([]),
+    [selected, setSelected] = useState(""),
+    [busy, setBusy] = useState(false),
+    [allowed, setAllowed] = useState<boolean | null>(null),
+    [error, setError] = useState("");
+  const seq = useRef(0),
+    createKey = useRef(crypto.randomUUID()),
+    pending = useRef(false);
+  const load = useCallback(async () => {
+    const n = ++seq.current;
     setBusy(true);
     setError("");
-    setPatients([]);
     try {
       const access = await proApi.status();
-      if (version !== generation.current) return;
+      if (seq.current !== n) return;
       setAllowed(access);
       if (!access) {
-        setOrganizations([]);
-        setMemberships([]);
-        setSelectedId("");
+        setOrgs([]);
+        setMembers([]);
         return;
       }
       const data = await proApi.workspaces();
-      if (version !== generation.current) return;
-      setOrganizations(data.organizations);
-      setMemberships(data.memberships);
-      const id = data.organizations.some((o) => o.id === selectedRef.current)
-        ? selectedRef.current
-        : data.organizations[0]?.id || "";
-      setSelectedId(id);
-      if (id) {
-        const rows = await proApi.patients(id);
-        if (version === generation.current) setPatients(rows);
-      }
+      if (seq.current !== n) return;
+      setOrgs(data.organizations);
+      setMembers(data.memberships);
+      setSelected((s) =>
+        data.organizations.some((o) => o.id === s)
+          ? s
+          : data.organizations[0]?.id || "",
+      );
     } catch (e) {
-      if (version === generation.current) {
+      if (seq.current === n) {
+        // A network outage must not unmount a case with unsaved edits.
+        // An explicit pilot-status false above still clears access immediately.
         setError(proErrorMessage(e));
-        setOrganizations([]);
-        setMemberships([]);
       }
     } finally {
-      if (version === generation.current) setBusy(false);
+      if (seq.current === n) setBusy(false);
     }
   }, []);
   useEffect(() => {
-    void refresh();
+    void load();
+    const focus = () => {
+      if (!pending.current) void load();
+    };
+    window.addEventListener("focus", focus);
     return () => {
-      generation.current++;
+      seq.current++;
+      window.removeEventListener("focus", focus);
     };
-  }, [refresh]);
-  useEffect(() => {
-    const onFocus = () => {
-      if (!pending.current) void refresh();
-    };
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, [refresh]);
-  async function selectOrganization(id: string) {
-    const version = ++generation.current;
-    setSelectedId(id);
-    setPatients([]);
-    setError("");
-    setBusy(true);
-    try {
-      const rows = await proApi.patients(id);
-      if (version === generation.current) setPatients(rows);
-    } catch (e) {
-      if (version === generation.current) setError(proErrorMessage(e));
-    } finally {
-      if (version === generation.current) setBusy(false);
-    }
-  }
-  async function create(kind: "organization" | "patient") {
+  }, [load]);
+  async function create() {
     if (pending.current) return;
     pending.current = true;
     setBusy(true);
-    setError("");
     try {
-      if (kind === "organization") await proApi.createOrganization(orgRequest);
-      else {
-        const scope = `${userId}.patient.${selectedId}`;
-        const key = (patientRequests.current[selectedId] ||= requestKey(
-          scope,
-          safeStorage(),
-        ));
-        await proApi.createPatient(selectedId, key);
-        clearRequestKey(scope, safeStorage());
-        delete patientRequests.current[selectedId];
-      }
-      await refresh();
+      await proApi.createOrganization(createKey.current);
+      await load();
     } catch (e) {
       setError(proErrorMessage(e));
     } finally {
@@ -199,143 +109,53 @@ function ProWorkspace({ userId }: { userId: string }) {
     }
   }
   const roles =
-    memberships.find(
+    members.find(
       (m) =>
-        m.organization_id === selectedId &&
+        m.organization_id === selected &&
         m.user_id === userId &&
         m.status === "active",
     )?.roles || [];
   return (
-    <main aria-busy={busy}>
+    <main>
       <section className="pro-intro">
         <div>
-          <p className="pro-eyebrow">یک زیرساخت، تجربه‌ای مشترک</p>
-          <h1>محیط کاری شما</h1>
-          <p>پروندهٔ آزمایشی، مجوز روشن و اطلاعات نسخه‌بندی‌شده.</p>
+          <p className="pro-eyebrow">از اطلاعات مراجع تا برنامه غذایی</p>
+          <h1>فضای کاری شما</h1>
+          <p>ثبت پرونده، ویرایش پاسخ‌ها، تولید منو و خروجی PDF.</p>
         </div>
-        <FlaskConical size={44} />
       </section>
-      <aside className="pro-notice">
-        <strong>فقط دادهٔ مصنوعی</strong>
-        <p>
-          فقط اطلاعات ساختگی ثبت کنید؛ نام و شمارهٔ فرد واقعی وارد نشود. تولید
-          رژیم، دعوت بیمار و ارسال پیامک در این فاز فعال نیست.
-        </p>
-      </aside>
       {error && (
         <p className="pro-error" role="alert">
           {error}
         </p>
       )}
-      {busy && <p role="status">در حال دریافت اطلاعات…</p>}
-      <div className="pro-toolbar">
-        <h2>فضای کاری</h2>
-        <button disabled={busy} onClick={() => void refresh()}>
-          <RefreshCw size={17} /> دریافت مجدد
-        </button>
-      </div>
+      {busy && <p role="status">در حال دریافت فضای کاری…</p>}
       {allowed === false && (
-        <div className="pro-empty">
-          <ShieldCheck />
-          <h2>دسترسی آزمایش لازم است</h2>
-          <p>
-            ورود با شمارهٔ تأییدشده کافی نیست. مدیر آزمایش باید دسترسی زمان‌دار
-            شما را ثبت کند.
-          </p>
-        </div>
+        <p className="pro-empty">دسترسی این حساب به پنل فعال نیست.</p>
       )}
-      {allowed && organizations.length === 0 && !busy && !error && (
-        <div className="pro-empty">
-          <Building2 size={38} />
-          <h2>اولین محیط آزمایش را بسازید</h2>
-          <p>این کار اشتراک یا پرونده‌ای در اپ اصلی ایجاد نمی‌کند.</p>
-          <button
-            className="pro-primary"
-            onClick={() => void create("organization")}
-          >
-            ساخت محیط آزمایش
-          </button>
-        </div>
+      {allowed && !orgs.length && !busy && !error && (
+        <button className="pro-primary" onClick={() => void create()}>
+          ساخت فضای کاری
+        </button>
       )}
-      {organizations.length > 0 && (
+      {orgs.length > 0 && (
         <>
           <label className="pro-select">
-            سازمان
+            فضای کاری
             <select
-              aria-label="انتخاب سازمان"
-              value={selectedId}
+              aria-label="فضای کاری"
+              value={selected}
+              onChange={(e) => setSelected(e.target.value)}
               disabled={busy}
-              onChange={(e) => void selectOrganization(e.target.value)}
             >
-              {organizations.map((o) => (
+              {orgs.map((o) => (
                 <option key={o.id} value={o.id}>
-                  {o.name} · {o.id.slice(0, 8)}
+                  {o.name === "کلینیک آزمایشی" ? "فضای کاری به‌تن" : o.name}
                 </option>
               ))}
             </select>
           </label>
-          <p className="pro-role">
-            نقش شما: {roles.map((r) => rolesFa[r]).join("، ")}
-            <span>مالکیت به‌تنهایی مجوز درمان یا تأیید برنامه نیست.</span>
-          </p>
-          <div className="pro-tabs" role="group" aria-label="بخش‌های محیط کاری">
-            <button
-              aria-pressed={showRecords}
-              onClick={() => setShowRecords(true)}
-            >
-              پرونده‌ها و اطلاعات ورودی
-            </button>
-            <button
-              aria-pressed={!showRecords}
-              onClick={() => setShowRecords(false)}
-            >
-              آزمایش سریع فاز اول
-            </button>
-          </div>
-          {showRecords ? (
-            <Suspense fallback={<p role="status">در حال بازکردن پرونده‌ها…</p>}>
-              <CaseWorkspace
-                key={selectedId}
-                org={selectedId}
-                userId={userId}
-                roles={roles}
-              />
-            </Suspense>
-          ) : (
-            <section className="pro-panel">
-              <div className="pro-toolbar">
-                <h2>
-                  پرونده‌های مصنوعی{" "}
-                  <small>({patients.length.toLocaleString("fa-IR")})</small>
-                </h2>
-                {canCreateSandboxPatient(roles) && (
-                  <button
-                    className="pro-primary"
-                    disabled={busy}
-                    onClick={() => void create("patient")}
-                  >
-                    <Plus size={18} /> پروندهٔ آزمایشی
-                  </button>
-                )}
-              </div>
-              {patients.length === 0 && !busy && (
-                <p className="pro-muted">پروندهٔ قابل دسترسی ندارید.</p>
-              )}
-              <ul className="pro-cases">
-                {patients.map((p) => (
-                  <li key={p.id}>
-                    <div>
-                      <strong>مراجع مصنوعی</strong>
-                      <code dir="ltr">{p.case_code}</code>
-                    </div>
-                    <time dateTime={p.created_at}>
-                      {new Date(p.created_at).toLocaleDateString("fa-IR")}
-                    </time>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
+          <RealCaseWorkspace key={selected} org={selected} roles={roles} />
         </>
       )}
     </main>
