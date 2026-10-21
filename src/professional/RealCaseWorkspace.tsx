@@ -1,3 +1,4 @@
+import { ArrowRight, Check, ChevronLeft, FileText, FolderHeart, Plus, RefreshCw, Save, Search, Sparkles, UserRound, Users } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CaseIntakeForm } from "./CaseIntakeForm";
 import {
@@ -86,22 +87,26 @@ export function RealCaseWorkspace({
       />
     );
   return (
-    <section className="pro-panel pro-record-workspace">
-      <div className="pro-toolbar">
-        <h2>مراجعان و برنامه‌ها</h2>
+    <section className="pro-panel pro-record-workspace pro-directory">
+      <div className="pro-toolbar pro-directory-heading">
+        <div><p className="pro-section-kicker">مراجعان شما</p><h2>هر پرونده، یک مسیر تازه.</h2></div>
         <div className="pro-actions">
           <button disabled={busy} onClick={() => void load()}>
-            دریافت مجدد
+            <RefreshCw size={16} className={busy ? "pro-spin" : ""} /> دریافت مجدد
           </button>
           <button className="pro-primary" disabled={busy||!access?.can_write||(access.case_limit!==null&&access.case_count>=access.case_limit)} onClick={() => setSelected("new")}>
-            پرونده جدید
+            <Plus size={18} /> پرونده جدید
           </button>
         </div>
       </div>
-      {access && <p className="pro-muted">{access.can_write ? 'دسترسی ساخت برنامه فعال است' : 'اعتبار ساخت برنامه پایان یافته؛ سوابق و PDF همچنان در دسترس‌اند.'} · {access.case_count.toLocaleString('fa-IR')} پرونده{access.case_limit !== null ? ' از '+access.case_limit.toLocaleString('fa-IR') : ''}{access.expires_at ? ' · تا '+new Date(access.expires_at).toLocaleDateString('fa-IR') : ''}</p>}
-      <form className="pro-toolbar" onSubmit={e=>{e.preventDefault();setPage(0);setQuery(search.trim().replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/^\+/, '').replace(/^0(?=9\d{9}$)/,'98'));}}>
-        <label>جست‌وجوی نام یا شماره<input aria-label="جست‌وجوی پرونده" type="search" value={search} onChange={e=>setSearch(e.target.value)} maxLength={100}/></label>
-        <button disabled={busy}>جستجو</button>
+      {access && <div className="pro-overview" aria-label="خلاصه فضای کاری">
+        <div><span className="pro-stat-icon"><Users size={19} /></span><span><small>پرونده‌های فضای کاری</small><strong>{access.case_count.toLocaleString('fa-IR')} <em>{access.case_limit !== null ? 'از '+access.case_limit.toLocaleString('fa-IR') : 'پرونده'}</em></strong></span></div>
+        <div><span className={'pro-license-dot '+(!access.can_write?'is-paused':'')} /><span><small>وضعیت دسترسی</small><strong className="pro-stat-caption">{access.can_write ? 'آمادهٔ ساخت برنامه' : 'مشاهدهٔ سوابق'}<em>{access.expires_at ? 'تا '+new Date(access.expires_at).toLocaleDateString('fa-IR') : 'فضای کاری فعال'}</em></strong></span></div>
+      </div>}
+      {access && !access.can_write && <p className="pro-muted">اعتبار ساخت برنامه پایان یافته؛ سوابق و PDF همچنان در دسترس‌اند.</p>}
+      <form className="pro-search-bar" onSubmit={e=>{e.preventDefault();setPage(0);setQuery(search.trim().replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/^\+/, '').replace(/^0(?=9\d{9}$)/,'98'));}}>
+        <label><span className="sr-only">جست‌وجوی نام یا شماره</span><Search size={19} aria-hidden="true" /><input placeholder="نام یا شماره تماس مراجع…" aria-label="جست‌وجوی پرونده" type="search" value={search} onChange={e=>setSearch(e.target.value)} maxLength={100}/></label>
+        <button disabled={busy}>جستجو</button><span className="pro-result-count">{total.toLocaleString("fa-IR")} نتیجه</span>
       </form>
       {error && (
         <p role="alert" className="pro-error">
@@ -110,21 +115,19 @@ export function RealCaseWorkspace({
       )}
       {busy && <p role="status">در حال دریافت پرونده‌ها…</p>}
       {!busy && !error && !rows.length && (
-        <p className="pro-empty">اولین مراجع را با «پرونده جدید» ثبت کنید.</p>
+        <div className="pro-empty pro-directory-empty"><span className="pro-empty-icon"><FolderHeart size={30} /></span><h3>{query ? 'پرونده‌ای پیدا نشد' : 'اولین همراهی از اینجا شروع می‌شود.'}</h3><p>{query ? 'نام یا شماره را دوباره بررسی کنید.' : 'برای شروع، اولین مراجع را با «پرونده جدید» ثبت کنید.'}</p>{query && <button onClick={()=>{setSearch('');setQuery('');setPage(0);}}>نمایش همه مراجعان</button>}</div>
       )}
-      <ul className="pro-cases">
+      <div className="pro-list-caption"><span>مراجع / شماره تماس</span><span>آخرین ویرایش</span><span>پرونده</span></div>
+      <ul className="pro-cases pro-directory-list">
         {rows.map((r) => (
             <li key={r.id}>
-              <div>
-                <strong>{r.display_name}</strong>
-                <span dir="ltr">{r.phone}</span>
-                <small>نسخه {r.revision.toLocaleString("fa-IR")}</small>
-              </div>
-              <button onClick={() => setSelected(r.id)}>بازکردن پرونده</button>
+              <div className="pro-person"><span className="pro-avatar" aria-hidden="true">{r.display_name.trim().slice(0,1)}</span><div><strong>{r.display_name}</strong><span dir="ltr">{r.phone || '—'}</span></div></div>
+              <div className="pro-record-meta"><time>{new Date(r.updated_at).toLocaleDateString('fa-IR')}</time><small>نسخه {r.revision.toLocaleString("fa-IR")}</small></div>
+              <button className="pro-open-case" onClick={() => setSelected(r.id)}>بازکردن پرونده<ChevronLeft size={16} /></button>
             </li>
           ))}
       </ul>
-      <div className="pro-actions"><button disabled={busy||page===0} onClick={()=>setPage(p=>p-1)}>صفحه قبل</button><span>صفحه {(page+1).toLocaleString('fa-IR')} · {total.toLocaleString('fa-IR')} پرونده</span><button disabled={busy||(page+1)*25>=total} onClick={()=>setPage(p=>p+1)}>صفحه بعد</button></div>
+      <div className="pro-actions pro-pagination"><button disabled={busy||page===0} onClick={()=>setPage(p=>p-1)}>صفحه قبل</button><span>صفحه {(page+1).toLocaleString('fa-IR')} · {total.toLocaleString('fa-IR')} پرونده</span><button disabled={busy||(page+1)*25>=total} onClick={()=>setPage(p=>p+1)}>صفحه بعد</button></div>
     </section>
   );
 }
@@ -355,16 +358,21 @@ function RealCaseDetail({
       onBack();
   }
   return (
-    <section className="pro-panel pro-record-workspace" aria-busy={busy}>
-      <div className="pro-toolbar">
-        <div>
+    <section className="pro-panel pro-record-workspace pro-detail" aria-busy={busy}>
+      <div className="pro-toolbar pro-detail-heading">
+        <div className="pro-detail-person"><span className="pro-avatar"><UserRound size={23} /></span><div>
           <h2>{id ? form.display_name || "پرونده مراجع" : "پرونده جدید"}</h2>
-          {id && <small>نسخه {revision.toLocaleString("fa-IR")}</small>}
-        </div>
-        <button disabled={busy} onClick={back}>
-          فهرست مراجعان
+          <span className="pro-record-state">{id && <small>نسخه {revision.toLocaleString("fa-IR")}</small>}<span className={dirty ? 'is-unsaved' : 'is-saved'}>{dirty ? 'در حال تکمیل اطلاعات' : 'اطلاعات ذخیره شده'}</span></span>
+        </div></div>
+        <button className="pro-back" disabled={busy} onClick={back}>
+          <ArrowRight size={17} /> فهرست مراجعان
         </button>
       </div>
+      <nav className="pro-case-path" aria-label="مسیر آماده‌سازی برنامه">
+        <a href="#pro-intake-editor"><span>۱</span>اطلاعات مراجع</a>
+        {id ? <a href="#pro-plan-builder"><span>۲</span>ساخت برنامه</a> : <span className="pro-path-inactive"><span>۲</span>ساخت برنامه</span>}
+        {id ? <a href="#pro-saved-programs"><span>۳</span>برنامه‌ها و خروجی</a> : <span className="pro-path-inactive"><span>۳</span>برنامه‌ها و خروجی</span>}
+      </nav>
       {error && (
         <p role="alert" className="pro-error">
           {error}
@@ -402,6 +410,7 @@ function RealCaseDetail({
       )}
       {!locked && (
         <>
+          <div id="pro-intake-editor" className="pro-intake-editor">
           <CaseIntakeForm
             value={form}
             disabled={busy || Boolean(saveRequest.current) || !access?.can_write}
@@ -412,7 +421,7 @@ function RealCaseDetail({
             identity={
               <>
                 <label>
-                  چه اسمی صدات کنیم؟
+                  نام مراجع
                   <input
                     aria-label="نام مراجع"
                     maxLength={80}
@@ -448,7 +457,7 @@ function RealCaseDetail({
               </>
             }
           />
-          <div className="pro-actions">
+          <div className="pro-actions pro-save-bar">
             <button
               className="pro-primary"
               disabled={
@@ -459,9 +468,10 @@ function RealCaseDetail({
               }
               onClick={() => void save()}
             >
-              {saveRequest.current ? "تلاش مجدد ذخیره" : "ذخیره اطلاعات پرونده"}
+              <Save size={17} />{saveRequest.current ? "تلاش مجدد ذخیره" : "ذخیره اطلاعات پرونده"}
             </button>
-            {dirty && <span>تغییرات ذخیره نشده</span>}
+            <span className="pro-save-status">{dirty ? <><span className="pro-unsaved-dot" />تغییرات ذخیره نشده</> : <><Check size={16} />آخرین تغییرات ذخیره شده‌اند</>}</span>
+          </div>
           </div>
           {id && (
             <>
@@ -491,8 +501,8 @@ function RealCaseDetail({
                 <div className="pro-actions"><button disabled={busy||historyPage===0} onClick={()=>void run(async()=>{const r=await realCaseApi.history(org,id,historyPage-1);setHistory(r.rows);setHistoryPage(p=>p-1);})}>نسخه‌های جدیدتر</button><span>صفحه {(historyPage+1).toLocaleString('fa-IR')}</span><button disabled={busy||(historyPage+1)*10>=historyTotal} onClick={()=>void run(async()=>{const r=await realCaseApi.history(org,id,historyPage+1);setHistory(r.rows);setHistoryPage(p=>p+1);})}>نسخه‌های قدیمی‌تر</button></div>
               </details>
               {!access?.can_write && <p role="status" className="pro-muted">اعتبار ساخت و ویرایش برنامه پایان یافته است؛ مشاهده سوابق و خروجی PDF فعال است.</p>}
-              <section className="pro-generation">
-                <h3>ساخت برنامه غذایی</h3>
+              <section id="pro-plan-builder" className="pro-generation">
+                <div className="pro-block-heading"><span className="pro-block-icon"><Sparkles size={22} /></span><div><small>قدم بعدی</small><h3>ساخت برنامه غذایی</h3></div></div>
                 <p>
                   برنامه با موتور به‌تن تولید می‌شود. در PDF از هر وعده یک منو
                   انتخاب خواهد شد.
@@ -535,7 +545,7 @@ function RealCaseDetail({
                   />
                 </label>
                 <button
-                  className="pro-primary"
+                  className="pro-primary pro-generate-button"
                   disabled={
                     busy ||
                     dirty ||
@@ -544,7 +554,7 @@ function RealCaseDetail({
                   }
                   onClick={() => void generate()}
                 >
-                  تولید و پیش‌نمایش برنامه
+                  <Sparkles size={18} /> تولید و پیش‌نمایش برنامه
                 </button>
                 {dirty && (
                   <p className="pro-muted">
@@ -573,7 +583,7 @@ function RealCaseDetail({
                     </p>
                   </>
                 )}
-                <h3>برنامه‌های ذخیره‌شده</h3>
+                <div id="pro-saved-programs" className="pro-block-heading pro-saved-heading"><span className="pro-block-icon"><FileText size={21} /></span><div><small>آرشیو مراجع</small><h3>برنامه‌های ذخیره‌شده</h3></div></div>
                 {!plans.length && <p>هنوز برنامه‌ای ذخیره نشده است.</p>}
                 <ul className="pro-cases">
                   {plans.map((p) => (
