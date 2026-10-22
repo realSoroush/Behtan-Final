@@ -22,7 +22,7 @@ export function NutritionQualitySummary({ quality }: { quality: FoodQualitySumma
       : 'کم';
 
   return (
-    <section className="rounded-3xl border border-neutral-100 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 space-y-4">
+    <section className="member-quality rounded-3xl border border-neutral-100 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="font-bold text-neutral-900 dark:text-neutral-100">کیفیت برنامه امروز</h2>
