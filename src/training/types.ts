@@ -57,7 +57,7 @@ export interface TrainingInput {
   experience: "beginner" | "returning" | "regular";
   goal: "general" | "muscle";
   days: number[];
-  minutes: 45 | 60;
+  minutes: number;
   equipment: Equipment[];
   start_date: string;
   screening: {

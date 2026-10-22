@@ -145,7 +145,7 @@ function Workspace({ userId }: { userId: string }) {
         <div>
           <p className="pro-eyebrow"><span /> فضای کاری حرفه‌ای شما</p>
           <h1>برنامه‌ریزی بهتر،<br className="pro-mobile-break" /> همراهی نزدیک‌تر.</h1>
-          <p>پرونده مراجع را کامل کنید؛ برنامه غذایی را آماده و ارائه کنید.</p>
+          <p>پرونده مراجع را کامل کنید؛ برنامه تخصصی را آماده و ارائه کنید.</p>
         </div>
         {orgs.length > 0 && <label className="pro-select pro-workspace-picker">
           <span>فضای کاری</span>

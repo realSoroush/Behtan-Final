@@ -10,8 +10,8 @@ const read = (iso: string) => {
     ? date : { year: 0, month: 0, day: 0 };
 };
 
-export function JalaliBirthDate({ value, onChange, invalid, selectComponent: Select = 'select' }: {
-  value: string; onChange: (iso: string) => void; invalid: boolean; selectComponent?: ElementType;
+export function JalaliBirthDate({ value, onChange, invalid, selectComponent: Select = 'select', minAge = MIN_SUPPORTED_AGE, maxAge = MAX_SUPPORTED_AGE }: {
+  value: string; onChange: (iso: string) => void; invalid: boolean; selectComponent?: ElementType; minAge?:number; maxAge?:number;
 }) {
   const [draft, setDraft] = useState(() => read(value));
   const emitted = useRef(value);
@@ -25,8 +25,8 @@ export function JalaliBirthDate({ value, onChange, invalid, selectComponent: Sel
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const currentYear = isoToJalali(today)!.year;
-  const latestYear = currentYear - MIN_SUPPORTED_AGE;
-  const earliestYear = currentYear - MAX_SUPPORTED_AGE - 1;
+  const latestYear = currentYear - minAge;
+  const earliestYear = currentYear - maxAge - 1;
   const years = Array.from({ length: latestYear - earliestYear + 1 }, (_, i) => latestYear - i);
   if (draft.year && !years.includes(draft.year)) years.push(draft.year);
   const dayCount = draft.month ? jalaliMonthLength(draft.year || currentYear, draft.month) : 31;

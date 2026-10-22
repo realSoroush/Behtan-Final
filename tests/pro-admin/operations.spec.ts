@@ -7,6 +7,8 @@ async function adminSetup(page:Page,{denied=false,lose=false,stale=false}={}){
  await page.route('https://pro-test.supabase.co/**',async route=>{
   const path=new URL(route.request().url()).pathname,b=route.request().postDataJSON();
   if(path.endsWith('/admin_overview')){await route.fulfill(denied?{status:403,json:{message:'ADMIN_REQUIRED'}}:{json:{stats:{},users:[],plans:[]}});return;}
+  if(path.endsWith('/admin_pro_offers')){await route.fulfill({json:[]});return;}
+  if(path.endsWith('/admin_pro_modules')){await route.fulfill({json:{nutrition:true,training:true,revision:0}});return;}
   if(path.endsWith('/admin_pro_renewals')){await route.fulfill({json:[]});return;}
   if(path.endsWith('/admin_pro_overview')){await route.fulfill({json:{rows:[workspace],total:1}});return;}
   if(path.endsWith('/admin_pro_events')){await route.fulfill({json:{rows:b.p_kind==='failures'?[{id:'40000000-0000-4000-8000-000000000001',created_at:'2026-10-21T00:00:00Z',operation:'generate',error_code:'PRO_GENERATION_FAILED'}]:[],total:b.p_kind==='failures'?1:0}});return;}
@@ -79,4 +81,18 @@ test('admin resolves a renewal separately from granting a license',async({page})
 test('admin layout is readable on mobile in both themes',async({page},info)=>{
  await adminSetup(page);await page.getByRole('button',{name:'مدیریت Pro',exact:true}).click();
  for(const dark of [false,true]){await page.evaluate(d=>document.documentElement.classList.toggle('dark',d),dark);await page.evaluate(()=>document.fonts.ready);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:info.outputPath(`admin-${dark?'dark':'light'}.png`),fullPage:true});}
+});
+
+test('admin edits a public Pro tariff with exact period prices',async({page})=>{
+ await adminSetup(page);let offer:any={code:'training',title:'برنامه‌سازی تمرینی',subtitle:'فقط تمرین',features:['PDF فارسی'],prices:{'1':2490000,'3':5990000,'6':9490000,'12':14990000},revision:1,active:true};let saved:any;
+ await page.route('**/rest/v1/rpc/admin_pro_offers',r=>r.fulfill({json:[offer]}));
+ await page.route('**/rest/v1/rpc/admin_pro_save_offer',r=>{saved=r.request().postDataJSON();offer={...offer,title:saved.p_title,prices:saved.p_prices,revision:2};return r.fulfill({json:offer});});
+ await page.getByRole('button',{name:'مدیریت Pro',exact:true}).click();await page.getByRole('button',{name:'ویرایش تعرفه برنامه‌سازی تمرینی',exact:true}).click();
+ await page.getByLabel('نام کارت اشتراک').fill('پنل تمرین حرفه‌ای');await page.getByLabel('قیمت یک ماهه').fill('2500000');await page.getByRole('button',{name:'ذخیره تعرفه',exact:true}).click();
+ await expect(page.locator('.admin-pro-offer-grid')).toContainText('پنل تمرین حرفه‌ای');expect(saved.p_prices['1']).toBe(2500000);expect(saved.p_prices['12']).toBe(14990000);expect(saved.p_expected).toBe(1);
+});
+test('admin changes a workspace to training-only without altering its license',async({page})=>{
+ const state=await adminSetup(page);let saved:any;await page.route('**/rest/v1/rpc/admin_pro_set_modules',r=>{saved=r.request().postDataJSON();return r.fulfill({json:{nutrition:saved.p_nutrition,training:saved.p_training,revision:1}});});
+ await page.getByRole('button',{name:'مدیریت Pro',exact:true}).click();await page.getByRole('button',{name:'مدیریت فضای کاری',exact:true}).click();
+ await page.getByRole('combobox',{name:'ماژول‌های پنل Pro'}).click();await page.getByRole('option',{name:'فقط تمرین',exact:true}).click();await page.getByRole('button',{name:'ثبت ماژول‌های پنل',exact:true}).click();await expect(page.getByRole('status')).toContainText('ماژول‌های پنل ذخیره شدند');expect(saved.p_nutrition).toBe(false);expect(saved.p_training).toBe(true);expect(state.requests).toHaveLength(0);
 });

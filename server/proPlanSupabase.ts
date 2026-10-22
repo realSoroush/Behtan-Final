@@ -5,7 +5,7 @@ import type { RealIntake } from '../src/professional/menuPlan.ts';
 import { ProServerError, type PlanDependencies, type ServerDraft } from './proPlanService.ts';
 
 function databaseError(error: { message: string; code?: string }, status = 0): never {
-  const known = /PRO_(ACCESS_DENIED|STALE_REVISION|REQUEST_CONFLICT|INVALID_PLAN|DRAFT_EXPIRED|GENERATION_LIMIT|SUBSCRIPTION_EXPIRED|CASE_LIMIT)/.exec(error.message)?.[0];
+  const known = /PRO_(ACCESS_DENIED|STALE_REVISION|REQUEST_CONFLICT|MODULE_DISABLED|INVALID_PLAN|DRAFT_EXPIRED|GENERATION_LIMIT|SUBSCRIPTION_EXPIRED|CASE_LIMIT)/.exec(error.message)?.[0];
   if(error.code==='PGRST202')throw new ProServerError('PRO_MIGRATION_REQUIRED',503);
   if (known) throw new ProServerError(known, known === 'PRO_ACCESS_DENIED' ? 403 : known === 'PRO_GENERATION_LIMIT' ? 429 : 409);
   if (status === 401) throw new ProServerError('PRO_AUTH_REQUIRED', 401);
@@ -49,6 +49,7 @@ export function supabasePlanDependencies(): PlanDependencies {
       if(data.archived_at)throw new ProServerError('PRO_CASE_ARCHIVED',409);
       const access=await userClient(token).rpc('pro_workspace_status',{p_org:org});
       if(access.error)databaseError(access.error,access.status);
+      if(access.data?.modules?.nutrition===false)throw new ProServerError('PRO_MODULE_DISABLED',403);
       if(!access.data?.can_write)throw new ProServerError('PRO_SUBSCRIPTION_EXPIRED',403);
       return data as { answers:RealIntake; revision:number };
     },

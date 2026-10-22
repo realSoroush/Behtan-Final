@@ -1,3 +1,4 @@
+import { ProfessionalsPage } from '@/components/professionals/ProfessionalsPage';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
@@ -57,6 +58,8 @@ export default function App() {
     setAuthRequested(false);
     window.scrollTo({ top: 0, behavior: 'auto' });
   };
+
+  if (window.location.pathname.replace(/\/$/, '') === '/professionals') return <ProfessionalsPage />;
 
   if (authLoading || (user && profileLoading)) {
     return (

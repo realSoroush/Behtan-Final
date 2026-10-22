@@ -201,11 +201,13 @@ export async function setup(
           status: "active",
         },
       ];
-    else if(path.endsWith('/pro_body_reports')) {data=[];
+    else if(path.endsWith('/pro_training_history')){data={rows:[],total:0};
+    } else if(path.endsWith('/pro_authored_plans')){data=[];
+    } else if(path.endsWith('/pro_body_reports')) {data=[];
     } else if(path.endsWith('/pro_plan_body_report')) {data=null;
     } else if(path.endsWith('/pro_workspace_status')) {
       if(!active){await route.fulfill({status:403,json:{message:'PRO_ACCESS_DENIED'}});return;}
-      data={can_write:writable,source:'pilot',expires_at:'2026-11-19T00:00:00Z',case_limit:null,case_count:cases.length};
+      data={modules:{nutrition:true,training:true,body:true},can_write:writable,source:'pilot',expires_at:'2026-11-19T00:00:00Z',case_limit:null,case_count:cases.length};
     } else if(path.endsWith('/pro_browse_case_directory')) {
       const found=cases.filter(c=>Boolean(c.archived_at)===Boolean(b.p_archived)&&(!b.p_search||(c.display_name+' '+c.phone).includes(b.p_search)));
       data={rows:found.slice(b.p_page*25,b.p_page*25+25),total:found.length};

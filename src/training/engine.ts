@@ -42,7 +42,7 @@ function exact(x: Record<string, unknown>, fields: string[]) {
   if (Object.keys(x).sort().join() !== fields.sort().join())
     fail("TRAINING_INVALID_INPUT");
 }
-export function parseTrainingInput(value: unknown): TrainingInput {
+export function parseTrainingInput(value: unknown, professional = false): TrainingInput {
   if (!value || typeof value !== "object" || Array.isArray(value))
     return fail("TRAINING_INVALID_INPUT");
   const b = value as Record<string, unknown>;
@@ -62,19 +62,19 @@ export function parseTrainingInput(value: unknown): TrainingInput {
     !["home", "gym"].includes(String(b.location)) ||
     !["beginner", "returning", "regular"].includes(String(b.experience)) ||
     !["general", "muscle"].includes(String(b.goal)) ||
-    ![45, 60].includes(Number(b.minutes)) ||
+    (professional ? (!Number.isInteger(b.minutes) || Number(b.minutes)<15 || Number(b.minutes)>180) : ![45, 60].includes(Number(b.minutes))) ||
     typeof b.minutes !== "number"
   )
     return fail("TRAINING_INVALID_INPUT");
   if (
     !Array.isArray(b.days) ||
-    ![2, 3].includes(b.days.length) ||
+    (professional ? b.days.length<1 || b.days.length>7 : ![2, 3].includes(b.days.length)) ||
     b.days.some((x) => !Number.isInteger(x) || x < 0 || x > 6) ||
     new Set(b.days).size !== b.days.length
   )
     return fail("TRAINING_DAYS");
   const days = [...b.days].sort((a, b) => a - b) as number[];
-  if (days.some((d, i) => (days[(i + 1) % days.length] - d + 7) % 7 < 2))
+  if (!professional && days.some((d, i) => (days[(i + 1) % days.length] - d + 7) % 7 < 2))
     return fail("TRAINING_RECOVERY");
   if (
     !Array.isArray(b.equipment) ||
@@ -134,12 +134,23 @@ export function trainingEligibility(
   a: TrainingProfile,
   input: TrainingInput,
   now: Date,
+  professional = false,
 ): void {
   // Current date, never a caller-selected start date, determines age and safety.
   if (!Number.isFinite(now.getTime())) fail("TRAINING_INVALID_INPUT");
   if (!input.screening.confirmed || !a.safety_confirmed)
     fail("TRAINING_SCREENING_REQUIRED");
-  if (Object.entries(input.screening).some(([k, v]) => k !== "confirmed" && v))
+  if (professional) {
+    // Pro can draft for stable conditions/medications; never synthesize a generic
+    // workout for unresolved exertional symptoms, explicit restriction or recovery.
+    const born = new Date(a.birth_date+'T12:00:00Z');
+    const age = now.getUTCFullYear()-born.getUTCFullYear()-(now.getUTCMonth()<born.getUTCMonth()||(now.getUTCMonth()===born.getUTCMonth()&&now.getUTCDate()<born.getUTCDate())?1:0);
+    if (!Number.isFinite(age) || age<18 || a.pregnancy_status==='pregnant' || a.pregnancy_status==='breastfeeding'
+      || a.eating_disorder_status==='active_or_treatment' || input.screening.symptoms || input.screening.restriction || input.screening.recent_surgery || input.screening.pain || a.injuries_present)
+      fail('TRAINING_SPECIALIST_AUTHORING');
+    if (!Number.isFinite(a.height_cm)||!Number.isFinite(a.weight_kg)||a.height_cm<=0||a.weight_kg<=0) fail('TRAINING_INVALID_INPUT');
+  }
+  if (!professional && Object.entries(input.screening).some(([k, v]) => k !== "confirmed" && v))
     fail("TRAINING_REVIEW_REQUIRED");
   const birth = new Date(a.birth_date + "T12:00:00Z");
   let age = now.getUTCFullYear() - birth.getUTCFullYear();
@@ -153,11 +164,11 @@ export function trainingEligibility(
     !Number.isFinite(birth.getTime()) ||
     birth.toISOString().slice(0, 10) !== a.birth_date ||
     age < 18 ||
-    age > 64
+    (!professional && age > 64)
   )
     fail("TRAINING_SCOPE");
   if (
-    !evaluateMedicalEligibility({
+    !professional && !evaluateMedicalEligibility({
       gender: a.gender,
       birthDate: a.birth_date,
       heightCm: a.height_cm,
@@ -178,11 +189,11 @@ export function trainingEligibility(
     fail("TRAINING_REVIEW_REQUIRED");
   // V1 is a general-adult programme, not rehabilitation or condition-specific prescription.
   if (
-    a.medical_conditions.length ||
+    !professional && (a.medical_conditions.length ||
     a.medications_present ||
     a.injuries_present ||
     a.pregnancy_status !== "not_pregnant" ||
-    a.eating_disorder_status !== "none"
+    a.eating_disorder_status !== "none")
   )
     fail("TRAINING_REVIEW_REQUIRED");
   if (
@@ -256,9 +267,10 @@ export function buildTrainingPlan(
   raw: unknown,
   revision: number,
   now = new Date(),
+  professional = false,
 ): TrainingPlan {
-  const input = parseTrainingInput(raw);
-  trainingEligibility(a, input, now);
+  const input = parseTrainingInput(raw, professional);
+  trainingEligibility(a, input, now, professional);
   if (
     !Number.isInteger(revision) ||
     revision < 1 ||
@@ -299,9 +311,14 @@ export function buildTrainingPlan(
   const weeks = [1, 2, 3, 4].map((week) => ({
     week,
     sessions: scheduledDays.map((day, index) => {
-      const lines: TrainingLine[] = patterns.map((pattern) => {
+      // Consecutive Pro days use a rotating split, never repeat full-body daily.
+      const split = professional && (scheduledDays.length>3 || input.days.some((d)=>input.days.includes((d+1)%7)));
+      const cycle=((week-1)*scheduledDays.length+index)%3;
+      const selectedPatterns:Pattern[] = split ? ([['push','shoulder'],['pull','arms'],['squat','hinge','calf','core']] as Pattern[][])[cycle] : patterns;
+      const sessionPatterns = professional ? selectedPatterns.filter(pattern=>!["shoulder","arms"].includes(pattern)||EXERCISES.some(e=>e.pattern===pattern&&e.equipment.every(x=>input.equipment.includes(x)))) : selectedPatterns;
+      const lines: TrainingLine[] = sessionPatterns.map((pattern) => {
         const exercise = select(pattern, input, index, conservative);
-        const sets = conservative
+        const sets = professional && input.minutes<45 ? 1 : conservative
           ? week === 1
             ? 1
             : 2
@@ -341,7 +358,7 @@ export function buildTrainingPlan(
       return {
         day,
         date: sessionDate.toISOString().slice(0, 10),
-        title: "تمرین تمام‌بدن " + String.fromCharCode(65 + index),
+        title: (split ? ["فشار بالاتنه","کشش بالاتنه","پایین‌تنه و میان‌تنه"][cycle] : "تمرین تمام‌بدن " + String.fromCharCode(65 + index)),
         estimated_minutes,
         lines,
       };
@@ -357,6 +374,7 @@ export function buildTrainingPlan(
     input,
     weeks,
     notes: [
+      ...(professional ? ["این پیش‌نویس برای بازبینی متخصص است. بیماری و دارو به‌تنهایی موجب منع ساخت نشده‌اند؛ تناسب حرکات، حجم و شرایط مراجع باید بررسی شود."] : []),
       ...(a.workout_days !== input.days.length
         ? [
             "تعداد جلسات این برنامه با اطلاعات فعالیت پرونده متفاوت است؛ پیش از تنظیم برنامه غذایی روز تمرین، تعداد جلسات و نوع فعالیت پرونده را هماهنگ کن.",

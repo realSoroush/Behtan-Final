@@ -2,7 +2,7 @@ import type { PrintedPlan, RealIntake } from '../src/professional/menuPlan.ts';
 import { generatePrintedPlan } from '../src/professional/menuPlan.ts';
 import { configureNutritionCatalog } from '../src/utils/mealPlanEngine.ts';
 import type { NutritionCatalog, ProteinEnginePolicy } from '../src/types/index.ts';
-import { intakeEligibility } from '../src/professional/intake.ts';
+import { proNutritionDraftAllowed } from '../src/professional/intake.ts';
 
 export class ProServerError extends Error {
   code: string;
@@ -49,8 +49,8 @@ export async function processPlanRequest(body: unknown, token: string, deps: Pla
   if (current.revision !== b.revision) throw new ProServerError('PRO_STALE_REVISION', 409);
   const request: DraftRequest = { date:b.date as string, count:b.count as number, notes:(b.notes as string).trim() };
   // A future program date must not make a currently ineligible client eligible.
-  if (!intakeEligibility(current.answers, new Date()).canGenerateAutomaticPlan
-      || !intakeEligibility(current.answers, new Date(request.date + 'T12:00:00Z')).canGenerateAutomaticPlan)
+  if (!proNutritionDraftAllowed(current.answers, new Date())
+      || !proNutritionDraftAllowed(current.answers, new Date(request.date + 'T12:00:00Z')))
     throw new ProServerError('PRO_MEDICAL_STOP', 422);
   const { catalog, policy } = await deps.loadNutrition(token);
   let plan: PrintedPlan;

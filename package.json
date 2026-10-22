@@ -47,7 +47,7 @@
     "test:mobile-meals": "node --experimental-strip-types scripts/mobile-meals.test.mjs",
     "dev:pro": "vite --config vite.pro.config.ts",
     "build:pro": "npm run typecheck:pro:server && tsc -b && vite build --config vite.pro.config.ts",
-    "test:pro": "node --experimental-strip-types scripts/pro-real-plan.test.mjs && node --experimental-strip-types scripts/pro-database.test.mjs && node --experimental-strip-types scripts/pro-contracts.test.mjs && node --experimental-strip-types scripts/pro-intake.test.mjs && npm run test:pro:server && npm run test:pro:recovery:schema",
+    "test:pro": "node --experimental-strip-types scripts/pro-real-plan.test.mjs && node --experimental-strip-types scripts/pro-database.test.mjs && node --experimental-strip-types scripts/pro-contracts.test.mjs && node --experimental-strip-types scripts/pro-intake.test.mjs && npm run test:pro:server && npm run test:pro:recovery:schema && npm run test:pro:modules",
     "test:pro:browser": "playwright test --config playwright.pro.config.ts",
     "test:pro:native": "node --experimental-strip-types scripts/pro-real-plan.test.mjs && node --experimental-strip-types scripts/pro-database.test.mjs --native",
     "test:feasibility": "node --experimental-strip-types scripts/nutrition-feasibility-repair.test.mjs",
@@ -61,7 +61,9 @@
     "backup:pro": "node scripts/pro-backup.mjs",
     "backup:verify": "node scripts/pro-backup.mjs verify",
     "test:pro:backup": "node scripts/pro-backup.test.mjs",
-    "test:training": "node --experimental-strip-types scripts/training/engine.test.mjs && node --experimental-strip-types scripts/training/http.test.mjs"
+    "test:training": "node --experimental-strip-types scripts/training/engine.test.mjs && node --experimental-strip-types scripts/training/http.test.mjs",
+    "test:pro:modules": "node --experimental-strip-types scripts/pro-modules.test.mjs",
+    "test:public:browser": "playwright test --config playwright.public.config.ts"
   },
   "dependencies": {
     "@rive-app/canvas": "2.44.2",

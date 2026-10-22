@@ -1,3 +1,4 @@
+import {isoToJalali} from '@/utils/jalaliDate';
 import { PanelSelect } from "@/components/ui/PanelSelect";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useId, useRef, useState } from "react";
@@ -95,19 +96,19 @@ export function CaseIntakeForm({
                 <option value="male">مرد</option>
               </PanelSelect>
             </label>
-            <JalaliBirthDate
+            <JalaliBirthDate minAge={0} maxAge={120}
               selectComponent={PanelSelect}
               value={a.birth_date}
               onChange={(birth_date) => patch({ birth_date })}
-              invalid={Boolean(a.birth_date && result.age === null)}
+              invalid={Boolean(a.birth_date && !isoToJalali(a.birth_date))}
             />
             <label>
               قد (سانتی‌متر)
               <input
                 aria-label="قد (سانتی‌متر)"
                 type="number"
-                min={100}
-                max={250}
+                min={30}
+                max={300}
                 step={0.1}
                 value={a.height_cm || ""}
                 onChange={(e) => patch({ height_cm: Number(e.target.value) })}
@@ -118,8 +119,8 @@ export function CaseIntakeForm({
               <input
                 aria-label="وزن (کیلوگرم)"
                 type="number"
-                min={30}
-                max={300}
+                min={0.5}
+                max={500}
                 step={0.1}
                 value={a.weight_kg || ""}
                 onChange={(e) => patch({ weight_kg: Number(e.target.value) })}
@@ -364,14 +365,14 @@ export function CaseIntakeForm({
               پاسخ‌های ثبت‌شده را با مراجع بررسی کردم.
             </label>
             {a.safety_confirmed && result.status === "blocked" && (
-              <div className="pro-error" role="status">
-                <strong>ساخت خودکار برنامه برای این شرایط مجاز نیست.</strong>
+              <div className="pro-muted" role="status">
+                <strong>این پرونده به بازبینی تخصصی نیاز دارد.</strong>
                 <ul>
                   {result.blockers.map((b) => (
                     <li key={b.code}>{b.title}</li>
                   ))}
                 </ul>
-                <p>ذخیرهٔ اطلاعات، این توقف پزشکی را رفع نمی‌کند.</p>
+                <p>ذخیرهٔ پرونده و تدوین اختصاصی برنامه در پنل Pro در دسترس است. موارد بالا مربوط به دامنهٔ نسخهٔ خودکار عمومی‌اند.</p>
               </div>
             )}
           </>

@@ -1,7 +1,9 @@
+import {AuthoredPlanEditor} from './AuthoredPlanEditor';
+import type {AuthoredContent} from './authoredPlan';
 import {TrainingPanel} from './training/TrainingPanel';
 import {PanelModal} from "@/components/ui/PanelModal";
 import { PanelSelect } from "@/components/ui/PanelSelect";
-import { Archive, ArchiveRestore, ArrowRight, Check, ChevronLeft, FileText, FolderHeart, Plus, RefreshCw, Save, Search, Sparkles, UserRound, Users } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowRight, Check, ChevronLeft, FileText, FolderHeart, Plus, RefreshCw, Save, Search, Sparkles, UserRound, Users, Dumbbell, Utensils, ScanLine, ArrowUpLeft, PenLine } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CaseIntakeForm } from "./CaseIntakeForm";
 import {
@@ -156,6 +158,7 @@ function RealCaseDetail({
   initialId: string | null;
   onBack: () => void;
 }) {
+  const [authoredOpen,setAuthoredOpen]=useState(false),[authoredBusy,setAuthoredBusy]=useState(false),[authoredSeed,setAuthoredSeed]=useState<AuthoredContent|undefined>();
   const [trainingOpen,setTrainingOpen]=useState(false),[trainingBusy,setTrainingBusy]=useState(false);
   const [previewOpen,setPreviewOpen]=useState(false),[scanOpen,setScanOpen]=useState(false),[scanBusy,setScanBusy]=useState(false);
   const [archived,setArchived]=useState(false),[duplicates,setDuplicates]=useState<{id:string;display_name:string}[]>([]);
@@ -246,7 +249,7 @@ function RealCaseDetail({
         }
       } catch (e) {
         if (active && e instanceof Error && e.message === 'PRO_ACCESS_DENIED') {
-          setLocked(true);setScanOpen(false);setPreviewOpen(false);setTrainingOpen(false);
+          setLocked(true);setScanOpen(false);setPreviewOpen(false);setTrainingOpen(false);setAuthoredOpen(false);
           saveRequest.current = null;
           setDraftId('');
           setPlanId('');
@@ -344,7 +347,7 @@ function RealCaseDetail({
   }
   async function generate() {
     await run(async () => {
-      if (dirty || !id || stale || connectionWarning || !access?.can_write)
+      if (dirty || !id || stale || connectionWarning || !access?.can_write || !access?.modules?.nutrition)
         throw new Error('ابتدا اطلاعات پرونده را ذخیره و اتصال را بررسی کنید.');
       const result = await realCaseApi.generatePlan(org, id, revision, count, date, notes, generationKey.current);
       setPlan(result.plan);setPreviewOpen(true);
@@ -388,9 +391,13 @@ function RealCaseDetail({
           <ArrowRight size={17} /> فهرست مراجعان
         </button>
       </div>
-      {id && <div className="pro-actions"><button disabled={busy} onClick={()=>setScanOpen(true)}>تحلیل تصویری بدن و گزارش‌ها</button></div>}
-      {id&&!locked&&<div className="pro-actions"><button disabled={busy} onClick={()=>setTrainingOpen(true)}>برنامه تمرینی مراجع</button></div>}
-      {id&&!locked&&trainingOpen&&<PanelModal title="برنامه تمرینی مراجع" busy={trainingBusy} onClose={()=>setTrainingOpen(false)}><TrainingPanel org={org} record={id} revision={revision} canWrite={Boolean(access?.can_write)&&!archived&&!dirty&&!stale&&!connectionWarning} onBusy={setTrainingBusy}/></PanelModal>}
+      {id&&!locked&&<div className="pro-module-launcher" aria-label="ابزارهای پرونده">
+        <button className="pro-module-card" disabled={busy} onClick={()=>document.getElementById('pro-plan-builder')?.scrollIntoView({behavior:'smooth',block:'start'})}><span className="pro-module-symbol"><Utensils size={22}/></span><span><strong>تغذیه مراجع</strong><small>{access?.modules?.nutrition?'پیش‌نویس، تدوین و خروجی':'مشاهده سوابق تغذیه'}</small></span><ArrowUpLeft size={18}/></button>
+        <button className="pro-module-card" disabled={busy} onClick={()=>setTrainingOpen(true)} aria-label="برنامه تمرینی مراجع"><span className="pro-module-symbol"><Dumbbell size={22}/></span><span><strong>تمرین مراجع</strong><small>{access?.modules?.training?'جلسات، حرکات و برنامه اختصاصی':'مشاهده سوابق تمرین'}</small></span><ArrowUpLeft size={18}/></button>
+        <button className="pro-module-card" disabled={busy} onClick={()=>setScanOpen(true)} aria-label="تحلیل تصویری بدن و گزارش‌ها"><span className="pro-module-symbol"><ScanLine size={22}/></span><span><strong>گزارش بدن</strong><small>عکس‌ها، ارزیابی و گزارش‌های ثبت‌شده</small></span><ArrowUpLeft size={18}/></button>
+      </div>}
+      {id&&authoredOpen&&<PanelModal title="تدوین اختصاصی برنامه غذایی" busy={authoredBusy} onClose={()=>setAuthoredOpen(false)}><AuthoredPlanEditor org={org} record={id} revision={revision} kind="nutrition" name={form.display_name} canWrite={Boolean(access?.can_write&&access?.modules?.nutrition)&&!archived&&!dirty&&!stale&&!connectionWarning} onBusy={setAuthoredBusy} seed={authoredSeed}/></PanelModal>}
+      {id&&!locked&&trainingOpen&&<PanelModal title="برنامه تمرینی مراجع" busy={trainingBusy} onClose={()=>setTrainingOpen(false)}><TrainingPanel org={org} record={id} revision={revision} name={form.display_name} canWrite={Boolean(access?.can_write&&access?.modules?.training)&&!archived&&!dirty&&!stale&&!connectionWarning} onBusy={setTrainingBusy}/></PanelModal>}
       {id&&scanOpen&&<PanelModal title="تحلیل تصویری بدن" busy={scanBusy} onClose={()=>setScanOpen(false)}><BodyScanPanel org={org} record={id} revision={revision} canWrite={Boolean(access?.can_write)&&!archived&&!dirty&&!stale&&!connectionWarning} onBusy={setScanBusy}/></PanelModal>}
       <nav className="pro-case-path" aria-label="مسیر آماده‌سازی برنامه">
         <a href="#pro-intake-editor"><span>۱</span>اطلاعات مراجع</a>
@@ -528,6 +535,8 @@ function RealCaseDetail({
               </details>
               {!access?.can_write && <p role="status" className="pro-muted">ساخت و ویرایش در این پنل فعلاً غیرفعال است؛ مشاهده سوابق و خروجی PDF فعال است.</p>}
               <section id="pro-plan-builder" className="pro-generation">
+                <div className="pro-generation-choice"><div><h3>ابزار تدوین شما</h3><p className="pro-muted">با پیش‌نویس موتور شروع کنید یا برنامه را از ابتدا با نظر خودتان بچینید.</p></div><button disabled={busy||dirty||stale} onClick={()=>{setAuthoredSeed(undefined);setAuthoredOpen(true);}}><PenLine size={17}/> تدوین اختصاصی تغذیه و سوابق</button></div>
+                {!access?.modules?.nutrition&&<p role="status" className="pro-muted">ماژول تغذیه در اشتراک فعلی فعال نیست؛ سوابق و PDFهای قبلی قابل مشاهده‌اند.</p>}
                 <div className="pro-block-heading"><span className="pro-block-icon"><Sparkles size={22} /></span><div><small>قدم بعدی</small><h3>ساخت برنامه غذایی</h3></div></div>
                 <p>
                   برنامه با موتور به‌تن تولید می‌شود. در PDF از هر وعده یک منو
@@ -576,7 +585,7 @@ function RealCaseDetail({
                     busy || archived ||
                     dirty ||
                     stale ||
-                    !date || connectionWarning || !access?.can_write
+                    !date || connectionWarning || !access?.can_write || !access?.modules?.nutrition
                   }
                   onClick={() => void generate()}
                 >
@@ -589,10 +598,10 @@ function RealCaseDetail({
                 )}
                 {plan && previewOpen && (
                   <>
-                    <PanelModal title="برنامه غذایی مراجع" busy={busy} onClose={()=>setPreviewOpen(false)}>{error&&<p role="alert" className="pro-error">{error}</p>}{notice&&<p role="status" className="pro-success">{notice}</p>}{busy&&<p role="status">در حال انجام…</p>}<PlanPreview plan={plan} />{planId&&id&&<ReportAttachment org={org} record={id} plan={planId} revision={plan.intake_revision} canWrite={Boolean(access?.can_write)&&!archived}/>}
+                    <PanelModal title="برنامه غذایی مراجع" busy={busy} onClose={()=>setPreviewOpen(false)}>{error&&<p role="alert" className="pro-error">{error}</p>}{notice&&<p role="status" className="pro-success">{notice}</p>}{busy&&<p role="status">در حال انجام…</p>}<PlanPreview plan={plan} /><button disabled={busy||!access?.can_write||!access?.modules?.nutrition||dirty||stale} onClick={()=>{setAuthoredSeed({version:1,title:'برنامه غذایی اختصاصی',notes:plan.notes,reviewed:false,sections:plan.days.flatMap(d=>d.slots.map(slot=>({title:(d.workout?'روز تمرین · ':'روز استراحت · ')+slot.label,lines:slot.options.map((m,i)=>({name:'منو '+(i+1),details:m.components.map(c=>c.foodItem.name+' '+Math.round(c.grams)+' گرم').join(' + ')}))})))});setPreviewOpen(false);setAuthoredOpen(true);}}>ساخت نسخه اختصاصی از این برنامه</button>{planId&&id&&<ReportAttachment org={org} record={id} plan={planId} revision={plan.intake_revision} canWrite={Boolean(access?.can_write)&&!archived}/>}
                     <div className="pro-actions">
                       <button
-                        disabled={busy || archived || Boolean(planId) || dirty || stale || !access?.can_write}
+                        disabled={busy || archived || Boolean(planId) || dirty || stale || !access?.can_write || !access?.modules?.nutrition}
                         onClick={() => void savePlan()}
                       >
                         {planId ? "برنامه ذخیره شده" : "ذخیره این برنامه"}

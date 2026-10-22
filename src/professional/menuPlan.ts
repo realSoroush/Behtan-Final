@@ -12,7 +12,7 @@ import {
   calculateFullNutritionPlanWithTrace,
   type NutritionCalculationTrace,
 } from "../utils/nutritionHelpers.ts";
-import { intakeEligibility, type CaseIntake } from "./intake.ts";
+import { proNutritionDraftAllowed, type CaseIntake } from "./intake.ts";
 export interface RealIntake extends CaseIntake {
   display_name: string;
   phone: string;
@@ -94,10 +94,9 @@ export function generatePrintedPlan(
   if (!a.display_name.trim() || a.display_name.trim().length > 80 || !revision)
     throw new Error("نام و اطلاعات پرونده را ابتدا ذخیره کنید.");
   const referenceDate = new Date(date + "T12:00:00");
-  const eligibility = intakeEligibility(a, referenceDate);
-  if (!eligibility.canGenerateAutomaticPlan)
+  if (!proNutritionDraftAllowed(a, referenceDate))
     throw new Error(
-      "پرسش‌های ایمنی را کامل کنید؛ تولید برنامه برای اطلاعات فعلی مجاز نیست.",
+      "برای این شرایط از تدوین اختصاصی متخصص استفاده کنید.",
     );
   const preferences = {
     vegetarianStatus: a.vegetarian_status,

@@ -1,3 +1,5 @@
+import {AuthoredPlanEditor} from '../AuthoredPlanEditor';
+import type {AuthoredContent} from '../authoredPlan';
 import { useEffect, useRef, useState } from "react";
 import {
   Dumbbell,
@@ -31,7 +33,7 @@ export function initialTrainingInput(): TrainingInput {
     location: "home",
     experience: "beginner",
     goal: "general",
-    days: [0, 3],
+    days: [],
     minutes: 45,
     equipment: [],
     start_date: localToday(),
@@ -50,13 +52,16 @@ export function TrainingPanel({
   revision,
   canWrite,
   onBusy,
+  name,
 }: {
+  name: string;
   org: string;
   record: string;
   revision: number;
   canWrite: boolean;
   onBusy: (v: boolean) => void;
 }) {
+  const [mode,setMode]=useState<'engine'|'authored'>('engine'),[seed,setSeed]=useState<AuthoredContent|undefined>();
   const [input, setInput] = useState<TrainingInput>(initialTrainingInput),
     [rows, setRows] = useState<TrainingSnapshot[]>([]),
     [page, setPage] = useState(0),
@@ -157,16 +162,16 @@ export function TrainingPanel({
       ["dumbbells", "long_band", "stable_platform"].includes(e),
   );
   const previewStale = selected && selected.intake_revision !== revision;
+  if(mode==='authored')return <div className="training-panel"><div className="pro-module-tabs"><button aria-pressed={false} onClick={()=>setMode('engine')}>پیش‌نویس موتور و سوابق</button><button aria-pressed={true}>تدوین اختصاصی متخصص</button></div><AuthoredPlanEditor org={org} record={record} revision={revision} kind="training" name={name} canWrite={canWrite} onBusy={onBusy} seed={seed}/></div>;
   return (
     <div className="training-panel" aria-busy={busy}>
-      <div className="training-intro">
+      <div className="pro-module-tabs"><button aria-pressed={true}>پیش‌نویس موتور و سوابق</button><button disabled={busy} onClick={()=>{setSeed(undefined);setMode('authored');}}>تدوین اختصاصی متخصص</button></div><div className="training-intro">
         <span className="training-badge">
           <Dumbbell size={16} /> تمرین، قدم‌به‌قدم
         </span>
         <h3>یک برنامه که بشود ادامه‌اش داد.</h3>
         <p>
-          شروع چهار هفته‌ای برای آمادگی عمومی و تقویت عضلات؛ دو یا سه جلسه
-          تمام‌بدن با زمان و تجهیزات واقعی مراجع.
+          پیش‌نویس را با روزها، زمان و تجهیزات مراجع بسازید؛ یا از تدوین اختصاصی برای انتخاب آزاد جلسات و حرکات استفاده کنید.
         </p>
       </div>
       {error && (
@@ -239,11 +244,10 @@ export function TrainingPanel({
                 aria-label="زمان هر جلسه"
                 value={input.minutes}
                 onChange={(e) =>
-                  change({ minutes: Number(e.target.value) as 45 | 60 })
+                  change({ minutes: Number(e.target.value) })
                 }
               >
-                <option value="45">۴۵ دقیقه</option>
-                <option value="60">۶۰ دقیقه</option>
+                {[30,45,60,75,90,120].map(n=><option key={n} value={n}>{n.toLocaleString('fa-IR')} دقیقه</option>)}
               </PanelSelect>
             </label>
             <label>
@@ -281,7 +285,7 @@ export function TrainingPanel({
             دستگاه کششی را انتخاب کرد. انتخاب «باشگاه» به‌تنهایی به معنی وجود
             همه دستگاه‌ها نیست.
           </p>
-          <h4>دو یا سه روز با فاصله انتخاب کن</h4>
+          <h4>روزهای تمرین را انتخاب کنید</h4>
           <div className="training-days">
             {WEEKDAYS.map((name, i) => (
               <label
@@ -307,8 +311,7 @@ export function TrainingPanel({
           <div className="training-screen">
             <h4>آمادگی تمرین</h4>
             <p>
-              مواردی را که وجود دارند علامت بزن. این نسخه برای توان‌بخشی یا
-              شرایط ویژه برنامه اختصاصی نمی‌سازد.
+              موارد مرتبط را ثبت کنید. برای نسخهٔ اختصاصی، ابزار تدوین متخصص در همین پنجره در دسترس است.
             </p>
             {(
               [
@@ -358,7 +361,7 @@ export function TrainingPanel({
           </div>
           <button
             className="pro-primary"
-            disabled={busy || !canWrite || !input.screening.confirmed}
+            disabled={busy || !canWrite || !input.screening.confirmed || input.days.length===0}
             onClick={() =>
               void run(async () => {
                 const result = await trainingApi.generate(
@@ -388,7 +391,7 @@ export function TrainingPanel({
       </details>
       {selected && (
         <section ref={previewRef} className="training-preview">
-          <div className="training-preview-head">
+          <button disabled={busy||!canWrite} onClick={()=>{setSeed({version:1,title:'برنامه تمرینی اختصاصی',notes:selected.plan.notes.join('\n'),reviewed:false,sections:selected.plan.weeks.flatMap(w=>w.sessions.map(s=>({title:'هفته '+w.week+' · '+s.title,lines:s.lines.map(l=>({name:l.exercise.name,details:l.sets+' ست · '+l.reps.join(' تا ')+' تکرار · '+l.rest_seconds+' ثانیه استراحت'}))})))});setMode('authored');}}>ساخت نسخه اختصاصی از این پیش‌نویس</button><div className="training-preview-head">
             <div>
               <small>
                 {selected.approved_at ? "تأییدشده" : "پیش‌نویس برای بازبینی"}
