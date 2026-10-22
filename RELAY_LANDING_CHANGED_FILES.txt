@@ -1,0 +1,13 @@
+.github/workflows/pro-foundation.yml
+scripts/landing-catalog-database.test.mjs
+scripts/landing-page.smoke-test.mjs
+scripts/landing-wave.test.mjs
+src/components/landing/FlowWave.tsx
+src/components/landing/LandingPage.tsx
+src/components/landing/LandingSections.tsx
+src/components/landing/flow-wave-renderer.ts
+src/components/landing/flow-wave-shaders.ts
+src/components/landing/relay-landing.css
+src/hooks/useSubscriptionPlans.ts
+supabase/migrations/20261022_031_public_subscription_catalog.sql
+tests/public/landing.spec.ts

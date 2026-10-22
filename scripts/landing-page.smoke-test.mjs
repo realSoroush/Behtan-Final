@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { access, readFile } from 'node:fs/promises';
 
 const landing = await readFile(new URL('../src/components/landing/LandingPage.tsx', import.meta.url), 'utf8');
+const relayStyles = await readFile(new URL('../src/components/landing/relay-landing.css', import.meta.url), 'utf8');
+const sections = await readFile(new URL('../src/components/landing/LandingSections.tsx', import.meta.url), 'utf8');
 const app = await readFile(new URL('../src/App.tsx', import.meta.url), 'utf8');
 const auth = await readFile(new URL('../src/components/PhoneAuth.tsx', import.meta.url), 'utf8');
 const styles = await readFile(new URL('../src/index.css', import.meta.url), 'utf8');
@@ -16,8 +18,11 @@ assert.match(landing, /ساخت برنامه شخصی/, 'The primary onboarding 
 assert.match(landing, /ورود به حساب/, 'The returning-user CTA is missing.');
 assert.match(app, /authRequested \? <PhoneAuth onBack=\{closeAuth\} \/> : <LandingPage onStart=\{openAuth\} \/>/, 'Logged-out routing must lead to landing or auth.');
 assert.match(auth, /onBack\?: \(\) => void/, 'Auth needs a safe route back to landing.');
-assert.match(landing, /dark:bg-transparent dark:shadow-none/, 'Landing logo background must be transparent in dark mode.');
-assert.match(landing, /border-primary-400 bg-primary-500/, 'The final CTA must keep the brand-green background in both themes.');
+assert.match(relayStyles, /\.behtan-landing \.brand img\s*\{/, 'Logo styles must be scoped to the landing.');
+assert.match(relayStyles, /\.behtan-landing \.final-box\s*\{[^}]*background:\s*var\(--lime\)/, 'The final CTA must retain its green brand background.');
+assert.match(sections, /useSubscriptionPlans\(true\)/, 'Public prices must use the admin-managed catalog.');
+assert.doesNotMatch(landing, /<iframe|<dialog/, 'Production must use real app handoff, not the preview dialog.');
+assert.doesNotMatch(relayStyles, /(?:^|\})\s*(?:body|html|:root)\s*\{/m, 'Landing CSS must not change app-wide styles.');
 assert.match(styles, /font-family: 'IRANSansX'/, 'IRANSansX font-face is missing.');
 assert.match(styles, /url\('\/fonts\/IRANSansX-Regular\.woff'\)/, 'IRANSansX regular source is missing.');
 assert.match(styles, /url\('\/fonts\/IRANSansX-Bold\.woff'\)/, 'IRANSansX bold source is missing.');
@@ -28,3 +33,6 @@ await access(new URL('../public/fonts/IRANSansX-Regular.woff', import.meta.url))
 await access(new URL('../public/fonts/IRANSansX-Bold.woff', import.meta.url));
 
 console.log('✓ Landing page, auth handoff, and exact eNamad embed verified.');
+
+await import('./landing-catalog-database.test.mjs');
+await import('./landing-wave.test.mjs');
