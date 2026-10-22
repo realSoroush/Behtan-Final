@@ -1,3 +1,4 @@
+import {PanelModal} from "@/components/ui/PanelModal";
 import { ProSubscription } from "./ProSubscription";
 import { PanelSelect } from "@/components/ui/PanelSelect";
 import { ArrowUpLeft, FolderHeart, LifeBuoy, LogOut, ShieldCheck, Sparkles } from "lucide-react";
@@ -64,7 +65,7 @@ export function ProApp() {
   );
 }
 function Workspace({ userId }: { userId: string }) {
-  const [panel,setPanel]=useState("cases");
+  const [panel,setPanel]=useState("cases"),[subscriptionBusy,setSubscriptionBusy]=useState(false);
   const [orgs, setOrgs] = useState<ProOrganization[]>([]),
     [members, setMembers] = useState<ProMembership[]>([]),
     [selected, setSelected] = useState(""),
@@ -170,8 +171,8 @@ function Workspace({ userId }: { userId: string }) {
       {orgs.length > 0 && (
         <>
           <nav className="pro-workspace-tabs" aria-label="بخش‌های فضای کاری"><button aria-pressed={panel==='cases'} onClick={()=>setPanel('cases')}>مراجعان و برنامه‌ها</button><button aria-pressed={panel==='subscription'} onClick={()=>setPanel('subscription')}>اشتراک و ظرفیت</button></nav>
-          <div hidden={panel!=='cases'}><RealCaseWorkspace key={selected} org={selected} roles={roles} /></div>
-          {panel==='subscription'&&<ProSubscription key={selected} org={selected}/> }
+          <div><RealCaseWorkspace key={selected} org={selected} roles={roles} /></div>
+          {panel==='subscription'&&<PanelModal title="اشتراک و ظرفیت" busy={subscriptionBusy} onClose={()=>setPanel('cases')}><ProSubscription onBusy={setSubscriptionBusy} key={selected} org={selected}/></PanelModal> }
         </>
       )}
       <section id="pro-support" className="pro-support">

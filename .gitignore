@@ -48,3 +48,11 @@ playwright-report/
 
 # Generated Pro sample artifacts
 /output/
+
+# Private database exports
+backups/
+*.dump
+*.dump.partial
+/roles.sql
+/data.sql
+/schema.sql

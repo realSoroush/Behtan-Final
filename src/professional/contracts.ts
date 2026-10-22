@@ -27,7 +27,7 @@ export function proErrorMessage(error: unknown): string {
   if (code.includes('PRO_MIGRATION_REQUIRED')) return 'نسخه دیتابیس با پنل هماهنگ نیست؛ Migration جدید باید اجرا شود.';
   if (code.includes('PRO_API_NOT_DEPLOYED')) return 'مسیر ساخت برنامه در این انتشار موجود نیست؛ انتشار API پنل باید بررسی شود.';
   if (code.includes('PRO_API_UNAVAILABLE')) return 'سرویس ساخت برنامه پاسخ معتبر نداد؛ لاگ سرور پنل را بررسی کنید.';
-  if (code.includes('PRO_SUBSCRIPTION_EXPIRED')) return 'اعتبار ساخت و ویرایش پایان یافته است؛ سوابق و PDF همچنان در دسترس‌اند.';
+  if (code.includes('PRO_SUBSCRIPTION_EXPIRED')) return 'ساخت و ویرایش در این پنل فعلاً غیرفعال است؛ سوابق و PDF همچنان در دسترس‌اند.';
   if (code.includes('PRO_CASE_LIMIT')) return 'ظرفیت پرونده‌های این فضای کاری تکمیل شده است.';
   if (code.includes('PRO_SERVER_NOT_CONFIGURED')) return 'سرویس ساخت برنامه هنوز تنظیم نشده است؛ تنظیمات سرور پنل را بررسی کنید.';
   if (code.includes('PRO_AUTH_REQUIRED')) return 'نشست ورود منقضی شده است؛ دوباره وارد شوید.';

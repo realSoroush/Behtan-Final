@@ -1,6 +1,6 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "types": ["node"] },
-  "include": ["server/**/*.ts", "api/pro-plan.ts", "api/pro-account.ts"],
+  "include": ["server/**/*.ts", "api/pro-plan.ts", "api/pro-account.ts", "api/pro-body-scan.ts"],
   "references": []
 }

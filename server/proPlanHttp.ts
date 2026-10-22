@@ -5,7 +5,7 @@ import { ProServerError, processPlanRequest, type PlanDependencies } from './pro
 import { supabasePlanDependencies } from './proPlanSupabase.ts';
 export function createPlanHandler(dependencies: () => PlanDependencies = supabasePlanDependencies, health = proHealth) {
   return async (req: IncomingMessage & { body?: unknown }, res: ServerResponse) => {
-    const requestId=randomUUID();
+    const requestId=randomUUID(),started=Date.now();
     let deps:PlanDependencies|undefined,actor:string|undefined,body:unknown;
     res.setHeader('X-Request-Id',requestId);
     res.setHeader('Cache-Control','no-store');
@@ -52,7 +52,7 @@ export function createPlanHandler(dependencies: () => PlanDependencies = supabas
         try {await deps.reportFailure({id:requestId,actor,org:b.org,operation:b.action,code});}catch{/* Logging must not change the original result. */}
       }
       // Metadata only. Never log the request, JWT, profile, notes or raw error.
-      console.error(JSON.stringify({event:'pro_request_failed',request_id:requestId,code}));
+      console.error(JSON.stringify({event:'pro_request_failed',request_id:requestId,code,duration_ms:Date.now()-started}));
       res.statusCode = e instanceof ProServerError ? e.status : 503;
       res.end(JSON.stringify({ error:e instanceof ProServerError ? e.code : 'PRO_CONNECTION_ERROR' }));
     }

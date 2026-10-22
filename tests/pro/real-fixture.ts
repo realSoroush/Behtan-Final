@@ -201,7 +201,9 @@ export async function setup(
           status: "active",
         },
       ];
-    else if(path.endsWith('/pro_workspace_status')) {
+    else if(path.endsWith('/pro_body_reports')) {data=[];
+    } else if(path.endsWith('/pro_plan_body_report')) {data=null;
+    } else if(path.endsWith('/pro_workspace_status')) {
       if(!active){await route.fulfill({status:403,json:{message:'PRO_ACCESS_DENIED'}});return;}
       data={can_write:writable,source:'pilot',expires_at:'2026-11-19T00:00:00Z',case_limit:null,case_count:cases.length};
     } else if(path.endsWith('/pro_browse_case_directory')) {

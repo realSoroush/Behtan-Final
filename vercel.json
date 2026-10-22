@@ -5,6 +5,9 @@
     },
     "api/pro-account.ts": {
       "maxDuration": 30
+    },
+    "api/pro-body-scan.ts": {
+      "maxDuration": 60
     }
   }
 }

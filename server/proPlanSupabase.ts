@@ -22,7 +22,7 @@ export function supabasePlanDependencies(): PlanDependencies {
   const admin = createClient(url, secret, options);
   const userClient = (token: string) => createClient(url, anon, { ...options, global: { headers: { Authorization: `Bearer ${token}` } } });
   const call = async <T>(name: string, args: Record<string,unknown>): Promise<T> => {
-    const { data, error, status } = await admin.rpc(name, args);
+    const { data, error, status } = await admin.rpc(name, args).abortSignal(AbortSignal.timeout(12000)).retry(false);
     if (error) {
       if(status===401)throw new ProServerError('PRO_SERVER_CREDENTIAL_INVALID',503);
       databaseError(error,status);

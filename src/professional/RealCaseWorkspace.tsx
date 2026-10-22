@@ -1,3 +1,4 @@
+import {PanelModal} from "@/components/ui/PanelModal";
 import { PanelSelect } from "@/components/ui/PanelSelect";
 import { Archive, ArchiveRestore, ArrowRight, Check, ChevronLeft, FileText, FolderHeart, Plus, RefreshCw, Save, Search, Sparkles, UserRound, Users } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -14,7 +15,9 @@ import {
   type RealIntake,
   type PrintedPlan,
 } from "./menuPlan";
-import { printSavedPlan } from "./printPlan";
+import { BodyScanPanel } from "./body/BodyScanPanel";
+import {ReportAttachment} from "./body/ReportAttachment";
+import {printPlanWithBody} from "./body/printBodyPlan";
 import { PlanPreview } from "./PlanPreview";
 import { proErrorMessage, type ProRole } from "./contracts";
 const baseMessage = (e: unknown) =>
@@ -114,7 +117,7 @@ export function RealCaseWorkspace({
         <div><span className="pro-stat-icon"><Users size={19} /></span><span><small>پرونده‌های فضای کاری</small><strong>{access.case_count.toLocaleString('fa-IR')} <em>{access.case_limit !== null ? 'از '+access.case_limit.toLocaleString('fa-IR') : 'پرونده'}</em></strong></span></div>
         <div><span className={'pro-license-dot '+(!access.can_write?'is-paused':'')} /><span><small>وضعیت دسترسی</small><strong className="pro-stat-caption">{access.can_write ? 'آمادهٔ ساخت برنامه' : 'مشاهدهٔ سوابق'}<em>{access.expires_at ? 'تا '+new Date(access.expires_at).toLocaleDateString('fa-IR') : 'فضای کاری فعال'}</em></strong></span></div>
       </div>}
-      {access && !access.can_write && <p className="pro-muted">اعتبار ساخت برنامه پایان یافته؛ سوابق و PDF همچنان در دسترس‌اند.</p>}
+      {access && !access.can_write && <p className="pro-muted">ساخت و ویرایش فعلاً غیرفعال است؛ همه سوابق و PDFها در دسترس‌اند. برای ادامه، از «اشتراک و ظرفیت» درخواست تمدید ثبت کنید.</p>}
       <div className="pro-directory-filter"><button aria-pressed={!archivedOnly} onClick={()=>{setArchivedOnly(false);setPage(0);}}>پرونده‌های فعال</button><button aria-pressed={archivedOnly} onClick={()=>{setArchivedOnly(true);setPage(0);}}><Archive size={16}/>بایگانی</button></div>
       <form className="pro-search-bar" onSubmit={e=>{e.preventDefault();setPage(0);setQuery(search.trim().replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/^\+/, '').replace(/^0(?=9\d{9}$)/,'98'));}}>
         <label><span className="sr-only">جست‌وجوی نام یا شماره</span><Search size={19} aria-hidden="true" /><input placeholder="نام یا شماره تماس مراجع…" aria-label="جست‌وجوی پرونده" type="search" value={search} onChange={e=>setSearch(e.target.value)} maxLength={100}/></label>
@@ -152,6 +155,7 @@ function RealCaseDetail({
   initialId: string | null;
   onBack: () => void;
 }) {
+  const [previewOpen,setPreviewOpen]=useState(false),[scanOpen,setScanOpen]=useState(false),[scanBusy,setScanBusy]=useState(false);
   const [archived,setArchived]=useState(false),[duplicates,setDuplicates]=useState<{id:string;display_name:string}[]>([]);
   const [id, setId] = useState(initialId),
     [revision, setRevision] = useState(0),
@@ -240,7 +244,7 @@ function RealCaseDetail({
         }
       } catch (e) {
         if (active && e instanceof Error && e.message === 'PRO_ACCESS_DENIED') {
-          setLocked(true);
+          setLocked(true);setScanOpen(false);setPreviewOpen(false);
           saveRequest.current = null;
           setDraftId('');
           setPlanId('');
@@ -341,7 +345,7 @@ function RealCaseDetail({
       if (dirty || !id || stale || connectionWarning || !access?.can_write)
         throw new Error('ابتدا اطلاعات پرونده را ذخیره و اتصال را بررسی کنید.');
       const result = await realCaseApi.generatePlan(org, id, revision, count, date, notes, generationKey.current);
-      setPlan(result.plan);
+      setPlan(result.plan);setPreviewOpen(true);
       setDraftId(result.draft_id);
       generationKey.current = crypto.randomUUID();
       setPlanId("");
@@ -382,17 +386,19 @@ function RealCaseDetail({
           <ArrowRight size={17} /> فهرست مراجعان
         </button>
       </div>
+      {id && <div className="pro-actions"><button disabled={busy} onClick={()=>setScanOpen(true)}>تحلیل تصویری بدن و گزارش‌ها</button></div>}
+      {id&&scanOpen&&<PanelModal title="تحلیل تصویری بدن" busy={scanBusy} onClose={()=>setScanOpen(false)}><BodyScanPanel org={org} record={id} revision={revision} canWrite={Boolean(access?.can_write)&&!archived&&!dirty&&!stale&&!connectionWarning} onBusy={setScanBusy}/></PanelModal>}
       <nav className="pro-case-path" aria-label="مسیر آماده‌سازی برنامه">
         <a href="#pro-intake-editor"><span>۱</span>اطلاعات مراجع</a>
         {id ? <a href="#pro-plan-builder"><span>۲</span>ساخت برنامه</a> : <span className="pro-path-inactive"><span>۲</span>ساخت برنامه</span>}
         {id ? <a href="#pro-saved-programs"><span>۳</span>برنامه‌ها و خروجی</a> : <span className="pro-path-inactive"><span>۳</span>برنامه‌ها و خروجی</span>}
       </nav>
-      {error && (
+      {error && !(previewOpen&&plan) && (
         <p role="alert" className="pro-error">
           {error}
         </p>
       )}
-      {notice && (
+      {notice && !(previewOpen&&plan) && (
         <p role="status" className="pro-success">
           {notice}
         </p>
@@ -516,7 +522,7 @@ function RealCaseDetail({
                 ))}
                 <div className="pro-actions"><button disabled={busy||historyPage===0} onClick={()=>void run(async()=>{const r=await realCaseApi.history(org,id,historyPage-1);setHistory(r.rows);setHistoryPage(p=>p-1);})}>نسخه‌های جدیدتر</button><span>صفحه {(historyPage+1).toLocaleString('fa-IR')}</span><button disabled={busy||(historyPage+1)*10>=historyTotal} onClick={()=>void run(async()=>{const r=await realCaseApi.history(org,id,historyPage+1);setHistory(r.rows);setHistoryPage(p=>p+1);})}>نسخه‌های قدیمی‌تر</button></div>
               </details>
-              {!access?.can_write && <p role="status" className="pro-muted">اعتبار ساخت و ویرایش برنامه پایان یافته است؛ مشاهده سوابق و خروجی PDF فعال است.</p>}
+              {!access?.can_write && <p role="status" className="pro-muted">ساخت و ویرایش در این پنل فعلاً غیرفعال است؛ مشاهده سوابق و خروجی PDF فعال است.</p>}
               <section id="pro-plan-builder" className="pro-generation">
                 <div className="pro-block-heading"><span className="pro-block-icon"><Sparkles size={22} /></span><div><small>قدم بعدی</small><h3>ساخت برنامه غذایی</h3></div></div>
                 <p>
@@ -577,9 +583,9 @@ function RealCaseDetail({
                     قبل از تولید، پاسخ‌های ویرایش‌شده را ذخیره کنید.
                   </p>
                 )}
-                {plan && (
+                {plan && previewOpen && (
                   <>
-                    <PlanPreview plan={plan} />
+                    <PanelModal title="برنامه غذایی مراجع" busy={busy} onClose={()=>setPreviewOpen(false)}>{error&&<p role="alert" className="pro-error">{error}</p>}{notice&&<p role="status" className="pro-success">{notice}</p>}{busy&&<p role="status">در حال انجام…</p>}<PlanPreview plan={plan} />{planId&&id&&<ReportAttachment org={org} record={id} plan={planId} revision={plan.intake_revision} canWrite={Boolean(access?.can_write)&&!archived}/>}
                     <div className="pro-actions">
                       <button
                         disabled={busy || archived || Boolean(planId) || dirty || stale || !access?.can_write}
@@ -589,14 +595,14 @@ function RealCaseDetail({
                       </button>
                       <button
                         disabled={busy || !planId}
-                        onClick={() => void run(() => printSavedPlan(plan))}
+                        onClick={() => void run(() => printPlanWithBody(plan,org,planId))}
                       >
                         خروجی PDF / چاپ
                       </button>
                     </div>
                     <p className="pro-muted">
                       در پنجره چاپ، مقصد «Save as PDF» را انتخاب کنید.
-                    </p>
+                    </p></PanelModal>
                   </>
                 )}
                 <div id="pro-saved-programs" className="pro-block-heading pro-saved-heading"><span className="pro-block-icon"><FileText size={21} /></span><div><small>آرشیو مراجع</small><h3>برنامه‌های ذخیره‌شده</h3></div></div>
@@ -616,7 +622,7 @@ function RealCaseDetail({
                       <button
                         disabled={busy}
                         onClick={() => {
-                          setPlan(p.plan);
+                          setPlan(p.plan);setPreviewOpen(true);
                           setPlanId(p.id);
                         }}
                       >
