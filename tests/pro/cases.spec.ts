@@ -236,7 +236,10 @@ test('expired license preserves case access while disabling edits',async({page})
  await page.getByRole('button',{name:'بازکردن پرونده',exact:true}).click();
  await expect(page.getByRole('textbox',{name:'نام مراجع',exact:true})).toBeDisabled();
  await expect(page.getByRole('button',{name:'تولید و پیش‌نمایش برنامه',exact:true})).toBeDisabled();
- await expect(page.getByText(/اعتبار ساخت و ویرایش برنامه پایان یافته/)).toBeVisible();
+ await expect(page.getByRole('button',{name:'ذخیره اطلاعات پرونده',exact:true})).toBeDisabled();
+ await expect(page.getByRole('status').filter({
+   hasText:'مشاهده سوابق و خروجی PDF فعال است',
+ })).toBeVisible();
 });
 
 test('service diagnostic distinguishes missing configuration from missing API',async({page})=>{
