@@ -280,7 +280,7 @@ export function Step10Analysis() {
 
         {displayResult && status === 'success' && (
           <motion.div key="results" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
-            <div className="grid grid-cols-2 gap-3">
+            {displayResult.source==='ai'&&<div className="grid grid-cols-2 gap-3">
               <StatCard
                 emoji="💧"
                 label="درصد چربی بدن"
@@ -295,9 +295,10 @@ export function Step10Analysis() {
               />
               <StatCard emoji="🏗️" label="نوع بدن" value={BODY_TYPE_LABELS[displayResult.bodyType]} />
               <StatCard emoji="💪" label="توده عضلانی تخمینی" value={muscleLabel(displayResult.estimatedMuscleMass)} />
-            </div>
+            </div>}
 
-            <div className="rounded-3xl border border-primary-100 bg-gradient-to-br from-primary-50 to-emerald-50 p-5 dark:border-primary-800 dark:from-primary-900/20 dark:to-emerald-900/20">
+            {displayResult.source==='manual'&&<div className="onboarding-manual-result"><ShieldCheck size={21}/><div><strong>بدون عکس ادامه می‌دهیم</strong><p>نوع بدن انتخابی تو: {BODY_TYPE_LABELS[displayResult.bodyType]}</p></div></div>}
+            <div className="onboarding-analysis-note rounded-3xl border border-primary-100 bg-gradient-to-br from-primary-50 to-emerald-50 p-5 dark:border-primary-800 dark:from-primary-900/20 dark:to-emerald-900/20">
               <p className="mb-2 text-2xl">🌟</p>
               <p className="text-sm leading-relaxed text-neutral-700 dark:text-neutral-300">
                 {displayResult.narrative}
@@ -319,9 +320,9 @@ export function Step10Analysis() {
       </AnimatePresence>
 
       {displayResult && status === 'success' && (
-        <Button onClick={() => void nextStep()} loading={isSubmitting}>
+        <div className="onboarding-actions"><Button onClick={() => void nextStep()} loading={isSubmitting}>
           ادامه به مرحله پایانی
-        </Button>
+        </Button></div>
       )}
     </div>
   );

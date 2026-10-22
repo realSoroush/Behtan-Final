@@ -182,9 +182,9 @@ export function Step9BodyScan() {
           برگشت به ثبت یا آپلود تصویر
         </button>
 
-        <Button onClick={() => void nextStep()} disabled={!canContinueManually} loading={isSubmitting}>
+        <div className="onboarding-actions"><Button onClick={() => void nextStep()} disabled={!canContinueManually} loading={isSubmitting}>
           ادامه
-        </Button>
+        </Button></div>
       </div>
     );
   }
@@ -193,10 +193,19 @@ export function Step9BodyScan() {
     <div className="space-y-6">
       <StepHeader
         step={currentStep}
-        title="اسکن بدن با هوش مصنوعی"
-        subtitle="روبه‌روی دوربین بایستید یا یک عکس تمام‌قد آپلود کنید."
+        title="شناخت بهتر بدن تو"
+        subtitle="این مرحله اختیاری است؛ با عکس یا بدون عکس ادامه بده."
         onBack={prevStep}
       />
+
+      <button data-scan-choice
+        type="button"
+        onClick={handleSkip}
+        className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-neutral-200 py-3 font-semibold text-neutral-600 transition-all hover:border-primary-400 hover:text-primary-600 dark:border-neutral-700 dark:text-neutral-400"
+      >
+        <ArrowLeft size={18} />
+        ادامه بدون عکس
+      </button>
 
       <div className="space-y-3 rounded-2xl border border-primary-100 bg-primary-50 p-4 text-sm text-primary-800 dark:border-primary-800 dark:bg-primary-900/20 dark:text-primary-200">
         <div className="flex items-start gap-2 leading-relaxed">
@@ -292,7 +301,7 @@ export function Step9BodyScan() {
           )}
         </div>
         <p className="font-semibold text-neutral-700 dark:text-neutral-300">
-          {isPreparingImage ? 'در حال آماده‌سازی امن تصویر…' : 'عکس بکشید یا آپلود کنید'}
+          {isPreparingImage ? 'در حال آماده‌سازی امن تصویر…' : 'عکس را از گالری انتخاب کن'}
         </p>
         <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">JPG، PNG — حداکثر ۱۰ مگابایت</p>
         <input
@@ -316,22 +325,15 @@ export function Step9BodyScan() {
         </div>
       )}
 
-      <Button
+      <div className="onboarding-actions"><Button
         onClick={() => void handleAnalyze()}
         disabled={!data.bodyScanImage || !consentGranted || isPreparingImage}
         loading={isSubmitting}
       >
         تحلیل تصویر با هوش مصنوعی
-      </Button>
+      </Button></div>
 
-      <button
-        type="button"
-        onClick={handleSkip}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-neutral-200 py-3 font-semibold text-neutral-600 transition-all hover:border-primary-400 hover:text-primary-600 dark:border-neutral-700 dark:text-neutral-400"
-      >
-        <ArrowLeft size={18} />
-        رد کردن و انتخاب دستی نوع بدن
-      </button>
+
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { StepHeader } from '@/components/ui/StepHeader';
 import { Button } from '@/components/ui/Button';
-import { Select } from '@/components/ui/Input';
+import { Input, Select } from '@/components/ui/Input';
+import { useState } from 'react';
+import { UserRound } from 'lucide-react';
 import { OptionCard } from '@/components/ui/Card';
 import { useOnboardingStore } from '@/hooks/useOnboardingStore';
 import type { Gender } from '@/types';
@@ -11,7 +13,7 @@ export const PROVINCES = [
   'خوزستان', 'کرمان', 'گلستان', 'قم', 'هرمزگان',
   'لرستان', 'سیستان و بلوچستان', 'همدان', 'مرکزی', 'بوشهر',
   'زنجان', 'اردبیل', 'چهارمحال و بختیاری', 'کهگیلویه و بویراحمد',
-  'سمنان', 'ایلام', 'خراسان شمالی', 'خراسان جنوبی', 'قزوین', 'یزد', 'گلستان'
+  'سمنان', 'ایلام', 'خراسان شمالی', 'خراسان جنوبی', 'قزوین', 'یزد', 'کردستان'
 ];
 
 export const CITIES_BY_PROVINCE: Record<string, string[]> = {
@@ -24,32 +26,34 @@ export const CITIES_BY_PROVINCE: Record<string, string[]> = {
   مازندران: ['ساری', 'بابل', 'آمل', 'قائم‌شهر', 'نوشهر', 'چالوس', 'تنکابن'],
 };
 
+// Retained for the existing admin scenario picker; onboarding accepts actual city names.
 export const DEFAULT_CITIES = ['مرکز استان', 'شهرهای دیگر'];
+
 
 export function Step1Gender() {
   const { data, updateData, nextStep, currentStep, prevStep } = useOnboardingStore();
-  const cities = CITIES_BY_PROVINCE[data.province] ?? DEFAULT_CITIES;
+  const cities = CITIES_BY_PROVINCE[data.province] ?? [];
+  const [customCity,setCustomCity]=useState(()=>Boolean(data.city&&!cities.includes(data.city)));
 
-  const canContinue = Boolean(data.displayName?.trim()) && !!data.gender && !!data.province && !!data.city;
+  const canContinue = Boolean(data.displayName?.trim()) && !!data.gender && !!data.province && Boolean(data.city.trim());
 
-  const handleGender = (g: Gender) => updateData({
+  const handleGender = (g: Gender) => {if(g===data.gender)return;updateData({
     gender: g,
-    city: '',
     medicalConditions: g === 'male'
       ? data.medicalConditions.filter((condition) => condition !== 'pcos')
       : data.medicalConditions,
     pregnancyStatus: g === 'male' ? 'not_applicable' : null,
     safetyScreeningVersion: null,
     safetyAnswersConfirmed: false,
-  });
-  const handleProvince = (province: string) => updateData({ province, city: '' });
+  });};
+  const handleProvince = (province: string) => {if(province===data.province)return;setCustomCity(false);updateData({ province, city: '' });};
 
   return (
     <div className="space-y-6">
       <StepHeader
         step={currentStep}
-        title="اطلاعات پایه"
-        subtitle="برای شروع، جنسیت و محل سکونت خود را مشخص کنید."
+        title="از خودت بگو"
+        subtitle="با نام و چند اطلاعات ساده شروع می‌کنیم."
         onBack={prevStep}
       />
 
@@ -66,13 +70,13 @@ export function Step1Gender() {
           <OptionCard
             selected={data.gender === 'male'}
             onClick={() => handleGender('male')}
-            icon="🧔"
+            icon={<UserRound size={24}/>}
             label="مرد"
           />
           <OptionCard
             selected={data.gender === 'female'}
             onClick={() => handleGender('female')}
-            icon="👩"
+            icon={<UserRound size={24}/>}
             label="زن"
           />
         </div>
@@ -88,18 +92,19 @@ export function Step1Gender() {
       />
 
       {/* City */}
-      <Select
+      {cities.length>0&&<Select
         label="شهر"
-        value={data.city}
-        onChange={(e) => updateData({ city: e.target.value })}
+        value={customCity?'__other':data.city}
+        onChange={(e) => {const other=e.target.value==='__other';setCustomCity(other);updateData({ city: other?'':e.target.value });}}
         placeholder="شهر را انتخاب کنید"
-        options={cities.map((c) => ({ value: c, label: c }))}
+        options={[...cities.map((c) => ({ value: c, label: c })),{value:'__other',label:'شهر من در فهرست نیست'}]}
         disabled={!data.province}
-      />
+      />}
+      {(cities.length===0||customCity)&&<Input label="نام شهر" autoComplete="address-level2" maxLength={80} placeholder="نام شهرت را بنویس" value={data.city} disabled={!data.province} onChange={e=>updateData({city:e.target.value})}/>}
 
-      <Button onClick={nextStep} disabled={!canContinue}>
+      <div className="onboarding-actions"><Button onClick={nextStep} disabled={!canContinue}>
         ادامه
-      </Button>
+      </Button></div>
     </div>
   );
 }

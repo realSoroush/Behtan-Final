@@ -1,7 +1,7 @@
 import { JalaliBirthDate } from '@/components/ui/JalaliBirthDate';
 import { StepHeader } from '@/components/ui/StepHeader';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
+import { OnboardingNumberField } from './OnboardingNumberField';
 import { useOnboardingStore } from '@/hooks/useOnboardingStore';
 import {
   tryCalculateAge,
@@ -50,32 +50,28 @@ export function Step2Physical() {
       </div>
 
       {/* Height */}
-      <Input
-        label="قد (سانتی‌متر)"
-        type="number"
-        inputMode="numeric"
+      <OnboardingNumberField
+        label="قد" min={100} max={250}
         placeholder="مثال: ۱۷۵"
-        value={data.height ?? ''}
-        onChange={(e) => updateData({ height: e.target.value ? Number(e.target.value) : null })}
-        suffix="cm"
-        error={data.height !== null && !isValidHeight ? 'قد باید بین ۱۰۰ تا ۲۵۰ سانتی‌متر باشد.' : undefined}
+        value={data.height}
+        onChange={(height) => updateData({ height })}
+        suffix="سانتی‌متر"
+        errorMessage="قد باید بین ۱۰۰ تا ۲۵۰ سانتی‌متر باشد."
       />
 
       {/* Weight */}
-      <Input
-        label="وزن فعلی (کیلوگرم)"
-        type="number"
-        inputMode="decimal"
+      <OnboardingNumberField
+        label="وزن فعلی" min={30} max={300}
         placeholder="مثال: ۷۰"
-        value={data.weight ?? ''}
-        onChange={(e) => updateData({ weight: e.target.value ? Number(e.target.value) : null })}
-        suffix="kg"
-        error={data.weight !== null && !isValidWeight ? 'وزن باید بین ۳۰ تا ۳۰۰ کیلوگرم باشد.' : undefined}
+        value={data.weight}
+        onChange={(weight) => updateData({ weight })}
+        suffix="کیلوگرم"
+        errorMessage="وزن باید بین ۳۰ تا ۳۰۰ کیلوگرم باشد."
       />
 
-      <Button onClick={nextStep} disabled={!canContinue}>
+      <div className="onboarding-actions"><Button onClick={nextStep} disabled={!canContinue}>
         ادامه
-      </Button>
+      </Button></div>
     </div>
   );
 }

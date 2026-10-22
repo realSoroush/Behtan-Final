@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/hooks/useAuth';
 import { APP_LOGO_PATH, APP_NAME_FA } from '@/constants/brand';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import './onboarding/onboarding.css';
+import { normalizeOnboardingDigits } from '@/utils/onboardingExperience';
 import { TurnstileWidget } from '@/components/auth/TurnstileWidget';
 import { AUTH_CONFIG } from '@/config/authConfig';
 
@@ -39,12 +41,12 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
   }, [resendSeconds]);
 
   const handlePhoneChange = (value: string) => {
-    setPhone(value.replace(/[^\d\s\-+]/g, ''));
+    setPhone(normalizeOnboardingDigits(value).replace(/[^\d\s\-+]/g, ''));
     if (error) clearError();
   };
 
   const handleOtpChange = (value: string) => {
-    setOtp(value.replace(/\D/g, '').slice(0, 6));
+    setOtp(normalizeOnboardingDigits(value).replace(/\D/g, '').slice(0, 6));
     if (error) clearError();
   };
 
@@ -113,7 +115,7 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
   };
 
   return (
-    <div className="relative min-h-screen bg-neutral-50 dark:bg-neutral-950 flex flex-col">
+    <div className="onboarding-app onboarding-auth relative min-h-screen flex flex-col" dir="rtl">
       <ThemeToggle className="fixed right-4 top-4 z-50" />
       {onBack && (
         <button
@@ -125,7 +127,7 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
           صفحه اصلی
         </button>
       )}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 text-center pb-8">
+      <div className="onboarding-auth-intro flex-1 flex flex-col items-center justify-center px-6 text-center pb-8">
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -158,7 +160,7 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
           transition={{ delay: 0.3 }}
           className="flex flex-wrap justify-center gap-2 mt-6"
         >
-          {['🔥 محاسبه کالری دقیق', '🍽️ ۶ وعده روزانه', '🔄 جایگزینی غذا'].map((feature) => (
+          {['کالری و ماکروها', 'وعده‌های روزانه', 'جایگزینی غذا'].map((feature) => (
             <span
               key={feature}
               className="text-xs bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border border-primary-100 dark:border-primary-800 rounded-full px-3 py-1"
@@ -173,7 +175,7 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
         initial={{ y: 40, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.2, type: 'spring', stiffness: 200, damping: 25 }}
-        className="bg-white dark:bg-neutral-900 rounded-t-3xl px-6 pt-8 pb-10 border-t border-neutral-100 dark:border-neutral-800 shadow-2xl shadow-black/5"
+        className="onboarding-auth-panel bg-white dark:bg-neutral-900 rounded-t-3xl px-6 pt-8 pb-10 border-t border-neutral-100 dark:border-neutral-800 shadow-2xl shadow-black/5"
       >
         <h2 className="text-xl font-bold text-neutral-900 dark:text-neutral-100 mb-1">
           {step === 'phone' ? 'ورود به برنامه' : 'تأیید شماره موبایل'}
@@ -187,12 +189,13 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
 
         {step === 'phone' ? (
           <div className="flex flex-col gap-1.5 mb-4">
-            <label className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+            <label htmlFor="auth-phone" className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
               شماره موبایل
             </label>
             <div className="relative flex items-center">
               <span className="absolute right-4 text-lg select-none pointer-events-none">📱</span>
               <input
+                id="auth-phone"
                 type="tel"
                 inputMode="numeric"
                 autoComplete="tel"
@@ -220,10 +223,11 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
           </div>
         ) : (
           <div className="flex flex-col gap-1.5 mb-4">
-            <label className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+            <label htmlFor="auth-otp" className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
               کد تأیید
             </label>
             <input
+              id="auth-otp"
               type="text"
               inputMode="numeric"
               autoComplete="one-time-code"

@@ -113,7 +113,7 @@ assert(cameraSource.includes("document.visibilityState !== 'hidden'"), 'Backgrou
 assert(cameraSource.includes('countdownValueRef.current = 5'), 'Five-second timer is missing');
 
 assert(stepNineSource.includes('Google Gemini'), 'Processor is not disclosed in consent copy');
-assert(stepNineSource.includes('عکس بکشید یا آپلود کنید'), 'Existing upload action was removed');
+assert(stepNineSource.includes('type="file"') && stepNineSource.includes('handleFile(file)'), 'Existing upload input or file handler was removed');
 assert(!stepNineSource.includes('به هیچ سرور خارجی ارسال نمی‌شود'), 'False privacy promise is still present');
 assert(stepTenSource.includes('bodyScanResult: scanResult, bodyScanImage: null'), 'Raw image is not cleared after success');
 assert(stepTenSource.includes('timeoutMs: 45_000'), 'Client analysis timeout is missing');

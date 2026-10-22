@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+import {createRequire} from 'node:module';
+import {fileURLToPath} from 'node:url';
+import {normalizeOnboardingDigits,parseOnboardingNumber,onboardingDirection,onboardingPhase} from '../src/utils/onboardingExperience.ts';
+import {getVisibleOnboardingStep,getNextOnboardingStep} from '../src/utils/onboardingProgress.ts';
+for(const [input,expected] of [['۱۲۵٫۵',125.5],['١٢٥٫٥',125.5],[' 178 ',178],['.5',.5],['۸۵.',85],['0',0]])assert.equal(parseOnboardingNumber(input),expected,input);
+for(const input of ['',' ','-80','1e3','Infinity','NaN','125kg','1,000','۸۵..۵','۱۲/۵'])assert.equal(parseOnboardingNumber(input),null,input);
+assert.equal(normalizeOnboardingDigits('۰۹۱۲۳۴۵۶۷۸۹'),'09123456789');assert.equal(normalizeOnboardingDigits('١٢٣٤٥٦'),'123456');
+const steps=[1,2,3,4,5,6,7,9,10,11];assert.deepEqual(steps.map(getVisibleOnboardingStep),[1,2,3,4,5,6,7,8,9,10]);
+assert.equal(getNextOnboardingStep(7,11),9);assert.equal(onboardingDirection(9,7),-1);assert.equal(onboardingDirection(7,9),1);
+assert.deepEqual(steps.map(onboardingPhase),[0,0,0,1,1,1,1,2,2,2]);
+const root=fileURLToPath(new URL('..',import.meta.url));
+const result=await build({stdin:{contents:`export {useOnboardingStore as store} from './src/hooks/useOnboardingStore';export {Step1Gender,PROVINCES} from './src/components/onboarding/Step1Gender';export {Step2Physical} from './src/components/onboarding/Step2Physical';export {Step6Medical} from './src/components/onboarding/Step6Medical';export {Step7Dietary} from './src/components/onboarding/Step7Dietary';export {OnboardingReview} from './src/components/onboarding/OnboardingReview';export {Input,Select} from './src/components/ui/Input';export {createElement} from 'react';export {renderToStaticMarkup} from 'react-dom/server';`,resolveDir:root},tsconfig:root+'/tsconfig.json',bundle:true,platform:'node',format:'cjs',write:false,logLevel:'silent'});
+const module={exports:{}};new Function('module','exports','require',result.outputFiles[0].text)(module,module.exports,createRequire(import.meta.url));
+const {store,PROVINCES,Step1Gender,Step2Physical,Step6Medical,Step7Dietary,OnboardingReview,Input,Select,createElement,renderToStaticMarkup}=module.exports;
+assert.equal(PROVINCES.length,31);assert.equal(new Set(PROVINCES).size,31);assert(PROVINCES.includes('کردستان'));
+const render=(component,props={})=>{Object.assign(store.getInitialState(),store.getState());return renderToStaticMarkup(createElement(component,props));};
+store.getState().hydrateFromDraft('test-user',1,{displayName:'کاربر نمونه',gender:'male',province:'کردستان',city:'سنندج'});
+let html=render(Step1Gender);assert(html.includes('نام شهر'));assert(html.includes('سنندج'));assert(!html.includes('شهرهای دیگر'));
+html=render(Step2Physical);assert(html.includes('inputMode="decimal"'));assert(!html.includes('type="number"'));assert(html.includes('role="progressbar"'));
+store.getState().updateData({gender:'male',medicalConditions:['kidney_disease'],pregnancyStatus:'not_applicable',eatingDisorderStatus:'none',safetyAnswersConfirmed:true,safetyScreeningVersion:1});
+html=render(Step6Medical);assert(html.includes('برنامه خودکار برای شما صادر نمی‌شود'));assert(!html.includes('>ادامه</button>'));
+html=render(Step7Dietary);assert(html.includes('بادام زمینی'));assert(html.includes('onboarding-actions'));
+html=render(OnboardingReview,{data:{...store.getState().data,height:178,weight:125.5,goal:'weight_loss'}});assert(html.includes('۱۲۵٫۵'));assert(html.includes('کاهش وزن'));
+for(const Component of [Input,Select]){html=render(Component,{label:'فیلد آزمایشی',error:'خطای آزمایشی',options:[{value:'a',label:'گزینه'}]});const id=html.match(/id="([^"]+)"/)[1];assert(html.includes(`for="${id}"`));assert(html.includes(`aria-describedby="${id}-error"`));assert(html.includes('aria-invalid="true"'));}
+console.log('✓ Onboarding: Persian/Arabic decimal input, ten stable visible steps, reverse navigation, all 31 provinces, real city entry, linked field errors, review values and preserved medical hard-stop');

@@ -84,6 +84,8 @@ export function Step5Workout() {
                 <button
                   key={option.value}
                   type="button"
+                  data-ui="option"
+                  aria-pressed={data.trainingType === option.value}
                   onClick={() => updateAnswers({ trainingType: option.value })}
                   className={`w-full rounded-2xl border p-3 text-right transition-all ${
                     data.trainingType === option.value
@@ -109,6 +111,8 @@ export function Step5Workout() {
             </p>
             <input
               type="range"
+              aria-label="تعداد روزهای ورزش در هفته"
+              aria-valuetext={`${toPersianDigits(data.workoutDays)} روز در هفته`}
               min={1}
               max={7}
               value={data.workoutDays}
@@ -134,6 +138,8 @@ export function Step5Workout() {
                 <button
                   key={option.value}
                   type="button"
+                  data-ui="segment"
+                  aria-pressed={workoutDuration === option.value}
                   onClick={() => updateAnswers({ workoutDuration: option.value })}
                   className={`rounded-2xl border p-3 text-right transition-all ${
                     workoutDuration === option.value
@@ -158,6 +164,8 @@ export function Step5Workout() {
                 <button
                   key={option.value}
                   type="button"
+                  data-ui="option"
+                  aria-pressed={workoutIntensity === option.value}
                   onClick={() => updateAnswers({ workoutIntensity: option.value })}
                   className={`w-full rounded-2xl border p-3 text-right transition-all ${
                     workoutIntensity === option.value
@@ -187,8 +195,7 @@ export function Step5Workout() {
                 <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-white">{activityMeta.label}</p>
               </div>
               <div className="rounded-2xl px-3 py-2 text-center">
-                <p className="text-[10px] text-neutral-400">ضریب TDEE</p>
-                <p className="font-bold text-primary-600 dark:text-primary-400" dir="ltr">× {activityMeta.multiplier}</p>
+                <Dumbbell size={24} className="text-primary-600 dark:text-primary-400" aria-hidden="true"/>
               </div>
             </div>
             <p className="mt-2 text-xs leading-5 text-neutral-500 dark:text-neutral-400">{activityMeta.description}</p>
@@ -198,7 +205,7 @@ export function Step5Workout() {
         )}
       </div>
 
-      <Button onClick={handleNext} disabled={!canContinue}>ادامه</Button>
+      <div className="onboarding-actions"><Button onClick={handleNext} disabled={!canContinue}>ادامه</Button></div>
     </div>
   );
 }
