@@ -2,8 +2,8 @@ import { CompanionCard } from '@/components/companion/CompanionCard';
 import { getOnboardingCompanion } from '@/components/companion/companionState';
 import { APP_LOGO_PATH, APP_NAME_FA } from '@/constants/brand';
 import { useEffect, useRef, useState } from 'react';
-import { AlertCircle, Loader2 } from 'lucide-react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AlertCircle, Check, Loader2, ShieldCheck } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useOnboardingStore } from '@/hooks/useOnboardingStore';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useAuth } from '@/hooks/useAuth';
@@ -20,6 +20,8 @@ import { Step11Paywall } from './Step11Paywall';
 import type { SubscriptionPlan, UserProfile } from '@/types';
 import { startCheckout } from '@/lib/payments';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { ONBOARDING_PHASES, onboardingPhase, onboardingDirection } from '@/utils/onboardingExperience';
+import './onboarding.css';
 import { estimateActivityLevel } from '@/utils/activityLevel';
 import { resolveActivityResumeStep } from '@/utils/onboardingActivity';
 import {
@@ -37,12 +39,12 @@ interface OnboardingWizardProps {
 
 const SLIDE_VARIANTS = {
   enter: (direction: number) => ({
-    x: direction > 0 ? '-60px' : '60px',
+    x: direction > 0 ? '-22px' : '22px',
     opacity: 0,
   }),
   center: { x: 0, opacity: 1 },
   exit: (direction: number) => ({
-    x: direction > 0 ? '60px' : '-60px',
+    x: direction > 0 ? '22px' : '-22px',
     opacity: 0,
   }),
 };
@@ -73,6 +75,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const {
     profile,
     loading: profileLoading,
+    error: profileError,
+    refetch: refetchProfile,
     upsertProfile,
     saveOnboardingProgress,
   } = useUserProfile(user?.id);
@@ -97,6 +101,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     if (!user) return;
     if (checkedUserIdRef.current === user.id) return;
     if (profileLoading) return;
+    if (profileError) return;
 
     checkedUserIdRef.current = user.id;
 
@@ -119,6 +124,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     user,
     profile,
     profileLoading,
+    profileError,
     hydrateFromDraft,
     markHydratedEmpty,
   ]);
@@ -241,77 +247,47 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     }
   };
 
+  const reduced=useReducedMotion();
+  const [navigation,setNavigation]=useState({step:currentStep,direction:1});
+  if(navigation.step!==currentStep)setNavigation({step:currentStep,direction:onboardingDirection(navigation.step,currentStep)});
+  const phase=onboardingPhase(currentStep);
   const companionMessage = getOnboardingCompanion(currentStep);
   const [companionFocus, setCompanionFocus] = useState<{step: number; nonce: number} | null>(null);
 
-  const isReadyForCurrentUser = !!user && isHydrated && hydratedUserId === user.id;
+  const isReadyForCurrentUser = !!user && checkedUserIdRef.current === user.id && isHydrated && hydratedUserId === user.id;
 
   if (!isReadyForCurrentUser) {
-    return (
-      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 flex items-center justify-center">
-        <div className="text-center space-y-3">
-          <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-neutral-500 dark:text-neutral-400 text-sm">در حال بازیابی اطلاعات...</p>
-        </div>
-      </div>
-    );
+    if(profileError)return <div className="onboarding-app onboarding-loading" role="alert"><AlertCircle size={28}/><p>اطلاعات قبلی‌ات دریافت نشد.</p><p>اتصال را بررسی کن و دوباره تلاش کن.</p><button type="button" className="onboarding-retry" onClick={()=>void refetchProfile()}>تلاش دوباره</button></div>;
+    return <div className="onboarding-app onboarding-loading" role="status"><Loader2 size={28} className="animate-spin"/><p>در حال بازیابی اطلاعاتت…</p></div>;
   }
 
-  return (
-    <div className="relative min-h-screen bg-neutral-50 dark:bg-neutral-950 flex flex-col">
-      <ThemeToggle className="fixed right-4 top-4 z-50" />
-      <div className="text-center py-6 border-b border-neutral-100 dark:border-neutral-800">
-        <img src={APP_LOGO_PATH} alt={`لوگوی ${APP_NAME_FA}`} className="inline-block h-8 w-8 object-contain align-middle" />
-        <span className="mr-2 font-bold text-lg text-neutral-800 dark:text-neutral-200">{APP_NAME_FA}</span>
-      </div>
-
-      <div className="flex-1 overflow-hidden">
-        <div className="max-w-md mx-auto px-5 py-6">
-          {companionMessage && !submitError && (
-            <CompanionCard message={isSubmitting ? {mood:'thinking',title:'داریم اطلاعاتت را ذخیره می‌کنیم.',body:'تا پایان ذخیره‌سازی همین‌جا بمان.'} : companionFocus?.step === currentStep && currentStep !== 6 ? {...companionMessage, mood:'listening'} : companionMessage} compact reactionKey={`${currentStep}:${companionFocus?.nonce ?? 0}`} />
-          )}
-          {submitError && (
-            <div
-              role="alert"
-              className="mb-4 flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
-            >
-              <AlertCircle size={18} className="mt-0.5 shrink-0" />
-              <span>{submitError}</span>
-            </div>
-          )}
-
-          <div className={isSubmitting ? 'pointer-events-none select-none opacity-70' : ''}
-            onFocusCapture={event => {
-              if ((event.target as HTMLElement).matches('input, select, textarea')) {
-                setCompanionFocus({step:currentStep,nonce:Date.now()});
-              }
-            }}>
-            <AnimatePresence mode="wait" custom={currentStep}>
-              <motion.div
-                key={currentStep}
-                custom={currentStep}
-                variants={SLIDE_VARIANTS}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={TRANSITION}
-              >
-                {renderStep()}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-
-          {isSubmitting && (
-            <div
-              className="mt-4 flex items-center justify-center gap-2 text-sm font-medium text-neutral-500 dark:text-neutral-400"
-              aria-live="polite"
-            >
-              <Loader2 size={17} className="animate-spin" />
-              <span>در حال ذخیره اطلاعات...</span>
-            </div>
-          )}
-        </div>
-      </div>
+  return <div className="onboarding-app" dir="rtl">
+    <header className="onboarding-topbar"><div>
+      <a className="onboarding-brand" href="/" aria-label="صفحهٔ اصلی به‌تن"><img src={APP_LOGO_PATH} alt=""/><strong>{APP_NAME_FA}</strong></a>
+      <span className="onboarding-topbar-label">برنامهٔ غذایی، به سبک زندگی تو</span>
+      <ThemeToggle/>
+    </div></header>
+    <div className="onboarding-layout">
+      <aside className="onboarding-guide">
+        <div className="onboarding-intro"><span className="onboarding-eyebrow">قدم‌به‌قدم، با هم</span><h2>برنامه‌ای که<br/>به تو می‌آید.</h2><p>از خودت بگو تا غذاها با هدف و روزمره‌ات هماهنگ باشند.</p></div>
+        {companionMessage&&<CompanionCard message={isSubmitting?{mood:'thinking',title:'داریم اطلاعاتت را ذخیره می‌کنیم.',body:'تا پایان ذخیره‌سازی همین‌جا بمان.'}:companionFocus?.step===currentStep&&currentStep!==6?{...companionMessage,mood:'listening'}:companionMessage} reactionKey={`${currentStep}:${companionFocus?.nonce??0}`}/>}
+        <ol className="onboarding-phases" aria-label="بخش‌های ساخت برنامه">{ONBOARDING_PHASES.map((label,index)=><li key={label} className={index===phase?'is-current':index<phase?'is-complete':''} aria-current={index===phase?'step':undefined}><span>{index<phase?<Check size={14}/>:String(index+1).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[Number(d)])}</span><div>{label}<small>{index===phase?'در این بخش هستی':index<phase?'این بخش را پشت سر گذاشتی':'در ادامه'}</small></div></li>)}</ol>
+        <p className="onboarding-save-note"><ShieldCheck size={16}/>هر مرحله پس از زدن «ادامه» ذخیره می‌شود.</p>
+      </aside>
+      <main className="onboarding-panel" aria-label="ساخت برنامهٔ غذایی">
+        {submitError&&<div role="alert" className="onboarding-error"><AlertCircle size={19}/><span>{submitError}</span></div>}
+        <fieldset className="onboarding-step-fields" disabled={isSubmitting} aria-busy={isSubmitting} onFocusCapture={event=>{if((event.target as HTMLElement).matches('input, select, textarea'))setCompanionFocus({step:currentStep,nonce:Date.now()});}}>
+          <AnimatePresence mode="wait" custom={navigation.direction}>
+            <motion.div key={currentStep} className="onboarding-step-content" data-step={currentStep} custom={navigation.direction} variants={SLIDE_VARIANTS} initial={reduced?false:'enter'} animate="center" exit={reduced?undefined:'exit'} transition={reduced?{duration:0}:TRANSITION}
+              onAnimationStart={definition=>{if(definition==='center')window.scrollTo({top:0,behavior:'instant'});}}
+              onAnimationComplete={definition=>{if(definition==='center'){const heading=document.getElementById('onboarding-step-title');if(!heading?.closest('.onboarding-step-content')?.contains(document.activeElement))heading?.focus({preventScroll:true});}}}>
+              {renderStep()}
+            </motion.div>
+          </AnimatePresence>
+        </fieldset>
+        {isSubmitting&&<div className="onboarding-saving" role="status"><Loader2 size={16} className="animate-spin"/><span>در حال ذخیرهٔ اطلاعات…</span></div>}
+      </main>
     </div>
-  );
+    <footer className="onboarding-footer">به‌تن همراه توست؛ هر پاسخ، یک قدم به برنامهٔ مناسب‌تر.</footer>
+  </div>;
 }

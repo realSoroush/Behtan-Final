@@ -89,21 +89,21 @@ export function Step6Medical() {
 
       {isBlocked ? (
         <div className="space-y-2">
-          <Button variant="secondary" onClick={handleSaveBlockedAnswers} loading={isSubmitting}>
+          <div className="onboarding-actions"><Button variant="secondary" onClick={handleSaveBlockedAnswers} loading={isSubmitting}>
             ذخیره پاسخ‌ها
-          </Button>
+          </Button></div>
           {savedBlockedAnswers && (
             <p role="status" className="text-center text-sm text-green-600 dark:text-green-400">پاسخ‌ها با موفقیت ذخیره شدند.</p>
           )}
         </div>
       ) : (
-        <Button
+        <div className="onboarding-actions"><Button
           onClick={handleContinue}
           disabled={!questionnaireComplete || !eligibility.canGenerateAutomaticPlan}
           loading={isSubmitting}
         >
           ادامه
-        </Button>
+        </Button></div>
       )}
     </div>
   );
