@@ -119,3 +119,9 @@ export function permissionState(
     ? "granted"
     : "expired";
 }
+
+export function proNutritionDraftAllowed(a:CaseIntake,referenceDate=new Date()):boolean {
+ const born=new Date(a.birth_date+'T12:00:00Z'),age=referenceDate.getUTCFullYear()-born.getUTCFullYear()-(referenceDate.getUTCMonth()<born.getUTCMonth()||(referenceDate.getUTCMonth()===born.getUTCMonth()&&referenceDate.getUTCDate()<born.getUTCDate())?1:0);
+ return Number.isFinite(age)&&age>=18&&age<=70&&a.safety_confirmed&&a.pregnancy_status!=='pregnant'&&a.pregnancy_status!=='breastfeeding'
+ &&a.eating_disorder_status==='none'&&!a.medical_conditions.some(c=>['kidney_disease','advanced_liver_disease','heart_disease','diabetes'].includes(c));
+}

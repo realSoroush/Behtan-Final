@@ -38,6 +38,7 @@ async function arrange(
             input,
             1,
             new Date("2026-10-22T12:00:00Z"),
+            true,
           ),
         },
       ]
@@ -71,6 +72,7 @@ async function arrange(
             b.input,
             1,
             new Date("2026-10-22T12:00:00Z"),
+            true,
           ),
         };
         rows.unshift(s);
@@ -99,6 +101,8 @@ async function arrange(
   return { fixture, rows, keys };
 }
 async function fill(page: any) {
+  await page.getByLabel("تمرین شنبه",{exact:true}).check();
+  await page.getByLabel("تمرین سه‌شنبه",{exact:true}).check();
   await page.getByLabel("یک جفت دمبل قابل‌کنترل", { exact: true }).check();
   await page.getByLabel("تأیید بررسی آمادگی تمرین", { exact: true }).check();
 }
@@ -201,7 +205,7 @@ test("suspended subscription retains approved history and PDF but disables new w
     page.getByLabel("یک جفت دمبل قابل‌کنترل", { exact: true }),
   ).toBeDisabled();
 });
-test("recovery and screening failures are explained without generating a plan", async ({
+test("consecutive Pro days generate a split for specialist review", async ({
   page,
 }) => {
   const { rows } = await arrange(page);
@@ -209,8 +213,9 @@ test("recovery and screening failures are explained without generating a plan", 
   await page.getByLabel("تمرین یکشنبه", { exact: true }).check();
   await page.getByLabel("تمرین سه‌شنبه", { exact: true }).uncheck();
   await page.getByRole("button", { name: "ساخت پیش‌نویس تمرین" }).click();
-  await expect(page.getByRole("alert").last()).toContainText("استراحت");
-  expect(rows).toHaveLength(0);
+  await expect(page.getByText("پیش‌نویس آماده است؛ حرکات و مقدار تمرین را قبل از تأیید بررسی کن.",{exact:true})).toBeVisible();
+  expect(rows).toHaveLength(1);
+  expect(rows[0].plan.weeks[0].sessions[0].title).not.toBe(rows[0].plan.weeks[0].sessions[1].title);
 });
 test("exercise QR destination opens only generic instructions without login or patient data", async ({
   page,

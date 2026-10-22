@@ -22,6 +22,7 @@ export function canCreateSandboxPatient(roles: ProRole[]): boolean {
 }
 export function proErrorMessage(error: unknown): string {
   const code = error instanceof Error ? error.message : String(error);
+  if(code.includes('PRO_MODULE_DISABLED'))return 'ماژول تغذیه در اشتراک این پنل فعال نیست؛ سوابق و خروجی‌های قبلی در دسترس‌اند.';
   if(code.includes('PRO_CASE_ARCHIVED'))return 'این پرونده بایگانی شده است؛ ابتدا آن را از بایگانی بازگردانید.';
   if (code.includes('PRO_SERVER_CREDENTIAL_INVALID')) return 'کلید سروری پنل معتبر نیست؛ تنظیمات Vercel باید اصلاح شود.';
   if (code.includes('PRO_MIGRATION_REQUIRED')) return 'نسخه دیتابیس با پنل هماهنگ نیست؛ Migration جدید باید اجرا شود.';
@@ -34,7 +35,7 @@ export function proErrorMessage(error: unknown): string {
   if (code.includes('PRO_CONNECTION_ERROR')) return 'ارتباط موقتاً برقرار نیست؛ اطلاعات شما حفظ شده است. دوباره تلاش کنید.';
   if (code.includes('PRO_DRAFT_EXPIRED')) return 'زمان پیش‌نمایش تمام شده است؛ برنامه را دوباره تولید کنید.';
   if (code.includes('PRO_GENERATION_LIMIT')) return 'تعداد درخواست‌های ساخت برنامه زیاد شده است؛ کمی بعد دوباره تلاش کنید.';
-  if (code.includes('PRO_MEDICAL_STOP')) return 'با پاسخ‌های ثبت‌شده، موتور اجازه ساخت برنامه خودکار نمی‌دهد.';
+  if (code.includes('PRO_MEDICAL_STOP')) return 'این سناریو به تدوین اختصاصی متخصص نیاز دارد؛ از ابزار تدوین اختصاصی برنامه استفاده کنید.';
   if (code.includes('PRO_GENERATION_FAILED')) return 'موتور نتوانست برنامه سازگار بسازد؛ اطلاعات و محدودیت‌های غذایی را بررسی کنید.';
   if (code.includes("PRO_STALE_REVISION"))
     return "نسخهٔ پرونده تغییر کرده است. آخرین نسخه را دریافت و تغییرات را دوباره بررسی کنید؛ اطلاعات بازنویسی نشد.";

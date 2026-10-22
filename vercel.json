@@ -12,5 +12,15 @@
     "api/pro-training.ts": {
       "maxDuration": 30
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/professionals",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/professionals/",
+      "destination": "/index.html"
+    }
+  ]
 }

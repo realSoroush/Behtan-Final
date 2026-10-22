@@ -92,7 +92,7 @@ export async function processTrainingRequest(
   )
     throw new ProServerError("PRO_INVALID_REQUEST");
   try {
-    const input = parseTrainingInput(b.input),
+    const input = parseTrainingInput(b.input, true),
       actor = await deps.verify(token);
     const hash = createHash("sha256")
       .update(JSON.stringify({ revision: b.revision, input }))
@@ -108,7 +108,7 @@ export async function processTrainingRequest(
     const ctx = await deps.context(args);
     if (ctx.plan && ctx.id) return { id: ctx.id, plan: ctx.plan };
     if (!ctx.answers) throw new ProServerError("PRO_CONNECTION_ERROR", 503);
-    const plan = buildTrainingPlan(ctx.answers, input, Number(b.revision), now);
+    const plan = buildTrainingPlan(ctx.answers, input, Number(b.revision), now, true);
     return await deps.stage({ ...args, p_plan: plan });
   } catch (e) {
     if (e instanceof TrainingError) throw new ProServerError(e.code, 422);

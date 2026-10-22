@@ -2,7 +2,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { rpc } from "./api";
 import type { PrintedPlan, RealIntake } from "./menuPlan";
 export type CaseSummary = Pick<RealCase,'id'|'display_name'|'phone'|'revision'|'updated_at'|'archived_at'|'archive_revision'>;
-export interface WorkspaceStatus { can_write:boolean; source:string; expires_at:string|null; case_limit:number|null; case_count:number }
+export interface WorkspaceStatus { modules?: import('./modules').ProModules; can_write:boolean; source:string; expires_at:string|null; case_limit:number|null; case_count:number }
 export interface RealCase {
   id: string;
   organization_id: string;

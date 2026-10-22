@@ -138,6 +138,7 @@ export function LandingPage({ onStart }: LandingPageProps) {
           <nav className="hidden items-center gap-7 text-sm font-semibold text-neutral-500 dark:text-neutral-400 md:flex" aria-label="منوی اصلی">
             <a href="#how-it-works" className="transition-colors hover:text-neutral-950 dark:hover:text-white">چطور کار می‌کند؟</a>
             <a href="#features" className="transition-colors hover:text-neutral-950 dark:hover:text-white">امکانات</a>
+            <a href="/professionals" className="transition-colors hover:text-neutral-950 dark:hover:text-white">پنل متخصصین</a>
             <a href="#safety" className="transition-colors hover:text-neutral-950 dark:hover:text-white">ایمنی و حریم خصوصی</a>
           </nav>
           <div className="flex items-center gap-2">
@@ -158,7 +159,7 @@ export function LandingPage({ onStart }: LandingPageProps) {
             </button>
           </div>
         </div>
-      </header>
+      <a href="/professionals" className="block border-t border-neutral-200 px-5 py-3 text-center text-sm font-bold text-primary-700 dark:border-neutral-800 dark:text-primary-300 md:hidden">پنل متخصصین · تغذیه و تمرین</a></header>
 
       <main>
         <section className="relative border-b border-neutral-100 px-5 pb-20 pt-8 dark:border-neutral-900 sm:px-8 sm:pb-28 sm:pt-12">

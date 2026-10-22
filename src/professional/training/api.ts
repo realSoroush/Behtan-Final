@@ -57,9 +57,11 @@ export function trainingError(e: unknown): string {
   const raw = e instanceof Error ? e.message : "",
     code = /(?:PRO|TRAINING)_[A-Z_]+/.exec(raw)?.[0];
   const messages: Record<string, string> = {
+    PRO_MODULE_DISABLED: "ماژول تمرین در اشتراک این پنل فعال نیست؛ سوابق قابل مشاهده‌اند.",
+    TRAINING_SPECIALIST_AUTHORING: "برای این شرایط، برنامه را از بخش «تدوین اختصاصی متخصص» تنظیم کنید؛ قالب عمومی خودکار مناسب این سناریو نیست.",
     TRAINING_INVALID_INPUT:
       "گزینه‌های تمرین را بررسی کن؛ یکی از پاسخ‌ها معتبر نیست.",
-    TRAINING_DAYS: "دو یا سه روز متفاوت انتخاب کن.",
+    TRAINING_DAYS: "روزهای تمرین را انتخاب کن.",
     TRAINING_RECOVERY:
       "بین روزهای تمرین، حتی آخر و اول هفته، دست‌کم یک روز استراحت بگذار.",
     TRAINING_SCREENING_REQUIRED: "ابتدا پرسش‌های آمادگی تمرین را تأیید کن.",
