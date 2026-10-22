@@ -1,3 +1,4 @@
+import {TrainingPanel} from './training/TrainingPanel';
 import {PanelModal} from "@/components/ui/PanelModal";
 import { PanelSelect } from "@/components/ui/PanelSelect";
 import { Archive, ArchiveRestore, ArrowRight, Check, ChevronLeft, FileText, FolderHeart, Plus, RefreshCw, Save, Search, Sparkles, UserRound, Users } from "lucide-react";
@@ -155,6 +156,7 @@ function RealCaseDetail({
   initialId: string | null;
   onBack: () => void;
 }) {
+  const [trainingOpen,setTrainingOpen]=useState(false),[trainingBusy,setTrainingBusy]=useState(false);
   const [previewOpen,setPreviewOpen]=useState(false),[scanOpen,setScanOpen]=useState(false),[scanBusy,setScanBusy]=useState(false);
   const [archived,setArchived]=useState(false),[duplicates,setDuplicates]=useState<{id:string;display_name:string}[]>([]);
   const [id, setId] = useState(initialId),
@@ -244,7 +246,7 @@ function RealCaseDetail({
         }
       } catch (e) {
         if (active && e instanceof Error && e.message === 'PRO_ACCESS_DENIED') {
-          setLocked(true);setScanOpen(false);setPreviewOpen(false);
+          setLocked(true);setScanOpen(false);setPreviewOpen(false);setTrainingOpen(false);
           saveRequest.current = null;
           setDraftId('');
           setPlanId('');
@@ -387,6 +389,8 @@ function RealCaseDetail({
         </button>
       </div>
       {id && <div className="pro-actions"><button disabled={busy} onClick={()=>setScanOpen(true)}>تحلیل تصویری بدن و گزارش‌ها</button></div>}
+      {id&&!locked&&<div className="pro-actions"><button disabled={busy} onClick={()=>setTrainingOpen(true)}>برنامه تمرینی مراجع</button></div>}
+      {id&&!locked&&trainingOpen&&<PanelModal title="برنامه تمرینی مراجع" busy={trainingBusy} onClose={()=>setTrainingOpen(false)}><TrainingPanel org={org} record={id} revision={revision} canWrite={Boolean(access?.can_write)&&!archived&&!dirty&&!stale&&!connectionWarning} onBusy={setTrainingBusy}/></PanelModal>}
       {id&&scanOpen&&<PanelModal title="تحلیل تصویری بدن" busy={scanBusy} onClose={()=>setScanOpen(false)}><BodyScanPanel org={org} record={id} revision={revision} canWrite={Boolean(access?.can_write)&&!archived&&!dirty&&!stale&&!connectionWarning} onBusy={setScanBusy}/></PanelModal>}
       <nav className="pro-case-path" aria-label="مسیر آماده‌سازی برنامه">
         <a href="#pro-intake-editor"><span>۱</span>اطلاعات مراجع</a>

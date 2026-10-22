@@ -1,0 +1,310 @@
+[
+  {
+    "exercise": "1760",
+    "path": "/training/media/1760.jpg",
+    "sha256": "77b9dd136aeff3264e9309f6c413d473e525f3f411a62572a97af1e3103f837c",
+    "bytes": 5977,
+    "upstream": "images/1760-yn8yg1r.jpg"
+  },
+  {
+    "exercise": "1760",
+    "path": "/training/media/1760.gif",
+    "sha256": "6a2440b565509a084f97e861dff6a69249f0d52f01730fc628d4698e273b4ea3",
+    "bytes": 68809,
+    "upstream": "videos/1760-yn8yg1r.gif"
+  },
+  {
+    "exercise": "1004",
+    "path": "/training/media/1004.jpg",
+    "sha256": "95d0df1491f64a1dc506d315bf979ff242bd63dcb62107104bcc244d037d5fd4",
+    "bytes": 5473,
+    "upstream": "images/1004-TUZLh71.jpg"
+  },
+  {
+    "exercise": "1004",
+    "path": "/training/media/1004.gif",
+    "sha256": "10bbf6b46b4fa8d4c25e7172b0c19fa9c1bfe61ccefc2df20e00446abb812502",
+    "bytes": 90174,
+    "upstream": "videos/1004-TUZLh71.gif"
+  },
+  {
+    "exercise": "1685",
+    "path": "/training/media/1685.jpg",
+    "sha256": "5bca6c69c1b233a5fd778afc81eacf8906278c30e829f685ef11a81f9dc6b7f7",
+    "bytes": 4097,
+    "upstream": "images/1685-QChZi3x.jpg"
+  },
+  {
+    "exercise": "1685",
+    "path": "/training/media/1685.gif",
+    "sha256": "70a2516f3839db46bcecbc9521c2b01c9b93052a68275e58bc11388de9472f1d",
+    "bytes": 55394,
+    "upstream": "videos/1685-QChZi3x.gif"
+  },
+  {
+    "exercise": "1459",
+    "path": "/training/media/1459.jpg",
+    "sha256": "3e553d83ba4e68f766ee476edfdedaa16be3f9a85825835aaaf1553222cdb1b4",
+    "bytes": 5379,
+    "upstream": "images/1459-rR0LJzx.jpg"
+  },
+  {
+    "exercise": "1459",
+    "path": "/training/media/1459.gif",
+    "sha256": "728b2fd47d29556886078e20d5b60cfa693e7d5e4623e4d1988ab304eb85121e",
+    "bytes": 75427,
+    "upstream": "videos/1459-rR0LJzx.gif"
+  },
+  {
+    "exercise": "3013",
+    "path": "/training/media/3013.jpg",
+    "sha256": "e33b67702a791b83a42b7b436b019f48d1c862b00fb54866661c73c3c9ce58d0",
+    "bytes": 6183,
+    "upstream": "images/3013-u0cNiij.jpg"
+  },
+  {
+    "exercise": "3013",
+    "path": "/training/media/3013.gif",
+    "sha256": "0488f6ef2f876420c071a2d4243f1f1574d25bba5b5eb72246da4f130d58ad91",
+    "bytes": 86092,
+    "upstream": "videos/3013-u0cNiij.gif"
+  },
+  {
+    "exercise": "1010",
+    "path": "/training/media/1010.jpg",
+    "sha256": "feed4ec2ac6bbe9e70095d9d50651734549edad66c513f7f4d0ea2d9a8bb9dd5",
+    "bytes": 5264,
+    "upstream": "images/1010-KUaoUV8.jpg"
+  },
+  {
+    "exercise": "1010",
+    "path": "/training/media/1010.gif",
+    "sha256": "b0a1f2ca87b446c255153f974670829004ee29ee61ad948fc77645ba45dd6947",
+    "bytes": 75723,
+    "upstream": "videos/1010-KUaoUV8.gif"
+  },
+  {
+    "exercise": "3211",
+    "path": "/training/media/3211.jpg",
+    "sha256": "0bc0b5b8c55cb6bfee3836193e9c3341382ea8105ef630d8fea812798a505e01",
+    "bytes": 4703,
+    "upstream": "images/3211-ZOuKWir.jpg"
+  },
+  {
+    "exercise": "3211",
+    "path": "/training/media/3211.gif",
+    "sha256": "785e06f5323ebb70353e406c3db670e693fbf0364d947f50c1d435d716f13d4d",
+    "bytes": 66936,
+    "upstream": "videos/3211-ZOuKWir.gif"
+  },
+  {
+    "exercise": "0493",
+    "path": "/training/media/0493.jpg",
+    "sha256": "1bafd2e3eb5acdafd5a41e24142e9ace5d6c1c2fd3266909e9f04637e6fb99ef",
+    "bytes": 6433,
+    "upstream": "images/0493-B1EVP9F.jpg"
+  },
+  {
+    "exercise": "0493",
+    "path": "/training/media/0493.gif",
+    "sha256": "b461ed0cfcae9dc9e25b2e82824f80f66cc450d33abb3be36b15d029290cc754",
+    "bytes": 113625,
+    "upstream": "videos/0493-B1EVP9F.gif"
+  },
+  {
+    "exercise": "0662",
+    "path": "/training/media/0662.jpg",
+    "sha256": "3e75f3fd8acaa41d6bf47e7d3e448de4584f5b6aabb28ce2c1ef91074189b0fb",
+    "bytes": 6556,
+    "upstream": "images/0662-I4hDWkc.jpg"
+  },
+  {
+    "exercise": "0662",
+    "path": "/training/media/0662.gif",
+    "sha256": "22d3df1d1d7dea5edd61907e431ef6a5c4bf4bd1b6d290981a437576c3833464",
+    "bytes": 87535,
+    "upstream": "videos/0662-I4hDWkc.gif"
+  },
+  {
+    "exercise": "0293",
+    "path": "/training/media/0293.jpg",
+    "sha256": "9bac4fee689c0b53dc19a8e88f76304c82808b018ff7a7d8ea472a3afb41983c",
+    "bytes": 8508,
+    "upstream": "images/0293-BJ0Hz5L.jpg"
+  },
+  {
+    "exercise": "0293",
+    "path": "/training/media/0293.gif",
+    "sha256": "68b6a883f0232f4c3ee83f4b1f2e4589f50b0b2dbf57864675e610ecda63a544",
+    "bytes": 105292,
+    "upstream": "videos/0293-BJ0Hz5L.gif"
+  },
+  {
+    "exercise": "3144",
+    "path": "/training/media/3144.jpg",
+    "sha256": "17b91fbdbf7bea299b8fb78980f6f6fc915779e8fee37cc822dc5a55372f2e67",
+    "bytes": 8655,
+    "upstream": "images/3144-Nu7jqFE.jpg"
+  },
+  {
+    "exercise": "3144",
+    "path": "/training/media/3144.gif",
+    "sha256": "e7a436616c28f1c64ead3be3c9dc38e8c833bc6e3d4ef4cae1ca44369b637846",
+    "bytes": 96983,
+    "upstream": "videos/3144-Nu7jqFE.gif"
+  },
+  {
+    "exercise": "0276",
+    "path": "/training/media/0276.jpg",
+    "sha256": "c7acc732835d6d4906205b27b0aa8efaf00a6a56c6e4e9e86f320719efff93fe",
+    "bytes": 5336,
+    "upstream": "images/0276-iny3m5y.jpg"
+  },
+  {
+    "exercise": "0276",
+    "path": "/training/media/0276.gif",
+    "sha256": "c3dde2bfa860d8a141861ee94259e9fafee2096c74cb0553c87a05bae9544b21",
+    "bytes": 74568,
+    "upstream": "videos/0276-iny3m5y.gif"
+  },
+  {
+    "exercise": "1373",
+    "path": "/training/media/1373.jpg",
+    "sha256": "d8e3ad3b3ca701d8a9bddd73e352f5b0a394319691365457ddfbc593a4acdaa2",
+    "bytes": 4734,
+    "upstream": "images/1373-bJYHBIN.jpg"
+  },
+  {
+    "exercise": "1373",
+    "path": "/training/media/1373.gif",
+    "sha256": "0e5f92103f2e6578a944b22dd23d40a9867250264914aa127481ba5e4147357e",
+    "bytes": 62166,
+    "upstream": "videos/1373-bJYHBIN.gif"
+  },
+  {
+    "exercise": "0334",
+    "path": "/training/media/0334.jpg",
+    "sha256": "360e2168c8e3c2532a84ba658d058eee1b39c53b886494b50663ebb01ccd3c88",
+    "bytes": 5732,
+    "upstream": "images/0334-DsgkuIt.jpg"
+  },
+  {
+    "exercise": "0334",
+    "path": "/training/media/0334.gif",
+    "sha256": "68de0e7c7727fa08a203f73b0d2935181a5c6489470d44b9028de4a7d10a17f1",
+    "bytes": 87645,
+    "upstream": "videos/0334-DsgkuIt.gif"
+  },
+  {
+    "exercise": "0313",
+    "path": "/training/media/0313.jpg",
+    "sha256": "725b9ba4024e389dab5132811cea67aa2a631b1e76d319cd40bdc137c5fb433d",
+    "bytes": 5575,
+    "upstream": "images/0313-slDvUAU.jpg"
+  },
+  {
+    "exercise": "0313",
+    "path": "/training/media/0313.gif",
+    "sha256": "4f2a6046f7acbb99b55c64316156dbcb19fda5ff4989f8ebfac85ae2480d2342",
+    "bytes": 78291,
+    "upstream": "videos/0313-slDvUAU.gif"
+  },
+  {
+    "exercise": "0577",
+    "path": "/training/media/0577.jpg",
+    "sha256": "869a808636e60b1a38b91d6ccfcad3ae527cb51f45d1a2989100d7ab3da60375",
+    "bytes": 9215,
+    "upstream": "images/0577-T0yTjgW.jpg"
+  },
+  {
+    "exercise": "0577",
+    "path": "/training/media/0577.gif",
+    "sha256": "789515907e5001da8ced127bcf8969e7ab265f25545bf7f0a80dbb6f0da213b0",
+    "bytes": 135362,
+    "upstream": "videos/0577-T0yTjgW.gif"
+  },
+  {
+    "exercise": "0739",
+    "path": "/training/media/0739.jpg",
+    "sha256": "f3325cd473f6ab249fd6dc3cfbb34faec805c2edd1476ac9035302673ed514b3",
+    "bytes": 8714,
+    "upstream": "images/0739-10Z2DXU.jpg"
+  },
+  {
+    "exercise": "0739",
+    "path": "/training/media/0739.gif",
+    "sha256": "4e4afb16a87ff94ecebf835cd56358e3ac3bbdf66f5743f211651400137ddec3",
+    "bytes": 115136,
+    "upstream": "videos/0739-10Z2DXU.gif"
+  },
+  {
+    "exercise": "0599",
+    "path": "/training/media/0599.jpg",
+    "sha256": "41cdeae0e8f14574c50193f216b73b7cf34953e332328be4ea5edb0cd3b8bdf7",
+    "bytes": 9935,
+    "upstream": "images/0599-Zg3XY7P.jpg"
+  },
+  {
+    "exercise": "0599",
+    "path": "/training/media/0599.gif",
+    "sha256": "83be1db342fcb514086eccd82b6748fe2d957caef22ce1501a9eaded5142d277",
+    "bytes": 141354,
+    "upstream": "videos/0599-Zg3XY7P.gif"
+  },
+  {
+    "exercise": "0180",
+    "path": "/training/media/0180.jpg",
+    "sha256": "49d67a069aee8fbfd7fd89880f66d3a8a25016a79f0b864a22523dbacb35843f",
+    "bytes": 8635,
+    "upstream": "images/0180-hvV79Si.jpg"
+  },
+  {
+    "exercise": "0180",
+    "path": "/training/media/0180.gif",
+    "sha256": "b1946c508d02ab7d4f9648ce68019dcc2e8decd313d4ea0ff8e6c60ca2619d93",
+    "bytes": 97782,
+    "upstream": "videos/0180-hvV79Si.gif"
+  },
+  {
+    "exercise": "0818",
+    "path": "/training/media/0818.jpg",
+    "sha256": "f2b6702b7b80267e5a77a727997afbed35c6d600f2cf92509b3b8d640de3be88",
+    "bytes": 8682,
+    "upstream": "images/0818-rkg41Fb.jpg"
+  },
+  {
+    "exercise": "0818",
+    "path": "/training/media/0818.gif",
+    "sha256": "dee7de41f5f9b8fc879c431bb6f83270f6e7575f293a62077d2eef6f984cae71",
+    "bytes": 120230,
+    "upstream": "videos/0818-rkg41Fb.gif"
+  },
+  {
+    "exercise": "0426",
+    "path": "/training/media/0426.jpg",
+    "sha256": "eb97532c58eda139b691df0b477b369afb99463ace89e15baf51cee7ec11957f",
+    "bytes": 5062,
+    "upstream": "images/0426-A6wtbuL.jpg"
+  },
+  {
+    "exercise": "0426",
+    "path": "/training/media/0426.gif",
+    "sha256": "667ba53e82227da5d825d2249bf849514b79a5c06a280afd9f8cdc619f75ce8b",
+    "bytes": 61262,
+    "upstream": "videos/0426-A6wtbuL.gif"
+  },
+  {
+    "exercise": "0997",
+    "path": "/training/media/0997.jpg",
+    "sha256": "606942be5a037cb6c9d8ae6bec2fd496cef9e499acaa6eb748f3d9d88602d41f",
+    "bytes": 5770,
+    "upstream": "images/0997-peAeMR3.jpg"
+  },
+  {
+    "exercise": "0997",
+    "path": "/training/media/0997.gif",
+    "sha256": "5ada10f60a6f83b2d266f1322212fcdb34afba685be2511b48f79084bd4f4758",
+    "bytes": 74647,
+    "upstream": "videos/0997-peAeMR3.gif"
+  }
+]

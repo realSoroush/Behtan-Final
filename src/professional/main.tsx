@@ -1,3 +1,4 @@
+import {ExerciseGuide} from '../training/Guide';
 import { createRoot } from "react-dom/client";
 import "../index.css";
 import "./pro.css";
@@ -9,7 +10,7 @@ document.title = "به‌تن حرفه‌ای | پنل برنامه‌دهی";
 createRoot(document.getElementById("root")!).render(
   <ThemeProvider>
     <AppErrorBoundary>
-      <ProApp />
+      {new URLSearchParams(window.location.search).has('exercise')?<ExerciseGuide id={new URLSearchParams(window.location.search).get('exercise')||''}/>:<ProApp />}
     </AppErrorBoundary>
   </ThemeProvider>,
 );
