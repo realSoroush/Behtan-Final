@@ -14,7 +14,7 @@ interface UseSubscriptionPlansReturn {
 }
 
 /** Loads the active, admin-managed subscription catalog from Supabase. */
-export function useSubscriptionPlans(): UseSubscriptionPlansReturn {
+export function useSubscriptionPlans(publicCatalog = false): UseSubscriptionPlansReturn {
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,13 +28,13 @@ export function useSubscriptionPlans(): UseSubscriptionPlansReturn {
     requestRef.current = controller;
     const timeout = setTimeout(() => controller.abort(), 12_000);
     try {
-      const { data, error: supabaseError } = await supabase
+      const query = publicCatalog ? supabase.rpc('public_subscription_catalog').retry(false) : supabase
         .from('subscription_plans')
         .select('code,name,emoji,price_toman,price_note,duration_days,features,badge,theme,sort_order,is_active')
         .eq('is_active', true)
         .order('sort_order', { ascending: true })
-        .order('code', { ascending: true })
-        .abortSignal(controller.signal);
+        .order('code', { ascending: true });
+      const { data, error: supabaseError } = await query.abortSignal(controller.signal);
       if (requestRef.current !== controller) return null;
       if (supabaseError) throw supabaseError;
       const nextPlans = buildSubscriptionPlans((data ?? []) as SubscriptionPlanRow[]);
@@ -53,7 +53,7 @@ export function useSubscriptionPlans(): UseSubscriptionPlansReturn {
         requestRef.current = null;
       }
     }
-  }, []);
+  }, [publicCatalog]);
 
   useEffect(() => {
     void fetchPlans();

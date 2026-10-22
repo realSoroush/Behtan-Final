@@ -24,6 +24,7 @@ jobs:
           node-version: "24"
           cache: npm
       - run: npm ci
+      - run: npm run test:landing
       - run: npm run test:pro
       - run: npm run test:pro:native
         env:
