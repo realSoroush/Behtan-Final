@@ -870,8 +870,7 @@ function totalResolvedOptions(options: ResolvedOption[]): MacroVector {
 function scoreResolvedDay(options: ResolvedOption[], dailyTarget: MacroVector): number {
   const nutritionScore = scoreDailyTotals(totalResolvedOptions(options), dailyTarget);
   const realismScore = options.reduce(
-    // Recorded meals are facts, including custom foods outside the catalog.
-    (sum, option) => sum + (option.locked ? 0 : mealRealismPenalty(option.resolved.components)),
+    (sum, option) => sum + mealRealismPenalty(option.resolved.components),
     0
   );
   return nutritionScore + 0.05 * realismScore;
