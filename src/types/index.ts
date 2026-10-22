@@ -293,6 +293,8 @@ export interface MealComponent {
 }
 
 export interface Meal {
+  source?: 'food_scan';
+  estimated?: boolean;
   slot: MealSlot;
   label: string;
   templateId: string;

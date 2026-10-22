@@ -1,13 +1,9 @@
 /**
  * geminiClient.ts
  * ----------------------------------------------------------------------------
- * SCOPE BOUNDARY: This is the ONLY file in the app allowed to call an AI
- * model. It is used exclusively for the onboarding "AI Body Scan" step
- * (vision analysis of a user photo -> body composition estimate).
- *
- * AI is NEVER used for: calorie math, macro math, meal generation, or any
- * nutrition data. Those are 100% deterministic (see nutritionHelpers.ts and
- * mealPlanEngine.ts).
+ * Body composition analysis only. Food photo estimates have their own authenticated
+ * foodScanClient/food-scan boundary and are always labeled as estimates.
+ * Prescribed calorie targets and meal generation remain deterministic.
  *
  * The Gemini API key must NEVER be exposed to the browser. This client calls
  * a Supabase Edge Function ("body-scan") which holds the key server-side and
