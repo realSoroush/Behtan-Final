@@ -8,6 +8,9 @@
     },
     "api/pro-body-scan.ts": {
       "maxDuration": 60
+    },
+    "api/pro-training.ts": {
+      "maxDuration": 30
     }
   }
 }

@@ -485,6 +485,8 @@ try {
   await testManagementDatabase({db,asUser,rpc,equal,denied});
   const {testBodyDatabase}=await import('./pro-body-database.test.mjs');
   await testBodyDatabase({db,asUser,rpc,equal,denied});
+  const {testTrainingDatabase}=await import('./training/database.test.mjs');
+  await testTrainingDatabase({db,asUser,rpc,equal,denied});
   console.log(
     `PASS: ${checks} Professional database assertions (${process.env.PRO_TEST_DATABASE_URL ? "native PostgreSQL" : "PGlite"}); tenant isolation, grants, RLS, OTP, retries, assignments, revocation, caps, B2C separation`,
   );
