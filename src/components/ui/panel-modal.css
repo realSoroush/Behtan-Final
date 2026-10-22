@@ -1,0 +1,88 @@
+.panel-modal {
+  width: min(1040px, calc(100vw - 32px));
+  max-height: 90dvh;
+  margin: auto;
+  border: 1px solid #dce6e1;
+  border-radius: 22px;
+  padding: 0;
+  color: #173b30;
+  background: #fff;
+  box-shadow: 0 24px 100px #001a1840;
+  font-family: inherit;
+  overflow: auto;
+}
+.panel-modal::backdrop {
+  background: #081b23a6;
+  backdrop-filter: blur(4px);
+}
+.panel-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  background: inherit;
+  border-bottom: 1px solid #dce6e1;
+  padding: 18px 24px;
+  z-index: 3;
+}
+.panel-modal-head h2 {
+  font-size: 19px;
+  margin: 0;
+}
+.panel-modal-head button {
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  border: 1px solid #cbd8d1;
+  background: transparent;
+  color: inherit;
+  border-radius: 12px;
+  font-size: 26px;
+}
+.panel-modal-body {
+  padding: 24px;
+}
+.panel-modal button,
+.panel-modal input,
+.panel-modal textarea {
+  font: inherit;
+}
+.panel-modal .pro-panel,
+.panel-modal .admin-card {
+  box-shadow: none;
+}
+.dark .panel-modal {
+  background: #142621;
+  color: #e2f0e9;
+  border-color: #344e43;
+}
+.dark .panel-modal-head {
+  border-color: #344e43;
+}
+.panel-modal :focus-visible {
+  outline: 3px solid #12a77a;
+  outline-offset: 3px;
+}
+@media (max-width: 600px) {
+  .panel-modal {
+    width: calc(100vw - 16px);
+    max-height: 94dvh;
+    border-radius: 16px;
+  }
+  .panel-modal-body {
+    padding: 16px;
+  }
+  .panel-modal-head {
+    padding: 14px 16px;
+  }
+  .panel-modal .admin-tools {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .panel-modal .admin-tools label {
+    min-width: 0;
+    flex: 1 1 180px;
+  }
+}

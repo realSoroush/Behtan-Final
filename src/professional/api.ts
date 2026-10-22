@@ -8,8 +8,9 @@ export async function rpc<T>(
   name: string,
   params?: Record<string, unknown>,
 ): Promise<T> {
-  const { data, error } = await supabase.rpc(name, params);
-  if (error) throw new Error(error.message);
+  const { data, error } = await supabase.rpc(name, params).abortSignal(AbortSignal.timeout(15000)).retry(false);
+  if (error?.code==='PGRST202') throw new Error('PRO_MIGRATION_REQUIRED');
+  if (error) throw new Error(error.message.includes('PRO_')||error.message.includes('ADMIN_REQUIRED') ? error.message : 'PRO_CONNECTION_ERROR');
   return data as T;
 }
 export const proApi = {
@@ -50,7 +51,8 @@ export const proApi = {
       .eq("organization_id", organizationId)
       .order("created_at", { ascending: false })
       .limit(100);
-    if (error) throw new Error(error.message);
+    if (error?.code==='PGRST202') throw new Error('PRO_MIGRATION_REQUIRED');
+  if (error) throw new Error(error.message.includes('PRO_')||error.message.includes('ADMIN_REQUIRED') ? error.message : 'PRO_CONNECTION_ERROR');
     return data;
   },
 };
