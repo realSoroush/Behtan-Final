@@ -6,16 +6,16 @@ const draft={...mergeActivityAnswers(createEmptyOnboardingData(),{dailyMovement:
 test.beforeEach(async({page})=>{
  await page.emulateMedia({reducedMotion:'reduce'});
  await page.route('**/src/hooks/useAuth.ts*',r=>r.fulfill({contentType:'text/javascript',body:`export function useAuth(){return {user:{id:'onboarding-test-user'},loading:false}}`}));
- await page.route('**/src/hooks/useUserProfile.ts*',r=>r.fulfill({contentType:'text/javascript',body:`import {useState,useCallback} from '/node_modules/.vite/deps/react.js';
- export function useUserProfile(){const [profile]=useState(()=>JSON.parse(localStorage.getItem('onboarding-test-profile')||'null'));const [error,setError]=useState(()=>localStorage.getItem('onboarding-test-load-error')?'failed':null);
- const saveOnboardingProgress=useCallback(async(step,draft)=>{if(localStorage.getItem('onboarding-test-save-error'))throw Error('offline');const {bodyScanImage,...safe}=draft;localStorage.setItem('onboarding-test-profile',JSON.stringify({onboarding_step:step,onboarding_draft_json:{...safe,bodyScanImage:null}}));},[]);
- const refetch=useCallback(async()=>{localStorage.removeItem('onboarding-test-load-error');setError(null);},[]);
- return {profile,loading:false,error,saveOnboardingProgress,refetch,upsertProfile:async()=>{}};}`}));
+ await page.route('**/src/hooks/useUserProfile.ts*',r=>r.fulfill({contentType:'text/javascript',body:`export { useUserProfile } from '/tests/public/onboarding-profile.mock.ts';`}));
  await page.route('**/src/hooks/useSubscriptionPlans.ts*',r=>r.fulfill({contentType:'text/javascript',body:`export function useSubscriptionPlans(){const plans=[{code:'test',name:'آزمایشی',theme:'green',priceToman:0,priceNote:'تست',durationDays:30,features:['اشتراک آزمایشی'],badge:null,emoji:''}];return {plans,loading:false,error:null,refetch:async()=>plans}}`}));
 });
 async function visit(page:Page,step:number,patch:Record<string,unknown>={},loadError=false){
+ const pageErrors:string[]=[];
+ page.on('pageerror',error=>pageErrors.push(error.message));
  await page.addInitScript(({step,draft,loadError})=>{if(!sessionStorage.getItem('onboarding-test-seeded')){localStorage.setItem('onboarding-test-profile',JSON.stringify({onboarding_step:step,onboarding_draft_json:draft}));if(loadError)localStorage.setItem('onboarding-test-load-error','1');sessionStorage.setItem('onboarding-test-seeded','1');}},{step,draft:{...draft,...patch},loadError});
  await page.goto('/tests/public/onboarding-harness.html');
+ // Surface module/bootstrap errors instead of waiting 30 seconds for every field.
+ await expect.poll(async()=>pageErrors[0]??(await page.locator('.onboarding-app').count()?'ready':'loading'),{message:'Onboarding test page must load without JavaScript module errors'}).toBe('ready');
 }
 test('actual city survives gender selection and saves before moving forward',async({page})=>{
  await visit(page,1);await page.getByRole('textbox',{name:'چه اسمی صدات کنیم؟'}).fill('سروش');
