@@ -64,7 +64,8 @@
     "test:pro:backup": "node scripts/pro-backup.test.mjs",
     "test:training": "node --experimental-strip-types scripts/training/engine.test.mjs && node --experimental-strip-types scripts/training/http.test.mjs",
     "test:pro:modules": "node --experimental-strip-types scripts/pro-modules.test.mjs",
-    "test:public:browser": "playwright test --config playwright.public.config.ts"
+    "test:public:browser": "playwright test --config playwright.public.config.ts",
+    "test:security:hardening": "node scripts/security-body-limits.test.mjs"
   },
   "dependencies": {
     "@rive-app/canvas": "2.44.2",
@@ -93,6 +94,6 @@
     "react-test-renderer": "18.3.1",
     "tailwindcss": "^3.4.13",
     "typescript": "^5.9.3",
-    "vite": "^5.4.8"
+    "vite": "6.4.4"
   }
 }

@@ -1,3 +1,4 @@
+import { readBoundedText, PayloadTooLargeError } from '../_shared/boundedBody.ts';
 import { authorityValid, gatewayOrigin, uuidValid, type GatewayReply, type Mode } from './gateway.ts';
 
 export interface Order {
@@ -78,9 +79,11 @@ export function paymentHandler(deps: Dependencies) {
         return reply({received:true}); // Public callback reveals no user/order details.
       }
       if (req.method!=='POST') return reply({error:'METHOD_NOT_ALLOWED'},405);
-      const raw=await req.text();
+      const raw=await readBoundedText(req,4096);
       if (raw.length>4096) return reply({error:'INVALID_REQUEST'},413);
-      const body=JSON.parse(raw);
+      let body;
+      try { body=JSON.parse(raw); } catch { return reply({error:'INVALID_REQUEST'},400); }
+      if(!body || typeof body!=='object' || Array.isArray(body)) return reply({error:'INVALID_REQUEST'},400);
       const bearer=req.headers.get('authorization')?.replace(/^Bearer\s+/i,'') ?? '';
       if (body.action==='reconcile') {
         if (!deps.reconcileSecret || bearer!==deps.reconcileSecret) return reply({error:'UNAUTHORIZED'},401);
@@ -145,6 +148,7 @@ export function paymentHandler(deps: Dependencies) {
         return reply({error:'GATEWAY_UNAVAILABLE'},502);
       }
     } catch (error) {
+      if(error instanceof PayloadTooLargeError) return reply({error:'INVALID_REQUEST'},413);
       const message=error instanceof Error ? error.message : '';
       const code=['CHECKOUT_DISABLED','ALREADY_ACTIVE','PLAN_UNAVAILABLE','OFFER_CHANGED','CHECKOUT_BUSY','PENDING_ORDER_EXISTS','RATE_LIMITED'].find(c=>message.includes(c));
       return reply({error:code ?? 'PAYMENT_UNAVAILABLE'},code ? 409 : 503);

@@ -1,3 +1,4 @@
+import { readBoundedText, PayloadTooLargeError } from '../_shared/boundedBody.ts';
 // ============================================================================
 // Supabase Edge Function: body-scan
 // Authenticated, bounded proxy for one ephemeral Gemini vision request.
@@ -103,7 +104,7 @@ function jsonResponse(
 ): Response {
   return new Response(JSON.stringify(payload), {
     status,
-    headers: { ...corsHeaders(req), 'Content-Type': 'application/json; charset=utf-8' },
+    headers: { ...corsHeaders(req), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
   });
 }
 
@@ -253,7 +254,7 @@ serve(async (req: Request) => {
       return jsonResponse(req, 500, { error: 'Body scan service is not configured' });
     }
 
-    const rawBody = await req.text();
+    const rawBody = await readBoundedText(req, MAX_REQUEST_BYTES);
     if (new TextEncoder().encode(rawBody).byteLength > MAX_REQUEST_BYTES) {
       return jsonResponse(req, 413, { error: 'Request payload is too large' });
     }
@@ -274,6 +275,17 @@ serve(async (req: Request) => {
     if (!image) {
       return jsonResponse(req, 400, { error: 'Invalid or unsupported image payload' });
     }
+
+    // Reserve atomically before spending provider credits. Onboarding precedes
+    // checkout, so this quota requires a verified account rather than a plan.
+    const quota = await fetch(`${SUPABASE_URL}/rest/v1/rpc/reserve_body_scan`, {
+      method: 'POST',
+      headers: { Authorization: req.headers.get('authorization')!, apikey: SUPABASE_ANON_KEY!, 'Content-Type': 'application/json' },
+      body: '{}',
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!quota.ok) return jsonResponse(req, 503, { error: 'Body scan quota unavailable' });
+    if (await quota.json() !== true) return jsonResponse(req, 429, { error: 'Body scan limit reached. Try again later.' });
 
     const userContext = [
       `جنسیت=${requestPayload.gender}`,
@@ -311,6 +323,7 @@ serve(async (req: Request) => {
           ],
           generationConfig: {
             temperature: 0.2,
+            maxOutputTokens: 2048,
             responseMimeType: 'application/json',
           },
         }),
@@ -343,6 +356,7 @@ serve(async (req: Request) => {
 
     return jsonResponse(req, 200, validatedResult);
   } catch (error) {
+    if (error instanceof PayloadTooLargeError) return jsonResponse(req, 413, { error: 'Request payload is too large' });
     if (error instanceof DOMException && error.name === 'AbortError') {
       return jsonResponse(req, 504, { error: 'Image analysis timed out' });
     }
