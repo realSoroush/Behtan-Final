@@ -7,11 +7,13 @@ import { useOnboardingStore } from '@/hooks/useOnboardingStore';
 import { useSubscriptionPlans } from '@/hooks/useSubscriptionPlans';
 import type { SubscriptionPlan, SubscriptionPlanTheme } from '@/types';
 import { formatSubscriptionPrice, isSameSubscriptionOffer } from '@/utils/subscriptionPlans';
+import { OnboardingReview } from './OnboardingReview';
 
 interface PlanCardProps {
   plan: SubscriptionPlan;
   selected: boolean;
   onSelect: () => void;
+  disabled?: boolean;
 }
 
 const THEME_STYLES: Record<SubscriptionPlanTheme, {
@@ -40,13 +42,15 @@ const THEME_STYLES: Record<SubscriptionPlanTheme, {
   },
 };
 
-function PlanCard({ plan, selected, onSelect }: PlanCardProps) {
+function PlanCard({ plan, selected, onSelect, disabled }: PlanCardProps) {
   const theme = THEME_STYLES[plan.theme];
   const isFree = plan.priceToman === 0;
 
   return (
     <motion.button
       type="button"
+      data-onboarding-plan
+      disabled={disabled}
       whileTap={{ scale: 0.98 }}
       onClick={onSelect}
       aria-pressed={selected}
@@ -61,7 +65,7 @@ function PlanCard({ plan, selected, onSelect }: PlanCardProps) {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2 break-words">
           {plan.emoji && <span className="text-2xl" aria-hidden="true">{plan.emoji}</span>}
-          <span className={`text-lg font-bold ${theme.title}`}>پلن {plan.name}</span>
+          <span data-plan-title className={`text-lg font-bold ${theme.title}`}>پلن {plan.name}</span>
         </div>
         {plan.badge && (
           <span className="flex max-w-full items-center gap-1 break-words rounded-full bg-primary-500 px-2.5 py-1 text-xs font-bold text-white">
@@ -71,7 +75,7 @@ function PlanCard({ plan, selected, onSelect }: PlanCardProps) {
       </div>
 
       <div className="mb-4">
-        <span className={`text-2xl font-extrabold ${theme.price}`}>
+        <span data-plan-price className={`text-2xl font-extrabold ${theme.price}`}>
           {formatSubscriptionPrice(plan.priceToman)}
         </span>
         <span className="mr-1 text-sm text-neutral-500">
@@ -146,10 +150,11 @@ export function Step11Paywall({ onComplete, checkout = false }: { onComplete: (p
     <div className="space-y-6">
       {!checkout && <StepHeader
         step={currentStep}
-        title="شروع سفر سلامتی"
-        subtitle="پلن مناسب خود را انتخاب کنید؛ اشتراک پس از تأیید پرداخت فعال می‌شود."
+        title="آمادهٔ شروعی؟"
+        subtitle="پاسخ‌هایت را مرور کن و اشتراک مناسب خودت را انتخاب کن."
         onBack={() => { if (!checking) prevStep(); }}
       />}
+      {!checkout&&<OnboardingReview data={data}/>}
 
       {loading ? (
         <div className="flex min-h-48 items-center justify-center rounded-3xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
@@ -182,6 +187,7 @@ export function Step11Paywall({ onComplete, checkout = false }: { onComplete: (p
             <PlanCard
               key={plan.code}
               plan={plan}
+              disabled={checking}
               selected={data.selectedTier === plan.code}
               onSelect={() => {
                 if (checking) return;
@@ -200,11 +206,11 @@ export function Step11Paywall({ onComplete, checkout = false }: { onComplete: (p
 
       {notice && <p role="status" className="text-sm leading-6 text-neutral-600 dark:text-neutral-300">{notice}</p>}
 
-      <Button onClick={() => void completeSelection()} loading={checking} disabled={!selectedPlan || loading || Boolean(error)}>
+      <div className="onboarding-actions"><Button onClick={() => void completeSelection()} loading={checking} disabled={!selectedPlan || loading || Boolean(error)}>
         {selectedPlan
           ? `${selectedPlan.priceToman === 0 ? 'فعال‌سازی رایگان' : 'پرداخت و فعال‌سازی'} — پلن ${selectedPlan.name}`
           : 'پلن را انتخاب کنید'}
-      </Button>
+      </Button></div>
 
     </div>
   );

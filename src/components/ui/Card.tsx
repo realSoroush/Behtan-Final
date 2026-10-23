@@ -43,6 +43,7 @@ export function OptionCard({ selected, onClick, icon, label, description, classN
       onClick={onClick}
       disabled={disabled}
       aria-pressed={selected}
+      data-ui="option"
       className={`
         relative w-full flex items-center gap-4 border-2 rounded-2xl p-4 text-right
         transition-all duration-200 cursor-pointer
@@ -56,7 +57,7 @@ export function OptionCard({ selected, onClick, icon, label, description, classN
       `}
     >
       {icon && (
-        <span
+        <span data-option-icon
           className={`flex-shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center text-xl
             ${selected ? 'bg-primary-500 text-white' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300'}`}
         >
@@ -100,6 +101,7 @@ export function CheckboxCard({ checked, onChange, icon, label, description }: Ch
       type="button"
       onClick={() => onChange(!checked)}
       aria-pressed={checked}
+      data-ui="checkbox"
       className={`
         w-full flex items-center gap-4 border-2 rounded-2xl p-4 text-right
         transition-all duration-200

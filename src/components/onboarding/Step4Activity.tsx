@@ -25,6 +25,8 @@ function SegmentButton({ selected, label, onClick }: { selected: boolean; label:
   return (
     <button
       type="button"
+      aria-pressed={selected}
+      data-ui="segment"
       onClick={onClick}
       className={`rounded-xl border px-3 py-2.5 text-xs font-semibold transition-all ${
         selected
@@ -86,7 +88,7 @@ export function Step4Activity() {
         </div>
       </section>
 
-      <Button onClick={nextStep} disabled={!canContinue}>ادامه</Button>
+      <div className="onboarding-actions"><Button onClick={nextStep} disabled={!canContinue}>ادامه</Button></div>
     </div>
   );
 }

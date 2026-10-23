@@ -123,7 +123,7 @@ export function Step7Dietary() {
         </div>
       </div>
 
-      <Button onClick={nextStep} disabled={!data.proteinBudgetPreference}>ادامه</Button>
+      <div className="onboarding-actions"><Button onClick={nextStep} disabled={!data.proteinBudgetPreference}>ادامه</Button></div>
     </div>
   );
 }

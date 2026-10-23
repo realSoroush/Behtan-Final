@@ -14,11 +14,11 @@ export function StepHeader({ step, title, subtitle, onBack }: StepHeaderProps) {
   const progress = (visibleStep / VISIBLE_ONBOARDING_STEPS) * 100;
 
   return (
-    <div className="mb-8">
+    <header className="onboarding-step-header mb-8">
       {/* Top row: back + counter */}
       <div className="flex items-center justify-between mb-4">
         <span className="text-sm text-neutral-400 dark:text-neutral-500 tabular-fa">
-          {toPersianDigits(visibleStep)} از {toPersianDigits(VISIBLE_ONBOARDING_STEPS)}
+          مرحلهٔ {toPersianDigits(visibleStep)} از {toPersianDigits(VISIBLE_ONBOARDING_STEPS)}
         </span>
         {onBack && step > 1 && (
           <button
@@ -33,7 +33,7 @@ export function StepHeader({ step, title, subtitle, onBack }: StepHeaderProps) {
       </div>
 
       {/* Progress bar */}
-      <div className="w-full h-2 bg-neutral-200 dark:bg-neutral-700 rounded-full overflow-hidden">
+      <div role="progressbar" aria-label="پیشرفت ساخت برنامه" aria-valuemin={0} aria-valuemax={VISIBLE_ONBOARDING_STEPS} aria-valuenow={visibleStep} className="onboarding-progress-track w-full h-2 bg-neutral-200 dark:bg-neutral-700 rounded-full overflow-hidden">
         <div
           className="h-full bg-primary-500 rounded-full transition-all duration-500 ease-out"
           style={{ width: `${progress}%` }}
@@ -42,11 +42,11 @@ export function StepHeader({ step, title, subtitle, onBack }: StepHeaderProps) {
 
       {/* Title */}
       <div className="mt-5">
-        <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">{title}</h1>
+        <h1 id="onboarding-step-title" tabIndex={-1} className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">{title}</h1>
         {subtitle && (
           <p className="mt-1.5 text-neutral-500 dark:text-neutral-400 leading-relaxed">{subtitle}</p>
         )}
       </div>
-    </div>
+    </header>
   );
 }

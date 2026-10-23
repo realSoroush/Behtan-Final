@@ -57,9 +57,9 @@ export function Step3Goal() {
         ))}
       </div>
 
-      <Button onClick={nextStep} disabled={!data.goal}>
+      <div className="onboarding-actions"><Button onClick={nextStep} disabled={!data.goal}>
         ادامه
-      </Button>
+      </Button></div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { type InputHTMLAttributes, type SelectHTMLAttributes, type ReactNode } from 'react';
+import { useId, type InputHTMLAttributes, type SelectHTMLAttributes, type ReactNode } from 'react';
 
 // ============================================================================
 // Input
@@ -11,11 +11,13 @@ interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'prefix
   startIcon?: ReactNode;
 }
 
-export function Input({ label, error, suffix, startIcon, className = '', ...props }: InputProps) {
+export function Input({ label, error, suffix, startIcon, className = '', id, ...props }: InputProps) {
+  const generatedId=useId();
+  const controlId=id??generatedId;
   return (
     <div className="flex flex-col gap-1.5">
       {label && (
-        <label className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+        <label htmlFor={controlId} className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
           {label}
         </label>
       )}
@@ -24,6 +26,10 @@ export function Input({ label, error, suffix, startIcon, className = '', ...prop
           <span className="absolute right-3 text-neutral-400 pointer-events-none">{startIcon}</span>
         )}
         <input
+          id={controlId}
+          data-ui="input"
+          aria-invalid={Boolean(error) || undefined}
+          aria-describedby={error ? `${controlId}-error` : undefined}
           className={`
             w-full bg-neutral-50 dark:bg-neutral-800 border
             ${error ? 'border-red-400' : 'border-neutral-200 dark:border-neutral-700'}
@@ -42,7 +48,7 @@ export function Input({ label, error, suffix, startIcon, className = '', ...prop
           </span>
         )}
       </div>
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p id={`${controlId}-error`} className="text-sm text-red-500">{error}</p>}
     </div>
   );
 }
@@ -63,15 +69,21 @@ interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'chi
   placeholder?: string;
 }
 
-export function Select({ label, error, options, placeholder, className = '', ...props }: SelectProps) {
+export function Select({ label, error, options, placeholder, className = '', id, ...props }: SelectProps) {
+  const generatedId=useId();
+  const controlId=id??generatedId;
   return (
     <div className="flex flex-col gap-1.5">
       {label && (
-        <label className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+        <label htmlFor={controlId} className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
           {label}
         </label>
       )}
       <select
+        id={controlId}
+        data-ui="select"
+        aria-invalid={Boolean(error) || undefined}
+        aria-describedby={error ? `${controlId}-error` : undefined}
         className={`
           w-full bg-neutral-50 dark:bg-neutral-800 border
           ${error ? 'border-red-400' : 'border-neutral-200 dark:border-neutral-700'}
@@ -94,7 +106,7 @@ export function Select({ label, error, options, placeholder, className = '', ...
           </option>
         ))}
       </select>
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p id={`${controlId}-error`} className="text-sm text-red-500">{error}</p>}
     </div>
   );
 }

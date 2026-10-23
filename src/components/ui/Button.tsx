@@ -36,6 +36,9 @@ export function Button({
 }: ButtonProps) {
   return (
     <button
+      data-ui="button"
+      data-variant={variant}
+      aria-busy={loading || undefined}
       className={`
         inline-flex items-center justify-center gap-2 font-semibold
         transition-all duration-200
