@@ -1,3 +1,4 @@
+import { readBoundedText, PayloadTooLargeError } from '../_shared/boundedBody.ts';
 import { Webhook } from 'https://esm.sh/standardwebhooks@1.0.0';
 import { createSmsProvider } from './providers/index.ts';
 import { SmsProviderError } from './core/types.ts';
@@ -56,7 +57,7 @@ Deno.serve(async (req: Request) => {
   if (Number.isFinite(contentLength) && contentLength > 64_000) return errorResponse(413, 'Payload too large');
 
   try {
-    const rawPayload = await req.text();
+    const rawPayload = await readBoundedText(req, 64_000);
     if (new TextEncoder().encode(rawPayload).byteLength > 64_000) return errorResponse(413, 'Payload too large');
     const event = verifyHook(rawPayload, Object.fromEntries(req.headers));
     const phone = event.user?.phone ?? '';
@@ -76,6 +77,7 @@ Deno.serve(async (req: Request) => {
     // Supabase Send SMS Hook only requires an empty successful response.
     return Response.json({}, { status: 200 });
   } catch (error) {
+    if (error instanceof PayloadTooLargeError) return errorResponse(413, 'Payload too large');
     // Log only the error category. Phone, OTP, hook payload and provider key stay out of logs.
     console.error('[send-sms]', error instanceof SmsProviderError ? error.message : 'Unhandled hook error');
 
