@@ -72,6 +72,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     goToStep,
   } = useOnboardingStore();
   const { user } = useAuth();
+  const userId = user?.id;
   const {
     profile,
     loading: profileLoading,
@@ -83,27 +84,29 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
   // Inject the authenticated Supabase saver into the wizard store. Every
   // Step's existing `nextStep()` call now uses this saver BEFORE navigation.
+  // Auth refreshes can return a new object for the same account. Keep this
+  // connection tied to identity so store renders cannot repeatedly reattach it.
   useEffect(() => {
-    if (!user) {
+    if (!userId) {
       setProgressSaver(null);
       return;
     }
 
     setProgressSaver(saveOnboardingProgress);
     return () => setProgressSaver(null);
-  }, [user, saveOnboardingProgress, setProgressSaver]);
+  }, [userId, saveOnboardingProgress, setProgressSaver]);
 
   // Resume once per wizard mount. The database is the cross-device source of
   // truth: a user who committed Step N resumes at the stored next step.
   const checkedUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!user) return;
-    if (checkedUserIdRef.current === user.id) return;
+    if (!userId) return;
+    if (checkedUserIdRef.current === userId) return;
     if (profileLoading) return;
     if (profileError) return;
 
-    checkedUserIdRef.current = user.id;
+    checkedUserIdRef.current = userId;
 
     if (profile?.onboarding_draft_json && profile.onboarding_step > 1) {
       const draftNeedsSafetyReview = profile.onboarding_step > 6 && (
@@ -111,17 +114,17 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         || profile.onboarding_draft_json.safetyAnswersConfirmed !== true
       );
       hydrateFromDraft(
-        user.id,
+        userId,
         draftNeedsSafetyReview
           ? 6
           : resolveBodyScanResumeStep(profile.onboarding_step, profile.onboarding_draft_json),
         profile.onboarding_draft_json
       );
     } else {
-      markHydratedEmpty(user.id);
+      markHydratedEmpty(userId);
     }
   }, [
-    user,
+    userId,
     profile,
     profileLoading,
     profileError,
