@@ -46,7 +46,7 @@ const draft=()=>({...mergeActivityAnswers(createEmptyOnboardingData(),{dailyMove
 async function unmount(){if(tree){await act(async()=>tree.unmount());tree=null;}release?.();release=null;}
 async function mount(step=1,patch={},loadError=false){
   await unmount();store.getState().reset();values.clear();
-  if(step>1)values.set('onboarding-test-profile',JSON.stringify({onboarding_step:step,onboarding_draft_json:{...draft(),...patch}}));
+  if(step>1||Object.keys(patch).length)values.set('onboarding-test-profile',JSON.stringify({onboarding_step:step,onboarding_draft_json:{...draft(),...patch}}));
   if(loadError)values.set('onboarding-test-load-error','1');
   storeWrites=0;release=store.subscribe(()=>{if(++storeWrites>80)throw Error('Onboarding lifecycle entered a repeated store-update loop');});
   await act(async()=>{tree=create(createElement(OnboardingWizard,{onComplete:async()=>{}}));});
@@ -54,6 +54,9 @@ async function mount(step=1,patch={},loadError=false){
 async function press(label){const node=button(label);assert(node,'Missing button: '+label);assert(!node.props.disabled,'Disabled button: '+label);await act(async()=>{await node.props.onClick();});}
 try {
   // The auth fixture deliberately returns a NEW object for the SAME user on every render.
+  await mount(1,{province:'کردستان',city:'سنندج'});
+  assert.equal(store.getState().data.city,'سنندج','Step-one drafts preserve existing profile answers');
+  await unmount();
   await mount();assert.equal(heading(),'از خودت بگو');const saver=store.getState().progressSaver;
   for(let i=0;i<12;i++)await act(async()=>store.getState().updateData({displayName:'کاربر '+i}));
   const beforeFocus=storeWrites;

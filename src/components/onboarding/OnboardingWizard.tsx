@@ -110,7 +110,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
     checkedUserIdRef.current = userId;
 
-    if (profile?.onboarding_draft_json && profile.onboarding_step > 1) {
+    if (profile?.onboarding_draft_json && profile.onboarding_step >= 1) {
       const draftNeedsSafetyReview = profile.onboarding_step > 6 && (
         profile.onboarding_draft_json.safetyScreeningVersion !== MEDICAL_SAFETY_SCREENING_VERSION
         || profile.onboarding_draft_json.safetyAnswersConfirmed !== true

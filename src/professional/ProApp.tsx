@@ -77,6 +77,7 @@ function Workspace({ userId }: { userId: string }) {
     [busy, setBusy] = useState(false),
     [allowed, setAllowed] = useState<boolean | null>(null),
     [error, setError] = useState("");
+  const hadAccess = useRef(false);
   const seq = useRef(0),
     createKey = useRef(crypto.randomUUID()),
     pending = useRef(false);
@@ -88,9 +89,12 @@ function Workspace({ userId }: { userId: string }) {
       const access = await proApi.status();
       if (seq.current !== n) return;
       setAllowed(access);
+      if (access) hadAccess.current = true;
       if (!access) {
         setOrgs([]);
         setMembers([]);
+        setSelected("");
+        setPanel("cases");
         return;
       }
       const data = await proApi.workspaces();
@@ -181,7 +185,7 @@ function Workspace({ userId }: { userId: string }) {
       )}
       {busy && <p role="status">در حال دریافت فضای کاری…</p>}
       {allowed === false && (
-        <ProOnboarding onComplete={()=>void load()}/>
+        hadAccess.current ? <p role="alert" className="pro-error">دسترسی این حساب به پنل فعال نیست.</p> : <ProOnboarding onComplete={()=>void load()}/>
       )}
       {allowed && !orgs.length && !busy && !error && (
         <button className="pro-primary" onClick={() => void create()}>

@@ -173,7 +173,7 @@ test("today details stay inline and swapping uses one dialog",async({page})=>{
  await expect(page.locator('dialog[open]')).toHaveCount(1);
  await page.keyboard.press('Escape');
  await expect(page.locator('dialog[open]')).toHaveCount(0);
- expect(await page.evaluate(()=>document.body.style.overflow)).not.toBe('hidden');
+ await expect.poll(()=>page.evaluate(()=>document.body.style.overflow)).not.toBe('hidden');
 });
 
 test("recording requires confirmation and cancellation leaves the meal unchanged",async({page})=>{
@@ -250,7 +250,10 @@ test('photo result can be corrected and saved as a custom lunch',async({page})=>
  await page.getByRole('button',{name:'ارسال برای بررسی',exact:true}).click();
  await page.getByRole('textbox',{name:'وزن برنج پخته'}).fill('۱۵۰');
  await expect(page.locator('.scan-totals')).toContainText('۱۹۵');
- await page.getByRole('combobox',{name:'وعدهٔ ثبت غذا'}).selectOption('lunch');
+ await page.getByRole('combobox',{name:'وعدهٔ ثبت غذا'}).click();
+ await page.getByRole('option',{name:'ناهار',exact:true}).click();
+ // This scenario replaces lunch; independent extra food is a separate flow.
+ await page.getByRole('checkbox',{name:'غذای اضافه؛ وعدهٔ قبلی حفظ شود',exact:true}).uncheck();
  await page.getByRole('button',{name:'این غذا رو خوردم',exact:true}).click();
  await expect(page.locator('.meal-receipt')).toHaveCount(0);
  await page.getByRole('dialog',{name:'تأیید ثبت وعده'}).getByRole('button',{name:'بله، ثبت کن'}).click();

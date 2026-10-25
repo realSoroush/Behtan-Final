@@ -10,11 +10,11 @@ test("invited owner creates workspace", async ({ page }) => {
     page.getByRole("button", { name: "پرونده جدید", exact: true }),
   ).toBeVisible();
 });
-test("uninvited account cannot open workspace", async ({ page }) => {
+test("new account sees self-service onboarding without workspace data", async ({ page }) => {
   await setup(page, { allowed: false });
   await page.goto("/");
   await expect(
-    page.getByText("دسترسی این حساب به پنل فعال نیست.", { exact: true }),
+    page.getByRole("heading", { name: "فضای کاری خودت را بساز", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "پرونده جدید", exact: true }),
@@ -49,6 +49,7 @@ test("revocation clears displayed client details on focus", async ({
   await expect(
     page.getByText("دسترسی این حساب به پنل فعال نیست.", { exact: true }),
   ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "فضای کاری خودت را بساز", exact: true })).toHaveCount(0);
   await expect(
     page.getByRole("textbox", { name: "نام مراجع", exact: true }),
   ).toHaveCount(0);

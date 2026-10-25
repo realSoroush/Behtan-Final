@@ -98,6 +98,9 @@ async function arrange(
   await page
     .getByRole("button", { name: "برنامه تمرینی مراجع", exact: true })
     .click();
+  // Manual editing remains the default; enter the engine through its explicit action.
+  page.once("dialog", (dialog: any) => dialog.accept());
+  await page.getByRole("button", { name: "تمرین‌دهی خودکار", exact: true }).click();
   return { fixture, rows, keys };
 }
 async function fill(page: any) {
@@ -170,6 +173,8 @@ test("training draft, animation, approval and saved history are usable", async (
   await page
     .getByRole("button", { name: "برنامه تمرینی مراجع", exact: true })
     .click();
+  page.once("dialog", (dialog: any) => dialog.accept());
+  await page.getByRole("button", { name: "تمرین‌دهی خودکار", exact: true }).click();
   await page.getByRole("button", { name: "مشاهده تمرین" }).click();
   await expect(
     page.getByRole("button", { name: "PDF برنامه تمرینی" }),
