@@ -1,7 +1,10 @@
-import { Children, isValidElement, useId, useLayoutEffect, useMemo, useRef, useState, type SelectHTMLAttributes } from 'react';
+import { Children, isValidElement, useId, useEffect, useLayoutEffect, useMemo, useRef, useState, type SelectHTMLAttributes } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown } from 'lucide-react';
 import './panel-select.css';
+
+// Preserve pre-paint measurement in browsers without SSR layout-effect warnings.
+const useBrowserLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 type Props = SelectHTMLAttributes<HTMLSelectElement>;
 export function PanelSelect({ children, value, defaultValue, onChange, disabled, className, id: suppliedId, style, ...props }: Props) {
@@ -23,7 +26,7 @@ export function PanelSelect({ children, value, defaultValue, onChange, disabled,
     read(children); return result;
   }, [children]);
   const current = options.findIndex(o => o.value === String(value ?? uncontrolled ?? options[0]?.value ?? ''));
-  useLayoutEffect(() => {
+  useBrowserLayoutEffect(() => {
     const parent = native.current?.closest('label');
     const external = trigger.current?.labels?.[0];
     const source = parent ?? external;
@@ -53,7 +56,7 @@ export function PanelSelect({ children, value, defaultValue, onChange, disabled,
     select.dispatchEvent(new Event('change', { bubbles: true }));
     setOpen(false); trigger.current?.focus();
   }
-  useLayoutEffect(() => {
+  useBrowserLayoutEffect(() => {
     if (!open) return;
     const outside = (e: PointerEvent) => { if (!menu.current?.contains(e.target as Node) && !trigger.current?.contains(e.target as Node)) setOpen(false); };
     const close = () => setOpen(false);
@@ -61,7 +64,7 @@ export function PanelSelect({ children, value, defaultValue, onChange, disabled,
     window.addEventListener('scroll', scroll, true); document.addEventListener('pointerdown', outside); window.addEventListener('resize', close);
     return () => { window.removeEventListener('scroll', scroll, true); document.removeEventListener('pointerdown', outside); window.removeEventListener('resize', close); };
   }, [open, options.length]);
-  useLayoutEffect(() => {
+  useBrowserLayoutEffect(() => {
     const list = menu.current, option = list?.querySelector<HTMLElement>(`[data-index="${active}"]`);
     if (open && list && option) {
       if (option.offsetTop < list.scrollTop) list.scrollTop = option.offsetTop;

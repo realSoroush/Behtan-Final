@@ -14,3 +14,5 @@ assert(!html.includes('2490000'));
 await import('./marketing.test.mjs');
 await import('./landing-catalog-database.test.mjs');
 console.log('PASS: sole marketing design, authentication handoff, catalogs, accessible mobile menu and eNamad.');
+
+await import('./marketing-database.test.mjs');
