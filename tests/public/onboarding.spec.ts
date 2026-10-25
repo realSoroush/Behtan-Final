@@ -17,13 +17,10 @@ async function visit(page:Page,step:number,patch:Record<string,unknown>={},loadE
  // Surface module/bootstrap errors instead of waiting 30 seconds for every field.
  await expect.poll(async()=>pageErrors[0]??(await page.locator('.onboarding-app').count()?'ready':'loading'),{message:'Onboarding test page must load without JavaScript module errors'}).toBe('ready');
 }
-test('actual city survives gender selection and saves before moving forward',async({page})=>{
- await visit(page,1);await page.getByRole('textbox',{name:'چه اسمی صدات کنیم؟'}).fill('سروش');
- await page.getByLabel('استان',{exact:true}).selectOption('کردستان');
- await page.getByRole('textbox',{name:'نام شهر',exact:true}).fill('سنندج');
- await page.getByRole('button',{name:'مرد',exact:true}).click();
- await expect(page.getByRole('textbox',{name:'نام شهر',exact:true})).toHaveValue('سنندج');
- await page.getByRole('button',{name:'ادامه',exact:true}).click();
+test('optional geography is deferred while legacy answers survive',async({page})=>{
+ await visit(page,1,{province:'کردستان',city:'سنندج'});await page.getByRole('textbox',{name:'چه اسمی صدات کنیم؟'}).fill('سروش');
+ await expect(page.getByRole('textbox',{name:'نام شهر',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'مرد',exact:true}).click();await page.getByRole('button',{name:'ادامه',exact:true}).click();
  await expect(page.getByRole('heading',{name:'مشخصات جسمی',exact:true})).toBeVisible();
  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('onboarding-test-profile')!).onboarding_draft_json.city)).toBe('سنندج');
  await page.reload();await expect(page.getByRole('heading',{name:'مشخصات جسمی',exact:true})).toBeVisible();

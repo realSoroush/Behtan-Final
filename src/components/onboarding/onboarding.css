@@ -135,3 +135,14 @@
 }
 @media(max-width:370px){.onboarding-topbar-label{display:none}.onboarding-layout{padding-inline:12px}.onboarding-panel{padding:20px 16px}.onboarding-guide .behtan-mascot{min-width:78px;width:78px;height:78px}.onboarding-phases li{font-size:9px}.onboarding-app [data-ui=option]{gap:8px;padding:12px}.onboarding-app [data-option-icon]{width:34px;min-width:34px;height:34px}.onboarding-step-header h1{font-size:21px}}
 @media(prefers-reduced-motion:reduce){.onboarding-app *{animation:none!important;transition:none!important;scroll-behavior:auto!important}.onboarding-app button:active{transform:none!important}}
+
+/* Checkout uses these tokens even when the member dashboard CSS has not loaded. */
+.onboarding-app .billing-period{display:flex;gap:6px;padding:5px;border:1px solid var(--ob-line);border-radius:17px;background:var(--ob-bg)}
+.onboarding-app .billing-period button{flex:1;min-height:44px;border-radius:12px;color:var(--ob-muted);font-size:13px;font-weight:700}
+.onboarding-app .billing-period button[aria-pressed=true]{background:var(--ob-accent);color:#20341f;box-shadow:0 2px 6px #00000008}
+.onboarding-app .billing-period button:disabled{opacity:.65}
+.onboarding-app .member-training-setup .member-period button[aria-pressed=true]{background:var(--ob-accent);color:#20341f;border-color:var(--ob-accent)}
+.onboarding-app .member-training-setup .member-muted{color:var(--ob-muted);font-size:12px}
+.onboarding-app .member-surface{padding:18px;border:1px solid var(--ob-line);border-radius:20px;background:var(--ob-soft)}
+.onboarding-step-content>fieldset{display:flex;flex-direction:column;gap:23px;min-height:510px}
+.onboarding-step-content>fieldset>*+*{margin-top:0!important}

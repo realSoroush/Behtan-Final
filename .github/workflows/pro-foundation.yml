@@ -50,6 +50,20 @@ jobs:
           npm run test:pro:recovery
       - run: npm run build && npm run build:admin && VITE_PRO_SANDBOX_ENABLED=true npm run build:pro
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:pro:browser && npm run test:pro:admin:browser && npm run test:public:browser
+      - name: Pro browser checks
+        run: npm run test:pro:browser
+      - name: Admin browser checks
+        run: npm run test:pro:admin:browser
+      - name: Public browser checks
+        run: npm run test:public:browser
+      - name: Preserve failed browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-failure-diagnostics
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+      - run: npm run test:market
       - run: npm run test:security:hardening
       - run: npm run test:production && npm run test:admin && npm run test:medical-safety && npm run test:nutrition && npm run test:meal-progress && npm run test:onboarding && npm run test:routing && npm run test:mobile-meals && npm run test:diagnostics && npm run test:feasibility && npm run test:protein && npm run test:progress

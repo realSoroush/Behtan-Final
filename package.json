@@ -8,7 +8,7 @@
     "test:companion": "node --experimental-strip-types scripts/companion-state.test.mjs",
     "export:companion-preview": "node scripts/package-companion-preview.mjs",
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node scripts/prerender.mjs",
     "preview": "vite preview",
     "lint": "eslint .",
     "test:nutrition": "node --experimental-strip-types scripts/nutrition-engine.smoke-test.mjs",
@@ -65,7 +65,12 @@
     "test:training": "node --experimental-strip-types scripts/training/engine.test.mjs && node --experimental-strip-types scripts/training/http.test.mjs",
     "test:pro:modules": "node --experimental-strip-types scripts/pro-modules.test.mjs",
     "test:public:browser": "playwright test --config playwright.public.config.ts",
-    "test:security:hardening": "node scripts/security-body-limits.test.mjs"
+    "test:security:hardening": "node scripts/security-body-limits.test.mjs",
+    "test:market": "node --experimental-strip-types scripts/market-engine.test.mjs && node --experimental-strip-types scripts/market-http.test.mjs && node --experimental-strip-types scripts/market-release.test.mjs && node scripts/member-review-regressions.test.mjs && node --experimental-strip-types scripts/extra-food-operation.test.mjs",
+    "backup:full": "node scripts/backup-full.mjs",
+    "backup:full:verify": "node scripts/verify-full-backup.mjs",
+    "dev:prepare": "node scripts/prepare-local-dev.mjs",
+    "test:billing:recovery": "node --experimental-strip-types scripts/billing-recovery.test.mjs && node scripts/payment-rollout.test.mjs"
   },
   "dependencies": {
     "@rive-app/canvas": "2.44.2",

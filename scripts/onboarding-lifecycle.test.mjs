@@ -1,3 +1,4 @@
+import {win32,resolve} from 'node:path';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { createRequire } from 'node:module';
@@ -6,8 +7,9 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const require = createRequire(import.meta.url);
 const mocks = {
+  'analytics.ts': `export function track(){}`,
   'useAuth.ts': `export function useAuth(){return {user:{id:globalThis.lifecycleUserId},loading:false}}`,
-  'useUserProfile.ts': `export {useUserProfile} from '${root}/tests/public/onboarding-profile.mock.ts';`,
+  'useUserProfile.ts': `export {useUserProfile} from ${JSON.stringify(resolve(root,'tests/public/onboarding-profile.mock.ts'))};`,
   'useSubscriptionPlans.ts': `const plans=[{code:'test',name:'آزمایشی',theme:'green',priceToman:0,priceNote:'تست',durationDays:30,features:[]}];export function useSubscriptionPlans(){return {plans,loading:false,error:null,refetch:async()=>plans}}`,
   'payments.ts': `export async function startCheckout(){throw Error('Checkout is outside this test');}`,
   'geminiClient.ts': `export class BodyScanError extends Error{};export async function analyzeBodyScan(){globalThis.lifecycleAnalysisCalls++;throw Error('Unexpected AI call');}`,
@@ -22,7 +24,7 @@ const compiled = await build({
   plugins: [{name:'lifecycle-fixtures',setup(b){
     b.onResolve({filter:/^framer-motion$/},()=>({path:'motion',namespace:'test'}));
     b.onLoad({filter:/.*/,namespace:'test'},()=>({contents:`export const motion={div:'div',button:'button'};export const AnimatePresence=({children})=>children;export const useReducedMotion=()=>true;`,loader:'js'}));
-    b.onLoad({filter:/\.(ts|tsx)$/},args=>{const name=args.path.split('/').at(-1);if(name in mocks)return {contents:mocks[name],loader:name.endsWith('tsx')?'tsx':'ts',resolveDir:root};});
+    b.onLoad({filter:/\.(ts|tsx)$/},args=>{const name=win32.basename(args.path);if(name in mocks)return {contents:mocks[name],loader:name.endsWith('tsx')?'tsx':'ts',resolveDir:root};});
     b.onLoad({filter:/\.css$/},()=>({contents:'',loader:'js'}));
   }}],
 });
@@ -44,7 +46,7 @@ const draft=()=>({...mergeActivityAnswers(createEmptyOnboardingData(),{dailyMove
 async function unmount(){if(tree){await act(async()=>tree.unmount());tree=null;}release?.();release=null;}
 async function mount(step=1,patch={},loadError=false){
   await unmount();store.getState().reset();values.clear();
-  if(step>1)values.set('onboarding-test-profile',JSON.stringify({onboarding_step:step,onboarding_draft_json:{...draft(),...patch}}));
+  if(step>1||Object.keys(patch).length)values.set('onboarding-test-profile',JSON.stringify({onboarding_step:step,onboarding_draft_json:{...draft(),...patch}}));
   if(loadError)values.set('onboarding-test-load-error','1');
   storeWrites=0;release=store.subscribe(()=>{if(++storeWrites>80)throw Error('Onboarding lifecycle entered a repeated store-update loop');});
   await act(async()=>{tree=create(createElement(OnboardingWizard,{onComplete:async()=>{}}));});
@@ -52,6 +54,9 @@ async function mount(step=1,patch={},loadError=false){
 async function press(label){const node=button(label);assert(node,'Missing button: '+label);assert(!node.props.disabled,'Disabled button: '+label);await act(async()=>{await node.props.onClick();});}
 try {
   // The auth fixture deliberately returns a NEW object for the SAME user on every render.
+  await mount(1,{province:'کردستان',city:'سنندج'});
+  assert.equal(store.getState().data.city,'سنندج','Step-one drafts preserve existing profile answers');
+  await unmount();
   await mount();assert.equal(heading(),'از خودت بگو');const saver=store.getState().progressSaver;
   for(let i=0;i<12;i++)await act(async()=>store.getState().updateData({displayName:'کاربر '+i}));
   const beforeFocus=storeWrites;

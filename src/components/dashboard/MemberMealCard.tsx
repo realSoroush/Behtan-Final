@@ -16,12 +16,14 @@ interface Props {
   onSwapComponent: (index: number) => void;
   onChangeMeal?:()=>void;
   changing?:boolean;
+  onSkip?:()=>void;
+  skipped?:boolean;
 }
-export function MemberMealCard({ meal, compact = false, readOnly = false, isConsumedSaving = false, consumedToggleDisabled = false, onToggleConsumed, onSwapComponent, onChangeMeal, changing=false }: Props) {
+export function MemberMealCard({ meal, compact = false, readOnly = false, isConsumedSaving = false, consumedToggleDisabled = false, onToggleConsumed, onSwapComponent, onChangeMeal, changing=false,onSkip,skipped=false }: Props) {
   const [expanded, setExpanded] = useState(!compact);
   const reduced = useReducedMotion();
   const disabled = readOnly || isConsumedSaving || consumedToggleDisabled;
-  const title = meal.source==='food_scan'?'وعدهٔ دلخواه · تخمینی':meal.components.slice(0, 2).map(c => c.foodItem.name).join(' و ');
+  const title = meal.source?(meal.estimated?'وعدهٔ دلخواه · تخمینی':'وعدهٔ دلخواه · ثبت دستی'):meal.components.slice(0, 2).map(c => c.foodItem.name).join(' و ');
   const companions = meal.components.slice(2).map(c => c.foodItem.name).join('، ');
   const toggle = <button type="button" className="member-primary meal-consume-button" onClick={onToggleConsumed} disabled={disabled} aria-pressed={meal.consumed} aria-label={meal.consumed ? 'علامت‌گذاری وعده به‌عنوان مصرف‌نشده' : 'علامت‌گذاری وعده به‌عنوان مصرف‌شده'}>
     {isConsumedSaving ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}<span>{isConsumedSaving ? 'در حال ثبت…' : readOnly?'ثبت در روز این برنامه':meal.consumed ? 'بازگرداندن وعده' : 'این وعده را خوردم'}</span>
@@ -39,6 +41,8 @@ export function MemberMealCard({ meal, compact = false, readOnly = false, isCons
       <div className="meal-macro-chips">{[['پروتئین', meal.totalProtein], ['کربوهیدرات', meal.totalCarbs], ['چربی', meal.totalFat]].map(([label, value]) => <span key={label}><b>{n(Number(value))}</b> گرم {label}</span>)}</div>
       <div className="meal-card-actions">{toggle}<button type="button" className="meal-detail-button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? 'بستن مواد' : 'تغییر مواد'}<ChevronDown size={16} /></button></div>
     </>}
+    {onSkip&&!meal.consumed&&!readOnly&&<button type='button' className='member-secondary meal-skip-action' disabled={disabled} onClick={onSkip}>{skipped?'بازگرداندن به وعده‌های پیش رو':'این وعده را نخوردم'}</button>}
+    {meal.source&&meal.consumed&&<p className='member-muted'>{meal.components.map(c=>c.foodItem.name+' · '+componentAmount(c)).join('، ')}</p>}
     <AnimatePresence initial={false}>{expanded && <motion.div className="meal-ingredients" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={reduced?{duration:0}:{height:{type:'spring',duration:.36,bounce:.06},opacity:{duration:.16}}}>
       {compact && <div className="day-expanded-plate"><FoodPlate meal={meal}/></div>}
       <div className="meal-ingredient-list">{meal.components.map((c, i) => <div className="meal-ingredient-row" key={`${i}-${c.foodItem.id}`}>

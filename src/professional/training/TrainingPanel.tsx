@@ -8,6 +8,8 @@ import {
   Check,
   FileDown,
   RefreshCw,
+  WandSparkles,
+  SlidersHorizontal,
 } from "lucide-react";
 import { PanelSelect } from "@/components/ui/PanelSelect";
 import { EQUIPMENT, WEEKDAYS } from "../../training/engine";
@@ -61,7 +63,7 @@ export function TrainingPanel({
   canWrite: boolean;
   onBusy: (v: boolean) => void;
 }) {
-  const [mode,setMode]=useState<'engine'|'authored'>('engine'),[seed,setSeed]=useState<AuthoredContent|undefined>();
+  const [mode,setMode]=useState<'engine'|'authored'>('authored'),[seed,setSeed]=useState<AuthoredContent|undefined>();
   const [input, setInput] = useState<TrainingInput>(initialTrainingInput),
     [rows, setRows] = useState<TrainingSnapshot[]>([]),
     [page, setPage] = useState(0),
@@ -162,10 +164,10 @@ export function TrainingPanel({
       ["dumbbells", "long_band", "stable_platform"].includes(e),
   );
   const previewStale = selected && selected.intake_revision !== revision;
-  if(mode==='authored')return <div className="training-panel"><div className="pro-module-tabs"><button aria-pressed={false} onClick={()=>setMode('engine')}>پیش‌نویس موتور و سوابق</button><button aria-pressed={true}>تدوین اختصاصی متخصص</button></div><AuthoredPlanEditor org={org} record={record} revision={revision} kind="training" name={name} canWrite={canWrite} onBusy={onBusy} seed={seed}/></div>;
+  if(mode==='authored')return <div className="training-panel"><div className="pro-module-tabs"><button aria-pressed={false} onClick={()=>{if(window.confirm('با تغییر مسیر، ویرایش‌های ثبت‌نشدهٔ دستی بسته می‌شوند. ادامه می‌دهید؟'))setMode('engine');}}><WandSparkles size={17}/>تمرین‌دهی خودکار</button><button aria-pressed={true}><SlidersHorizontal size={17}/>تنظیم دستی برنامه تمرینی</button></div><AuthoredPlanEditor org={org} record={record} revision={revision} kind="training" name={name} canWrite={canWrite} onBusy={onBusy} seed={seed}/></div>;
   return (
     <div className="training-panel" aria-busy={busy}>
-      <div className="pro-module-tabs"><button aria-pressed={true}>پیش‌نویس موتور و سوابق</button><button disabled={busy} onClick={()=>{setSeed(undefined);setMode('authored');}}>تدوین اختصاصی متخصص</button></div><div className="training-intro">
+      <div className="pro-module-tabs"><button aria-pressed={true}><WandSparkles size={17}/>تمرین‌دهی خودکار</button><button disabled={busy} onClick={()=>{setSeed(undefined);setMode('authored');}}><SlidersHorizontal size={17}/>تنظیم دستی برنامه تمرینی</button></div><div className="training-intro">
         <span className="training-badge">
           <Dumbbell size={16} /> تمرین، قدم‌به‌قدم
         </span>

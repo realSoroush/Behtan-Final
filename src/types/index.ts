@@ -98,6 +98,7 @@ export interface BodyScanConsentJson {
 export type BodyFatSource = 'ai_visual' | 'measured';
 
 export interface UserProfile {
+  workout_weekdays?: number[];
   display_name?: string | null;
   id: string;
   phone: string;
@@ -175,6 +176,7 @@ export type FoodQualityTag =
  * an invented number.
  */
 export interface FoodItem {
+  preparationState?: 'ready'|'cooked'|'dry'|'raw';
   id: string;
   name: string;              // "سینه مرغ پخته"
   role: FoodRole;
@@ -293,7 +295,7 @@ export interface MealComponent {
 }
 
 export interface Meal {
-  source?: 'food_scan';
+  source?: 'food_scan' | 'manual';
   estimated?: boolean;
   slot: MealSlot;
   label: string;

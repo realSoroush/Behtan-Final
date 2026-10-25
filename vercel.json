@@ -11,16 +11,19 @@
     },
     "api/pro-training.ts": {
       "maxDuration": 30
+    },
+    "api/member.ts": {
+      "maxDuration": 60
     }
   },
   "rewrites": [
     {
       "source": "/professionals",
-      "destination": "/index.html"
+      "destination": "/professionals/index.html"
     },
     {
       "source": "/professionals/",
-      "destination": "/index.html"
+      "destination": "/professionals/index.html"
     }
   ],
   "headers": [

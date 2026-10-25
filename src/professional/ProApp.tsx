@@ -1,3 +1,6 @@
+import {track} from '../member/analytics';
+import {ProOnboarding} from './ProOnboarding';
+import {paymentRequest} from '../lib/payments';
 import {PanelModal} from "@/components/ui/PanelModal";
 import { ProSubscription } from "./ProSubscription";
 import { PanelSelect } from "@/components/ui/PanelSelect";
@@ -16,6 +19,8 @@ import {
 import { RealCaseWorkspace } from "./RealCaseWorkspace";
 export function ProApp() {
   const { user, loading, signOut } = useAuth();
+  const authenticatedUserId = user?.id;
+  useEffect(()=>{if(authenticatedUserId)track('app_open',{source:'pro'});},[authenticatedUserId]);
   if (import.meta.env.VITE_PRO_SANDBOX_ENABLED !== "true")
     return (
       <main className="pro-app" dir="rtl">
@@ -72,6 +77,7 @@ function Workspace({ userId }: { userId: string }) {
     [busy, setBusy] = useState(false),
     [allowed, setAllowed] = useState<boolean | null>(null),
     [error, setError] = useState("");
+  const hadAccess = useRef(false);
   const seq = useRef(0),
     createKey = useRef(crypto.randomUUID()),
     pending = useRef(false);
@@ -83,9 +89,12 @@ function Workspace({ userId }: { userId: string }) {
       const access = await proApi.status();
       if (seq.current !== n) return;
       setAllowed(access);
+      if (access) hadAccess.current = true;
       if (!access) {
         setOrgs([]);
         setMembers([]);
+        setSelected("");
+        setPanel("cases");
         return;
       }
       const data = await proApi.workspaces();
@@ -108,12 +117,27 @@ function Workspace({ userId }: { userId: string }) {
     }
   }, []);
   useEffect(() => {
-    void load();
-    const focus = () => {
-      if (!pending.current) void load();
+    let alive=true,verifying=false;
+    const refresh=async()=>{
+      if(verifying||pending.current)return;
+      const token=new URLSearchParams(window.location.search).get('payment');
+      if(!token){await load();return;}
+      verifying=true;
+      try{
+        const result=await paymentRequest<{order:{status:string}}>({action:'verify',token});
+        if(!alive)return;
+        if(result.order.status!=='paid'){
+          setError(result.order.status==='failed'?'پرداخت تأیید نشد. برای بررسی دوباره صفحه را تازه کن.':'نتیجهٔ پرداخت هنوز قطعی نیست. برای بررسی دوباره صفحه را تازه کن.');setBusy(false);return;
+        }
+        window.history.replaceState(null,'',window.location.pathname);await load();
+      }catch{if(alive){setError('تأیید پرداخت انجام نشد؛ صفحه را دوباره باز کن.');setBusy(false);}}
+      finally{verifying=false;}
     };
+    void refresh();
+    const focus=()=>{void refresh();};
     window.addEventListener("focus", focus);
     return () => {
+      alive=false;
       seq.current++;
       window.removeEventListener("focus", focus);
     };
@@ -161,7 +185,7 @@ function Workspace({ userId }: { userId: string }) {
       )}
       {busy && <p role="status">در حال دریافت فضای کاری…</p>}
       {allowed === false && (
-        <p className="pro-empty">دسترسی این حساب به پنل فعال نیست.</p>
+        hadAccess.current ? <p role="alert" className="pro-error">دسترسی این حساب به پنل فعال نیست.</p> : <ProOnboarding onComplete={()=>void load()}/>
       )}
       {allowed && !orgs.length && !busy && !error && (
         <button className="pro-primary" onClick={() => void create()}>
@@ -172,7 +196,7 @@ function Workspace({ userId }: { userId: string }) {
         <>
           <nav className="pro-workspace-tabs" aria-label="بخش‌های فضای کاری"><button aria-pressed={panel==='cases'} onClick={()=>setPanel('cases')}>مراجعان و برنامه‌ها</button><button aria-pressed={panel==='subscription'} onClick={()=>setPanel('subscription')}>اشتراک و ظرفیت</button></nav>
           <div><RealCaseWorkspace key={selected} org={selected} roles={roles} /></div>
-          {panel==='subscription'&&<PanelModal title="اشتراک و ظرفیت" busy={subscriptionBusy} onClose={()=>setPanel('cases')}><ProSubscription onBusy={setSubscriptionBusy} key={selected} org={selected}/></PanelModal> }
+          {panel==='subscription'&&<PanelModal title="اشتراک و ظرفیت" busy={subscriptionBusy} onClose={()=>setPanel('cases')}><ProSubscription onBusy={setSubscriptionBusy} key={selected} org={selected}/><details><summary>انتخاب یا ارتقای اشتراک</summary><ProOnboarding existing onComplete={()=>void load()}/></details></PanelModal> }
         </>
       )}
       <section id="pro-support" className="pro-support">

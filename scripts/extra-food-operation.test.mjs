@@ -1,0 +1,4 @@
+import assert from 'node:assert/strict';import {extraFoodOperation,finishExtraFoodOperation} from '../src/member/extraFoodOperation.ts';
+const values=new Map();globalThis.sessionStorage={getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+const payload=['user','2026-10-24','lunch',{name:'test',grams:150}];
+const first=await extraFoodOperation(payload);assert.equal((await extraFoodOperation(payload)).id,first.id,'Unknown server response/retry retains ID');assert(![...values.values()].join('').includes('grams'),'Only digest/ID stored');finishExtraFoodOperation(first.id);assert.notEqual((await extraFoodOperation(payload)).id,first.id,'An intentional second meal gets a fresh ID');delete globalThis.sessionStorage;console.log('PASS durable extra food retry identity, explicit second meal and no food payload in persisted operation metadata');

@@ -5,7 +5,6 @@ import { ThemeToggle } from '../src/components/ui/ThemeToggle';
 import { BehtanMascot, CompanionAssets, type MascotMood } from '../src/components/companion/BehtanMascot';
 import { CompanionCard } from '../src/components/companion/CompanionCard';
 import { getDailyCompanion } from '../src/components/companion/companionState';
-import { LandingPage } from '../src/components/landing/LandingPage';
 import '../src/index.css';
 import './companion-preview.css';
 
@@ -62,8 +61,8 @@ function DayDemo(){
 function Preview(){
  const [screen,setScreen]=useState('studio');
  return <div className="companion-preview" dir="rtl"><header className="preview-header"><a href="#" onClick={e=>{e.preventDefault();setScreen('studio');}} className="preview-brand"><img src="/behtan-logo.png" alt=""/><strong>به‌تن</strong><span>همراه تازهٔ تو</span></a><ThemeToggle/></header>
- <nav className="preview-tabs" aria-label="بخش پیش‌نمایش">{[['studio','کاراکتر'],['onboarding','آغاز مسیر'],['day','امروز'],['landing','لندینگ']].map(([key,label])=><button key={key} aria-current={screen===key?'page':undefined} onClick={()=>setScreen(key)}>{label}</button>)}</nav>
- <main>{screen==='studio'?<Studio/>:screen==='onboarding'?<OnboardingDemo/>:screen==='day'?<DayDemo/>:<LandingPage onStart={()=>setScreen('onboarding')}/>}</main>
+ <nav className="preview-tabs" aria-label="بخش پیش‌نمایش">{[['studio','کاراکتر'],['onboarding','آغاز مسیر'],['day','امروز']].map(([key,label])=><button key={key} aria-current={screen===key?'page':undefined} onClick={()=>setScreen(key)}>{label}</button>)}</nav>
+ <main>{screen==='studio'?<Studio/>:screen==='onboarding'?<OnboardingDemo/>:<DayDemo/>}</main>
  <footer className="preview-note">پیش‌نمایش تعاملی · اطلاعات و ثبت‌ها نمایشی‌اند و به حساب یا دیتابیس متصل نیستند.</footer></div>;
 }
 createRoot(document.getElementById('root')!).render(<ThemeProvider>{embedded?<CompanionAssets.Provider value={embedded}><Preview/></CompanionAssets.Provider>:<Preview/>}</ThemeProvider>);

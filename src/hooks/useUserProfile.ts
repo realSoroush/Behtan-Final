@@ -60,6 +60,7 @@ export function useUserProfile(userId: string | undefined): UseUserProfileReturn
 
   useEffect(() => {
     void fetch();
+    const refresh=()=>void fetch();window.addEventListener('member-profile-changed',refresh);return()=>window.removeEventListener('member-profile-changed',refresh);
   }, [fetch]);
 
   const upsertProfile = useCallback(async (partial: Partial<UserProfile>) => {

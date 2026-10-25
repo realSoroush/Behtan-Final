@@ -1,15 +1,15 @@
-import { ProfessionalsPage } from '@/components/professionals/ProfessionalsPage';
-import { useEffect, useState } from 'react';
+import {track} from '@/member/analytics';
+import { MarketingEntry } from '@/components/marketing-entry';
+import { useEffect, useState,lazy,Suspense } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { PhoneAuth } from '@/components/PhoneAuth';
-import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
-import { DashboardPage } from '@/components/dashboard/DashboardPage';
+const OnboardingWizard=lazy(()=>import('@/components/onboarding/OnboardingWizard').then(m=>({default:m.OnboardingWizard})));
+const DashboardPage=lazy(()=>import('@/components/dashboard/DashboardPage').then(m=>({default:m.DashboardPage})));
 import { SafetyReviewPage } from '@/components/safety/SafetyReviewPage';
 import { MedicalSafetyBlockedPage } from '@/components/safety/MedicalSafetyBlockedPage';
 import { evaluateProfileMedicalEligibility } from '@/utils/medicalEligibility';
-import { LandingPage } from '@/components/landing/LandingPage';
-import { BillingAccess } from '@/components/billing/BillingAccess';
+const BillingAccess=lazy(()=>import('@/components/billing/BillingAccess').then(m=>({default:m.BillingAccess})));
 
 function isAuthRequested() {
   return typeof window !== 'undefined' && window.location.hash === '#auth';
@@ -24,8 +24,10 @@ function isAuthRequested() {
  * session recovery, ...) would then re-evaluate that stale snapshot and briefly
  * send a completed user back into onboarding.
  */
-export default function App() {
+function AppContent() {
   const { user, loading: authLoading, signOut } = useAuth();
+  const authenticatedUserId = user?.id;
+  useEffect(()=>{if(authenticatedUserId)track('app_open');},[authenticatedUserId]);
   const {
     profile,
     loading: profileLoading,
@@ -47,20 +49,13 @@ export default function App() {
     setAuthRequested(false);
   }, [user]);
 
-  const openAuth = () => {
-    if (window.location.hash !== '#auth') window.history.pushState(null, '', '#auth');
-    setAuthRequested(true);
-    window.scrollTo({ top: 0, behavior: 'auto' });
-  };
-
   const closeAuth = () => {
     if (window.location.hash === '#auth') window.history.pushState(null, '', window.location.pathname + window.location.search);
     setAuthRequested(false);
     window.scrollTo({ top: 0, behavior: 'auto' });
   };
 
-  if (window.location.pathname.replace(/\/$/, '') === '/professionals') return <ProfessionalsPage />;
-
+  if (window.location.pathname.replace(/\/$/, '') === '/professionals') return <MarketingEntry professional />;
   if (authLoading || (user && profileLoading)) {
     return (
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 flex items-center justify-center">
@@ -73,7 +68,7 @@ export default function App() {
   }
 
   if (!user) {
-    return authRequested ? <PhoneAuth onBack={closeAuth} /> : <LandingPage onStart={openAuth} />;
+    return authRequested ? <PhoneAuth onBack={closeAuth} /> : <MarketingEntry />;
   }
 
   if (!profile || profile.onboarding_completed !== true) {
@@ -114,3 +109,5 @@ export default function App() {
 
   return <BillingAccess key={user.id} onSignOut={signOut}><DashboardPage /></BillingAccess>;
 }
+
+export default function App(){return <Suspense fallback={<div role='status' className='p-8 text-center'>در حال آماده‌سازی به‌تن…</div>}><AppContent/></Suspense>;}

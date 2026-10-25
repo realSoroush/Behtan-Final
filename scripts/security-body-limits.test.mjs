@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import {readFile, unlink} from 'node:fs/promises';
 import {build} from 'esbuild';
@@ -6,8 +7,8 @@ import {randomUUID} from 'node:crypto';
 const output=new URL('./.security-body-limits-test.mjs',import.meta.url);
 const originalFetch=globalThis.fetch;
 try {
- await build({stdin:{contents:`export * from './supabase/functions/_shared/boundedBody.ts'; export {paymentHandler} from './supabase/functions/payments/core.ts'; import './supabase/functions/body-scan/index.ts'; import './supabase/functions/send-sms/index.ts';`,resolveDir:process.cwd(),loader:'ts'},outfile:output.pathname,bundle:true,platform:'node',format:'esm',plugins:[{name:'serve-test',setup(b){b.onResolve({filter:/^https:/},args=>({path:args.path,namespace:'test'}));b.onLoad({filter:/.*/,namespace:'test'},args=>({contents:args.path.includes('standardwebhooks')?'export class Webhook {verify(){throw new Error("Test must not reach signature verification")}}':'export function serve(handler){globalThis.bodyScanHandler=handler}',loader:'js'}));}}]});
- const env={GEMINI_API_KEY:'synthetic',SUPABASE_URL:'https://test.supabase.co',SUPABASE_ANON_KEY:'synthetic'};
+ await build({stdin:{contents:`export * from './supabase/functions/_shared/boundedBody.ts'; export {paymentHandler} from './supabase/functions/payments/core.ts'; import './supabase/functions/body-scan/index.ts'; import './supabase/functions/send-sms/index.ts';`,resolveDir:process.cwd(),loader:'ts'},outfile: fileURLToPath(output),bundle:true,platform:'node',format:'esm',plugins:[{name:'serve-test',setup(b){b.onResolve({filter:/^https:/},args=>({path:args.path,namespace:'test'}));b.onLoad({filter:/.*/,namespace:'test'},args=>({contents:args.path.includes('standardwebhooks')?'export class Webhook {verify(){throw new Error("Test must not reach signature verification")}}':'export function serve(handler){globalThis.bodyScanHandler=handler}',loader:'js'}));}}]});
+ const env={GEMINI_API_KEY:'synthetic',SUPABASE_URL:'https://test.supabase.co',SUPABASE_ANON_KEY:'synthetic',SUPABASE_SERVICE_ROLE_KEY:'server-only'};
  globalThis.Deno={env:{get:k=>env[k]},serve(handler){globalThis.smsHandler=handler;}};
  const {readBoundedText,PayloadTooLargeError,paymentHandler}=await import(output.href);
  const request=(chunks,headers={})=>new Request('https://test/scan',{method:'POST',headers,duplex:'half',body:new ReadableStream({pull(c){if(chunks.length)c.enqueue(chunks.shift());else c.close();},cancel(){chunks.length=0;}})});
@@ -25,12 +26,15 @@ try {
  const handler=globalThis.bodyScanHandler;
  let mode='ok',calls=[];
  const result={bodyFatPct:25,biologicalAge:30,bodyType:'mesomorph',estimatedMuscleMass:'average',narrative:'تخمینی',confidence:'low'};
- globalThis.fetch=async(url)=>{calls.push(String(url));if(String(url).endsWith('/auth/v1/user'))return Response.json(mode==='noauth'?{}:{id:'synthetic'});if(String(url).endsWith('/rpc/reserve_body_scan'))return Response.json(mode!=='quota',{status:mode==='quota-error'?503:200});return Response.json({candidates:[{content:{parts:[{text:JSON.stringify(result)}]}}]});};
+ globalThis.fetch=async(url)=>{calls.push(String(url));if(String(url).endsWith('/auth/v1/user'))return Response.json(mode==='noauth'?{}:{id:'synthetic'});if(String(url).endsWith('/rpc/member_begin_body_scan'))return Response.json(mode!=='quota',{status:mode==='quota-error'?503:200});if(String(url).endsWith('/rpc/member_finish_body_scan'))return Response.json(null);if(mode==='provider-error')return Response.json({}, {status:502});return Response.json({candidates:[{content:{parts:[{text:JSON.stringify(result)}]}}]});};
  const scan=()=>new Request('https://test/scan',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer synthetic',origin:'https://behtan.fit'},body:JSON.stringify({imageBase64:'data:image/jpeg;base64,'+Buffer.from([255,216,255,0]).toString('base64'),gender:'male',heightCm:178,weightKg:90,age:25})});
  mode='quota';assert.equal((await handler(scan())).status,429);assert.equal(calls.length,2);
- calls=[];mode='quota-error';assert.equal((await handler(scan())).status,503);assert.equal(calls.length,2);
+ calls=[];mode='quota-error';assert.equal((await handler(scan())).status,500);assert.equal(calls.length,2);
  calls=[];mode='noauth';assert.equal((await handler(scan())).status,401);assert.equal(calls.length,1);
- calls=[];mode='ok';const res=await handler(scan());assert.equal(res.status,200);assert.equal(res.headers.get('cache-control'),'no-store');assert.deepEqual(await res.json(),result);assert.equal(calls.length,3);
+ calls=[];mode='ok';const res=await handler(scan());assert.equal(res.status,200);assert.equal(res.headers.get('cache-control'),'no-store');assert.deepEqual(await res.json(),result);assert.equal(calls.length,4);assert(calls[3].endsWith('/rpc/member_finish_body_scan'));
+ calls=[];mode='provider-error';assert.equal((await handler(scan())).status,502);assert(calls.at(-1).endsWith('/rpc/member_finish_body_scan'));mode='ok';
+ for(const origin of ['https://pro.behtan.fit','http://localhost:5175','http://127.0.0.1:5175']){const r=await payment(new Request('https://test/payments',{method:'OPTIONS',headers:{origin}}));assert.equal(r.status,204);assert.equal(r.headers.get('access-control-allow-origin'),origin);}
+ assert.equal((await payment(new Request('https://test/payments',{method:'OPTIONS',headers:{origin:'https://evil.invalid'}}))).status,403);
  calls=[];assert.equal((await handler(request([new Uint8Array(8*1024*1024),new Uint8Array(1)],{'content-type':'application/json',authorization:'Bearer synthetic'}))).status,413);assert.equal(calls.length,1);
  const db=new PGlite();
  try {

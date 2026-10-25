@@ -25,57 +25,30 @@ const offers = [
     revision: 1,
   },
 ];
-test("public Pro offers load current prices, switch period and fit mobile", async ({
-  page,
-}, info) => {
-  await page.route("**/rest/v1/rpc/pro_offer_catalog", (r) =>
-    r.fulfill({ json: offers }),
-  );
-  await page.goto("/professionals");
-  await expect(
-    page.getByRole("heading", { name: "پنل شما. انتخاب شما." }),
-  ).toBeVisible();
-  await expect(page.locator(".professionals-plan")).toHaveCount(3);
-  await expect(page.locator(".professionals-plan").first()).toContainText(
-    "۲٬۴۹۰٬۰۰۰",
-  );
-  await page.getByRole("combobox", { name: "مدت اشتراک متخصصین" }).click();
-  await page.getByRole("option", { name: "یک ساله", exact: true }).click();
-  await expect(page.locator(".professionals-plan").last()).toContainText(
-    "۲۵٬۹۹۰٬۰۰۰",
-  );
-  await expect(page.locator(".professionals-plan").last()).toContainText(
-    "تومان / یک ساله",
-  );
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBe(true);
-  await page
-    .locator("#pro-pricing")
-    .screenshot({ path: info.outputPath("professionals-pricing.png") });
-  await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
-  await page.evaluate(() => document.documentElement.classList.add("dark"));
-  await page
-    .locator("#pro-pricing")
-    .screenshot({ path: info.outputPath("professionals-pricing-dark.png") });
+test.beforeEach(async({page})=>{
+ await page.route('**/rest/v1/rpc/public_subscription_catalog',r=>r.fulfill({json:[]}));
+ await page.route('**/rest/v1/marketing_settings*',r=>r.fulfill({json:{video_url:''}}));
+ await page.route('**/rest/v1/marketing_testimonials*',r=>r.fulfill({json:[]}));
+ await page.route('**/trustseal.enamad.ir/**',r=>r.abort());
 });
-test("pricing failure shows retry rather than stale or invented prices", async ({
-  page,
-}) => {
-  let fail = true;
-  await page.route("**/rest/v1/rpc/pro_offer_catalog", (r) =>
-    r.fulfill(
-      fail ? { status: 503, json: { message: "offline" } } : { json: offers },
-    ),
-  );
-  await page.goto("/professionals");
-  await expect(page.getByRole("alert")).toContainText(
-    "دریافت تعرفه‌ها انجام نشد",
-  );
-  await expect(page.locator(".professionals-plan")).toHaveCount(0);
-  fail = false;
-  await page.getByRole("button", { name: "دریافت مجدد" }).click();
-  await expect(page.locator(".professionals-plan")).toHaveCount(3);
+test('public Pro offers load current prices, switch period and fit mobile',async({page})=>{
+ await page.route('**/rest/v1/rpc/pro_offer_catalog',r=>r.fulfill({json:offers}));
+ await page.goto('/professionals');
+ await expect(page.locator('#pro-page')).toBeVisible();
+ await expect(page.locator('#pro-page h1')).toContainText('کنترل کامل');
+ await expect(page.locator('#pro-price-grid .pro-price')).toHaveCount(3);
+ await expect(page.locator('#pro-price-grid .pro-price').first()).toContainText('۲٬۴۹۰٬۰۰۰');
+ await page.locator('[data-pro-month="12"]').click();
+ await expect(page.locator('#pro-price-grid .pro-price').last()).toContainText('۲۵٬۹۹۰٬۰۰۰');
+ await expect(page.locator('#pro-price-grid .pro-price').last()).toContainText('۱۲ ماهه');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+test('pricing failure shows retry rather than stale or invented prices',async({page})=>{
+ let fail=true;
+ await page.route('**/rest/v1/rpc/pro_offer_catalog',r=>r.fulfill(fail?{status:503,json:{message:'offline'}}:{json:offers}));
+ await page.goto('/professionals');
+ await expect(page.locator('#pro-price-grid')).toContainText('دریافت اطلاعات ممکن نشد');
+ await expect(page.locator('#pro-price-grid .pro-price')).toHaveCount(0);
+ fail=false;await page.locator('#pro-price-grid').getByRole('button',{name:'تلاش دوباره'}).click();
+ await expect(page.locator('#pro-price-grid .pro-price')).toHaveCount(3);
 });

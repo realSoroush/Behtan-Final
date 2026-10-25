@@ -20,6 +20,6 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     }
   } catch { /* Authenticated return page and scheduled reconciliation retry safely. */ }
   res.statusCode=303;
-  res.setHeader('Location',`/?payment=${encodeURIComponent(token)}#auth`);
+  res.setHeader('Location',`${url.searchParams.get('return')==='pro'?'https://pro.behtan.fit/':'/'}?payment=${encodeURIComponent(token)}#auth`);
   res.end();
 }

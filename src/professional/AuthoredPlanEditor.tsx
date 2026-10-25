@@ -1,3 +1,4 @@
+import {ManualTrainingBuilder,AuthoredLivePreview} from './training/ManualTrainingBuilder';
 import { useEffect, useRef, useState } from "react";
 import { Plus, Trash2, FileDown, Copy, Save } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
@@ -198,7 +199,7 @@ export function AuthoredPlanEditor({
                 }
               />
             </label>
-            {content.sections.map((s, i) => (
+            {kind==='training'?<ManualTrainingBuilder content={content} mutate={mutate}/>:content.sections.map((s, i) => (
               <section className="pro-authored-section" key={i}>
                 <div className="pro-authored-section-head">
                   <label>
@@ -230,7 +231,7 @@ export function AuthoredPlanEditor({
                 {s.lines.map((l, j) => (
                   <div className="pro-authored-line" key={j}>
                     <label>
-                      {kind === "training" ? "نام حرکت" : "منو / ماده غذایی"}
+                      منو / ماده غذایی
                       <input
                         aria-label={"نام سطر " + (i + 1) + "-" + (j + 1)}
                         value={l.name}
@@ -243,9 +244,7 @@ export function AuthoredPlanEditor({
                       />
                     </label>
                     <label>
-                      {kind === "training"
-                        ? "ست، تکرار، استراحت و توضیحات"
-                        : "مقدار، واحد و توضیحات"}
+                      مقدار، واحد و توضیحات
                       <textarea
                         aria-label={"توضیحات سطر " + (i + 1) + "-" + (j + 1)}
                         value={l.details}
@@ -282,11 +281,11 @@ export function AuthoredPlanEditor({
                   }
                 >
                   <Plus size={16} /> افزودن{" "}
-                  {kind === "training" ? "حرکت" : "منو / ماده"}
+                  منو / ماده
                 </button>
               </section>
             ))}
-            <button
+            {kind!=='training'&&<button
               type="button"
               disabled={content.sections.length >= 28}
               onClick={() =>
@@ -299,8 +298,8 @@ export function AuthoredPlanEditor({
               }
             >
               <Plus size={16} /> افزودن{" "}
-              {kind === "training" ? "جلسه" : "وعده / بخش"}
-            </button>
+              وعده / بخش
+            </button>}
             <label className="pro-authored-notes">
               توضیحات برنامه
               <textarea
@@ -314,6 +313,7 @@ export function AuthoredPlanEditor({
                 }
               />
             </label>
+            {kind==='training'&&<AuthoredLivePreview content={content}/>}
             <label className="pro-authored-review">
               <input
                 type="checkbox"

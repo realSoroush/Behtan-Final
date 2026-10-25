@@ -15,8 +15,6 @@ const result = await build({ entryPoints:['previews/companion.tsx'],absWorkingDi
  name:'offline-preview',setup(b){
   b.onResolve({filter:/rive\.wasm\?url$/},()=>({path:'wasm',namespace:'embedded'}));
   b.onLoad({filter:/.*/,namespace:'embedded'},()=>({contents:'export default "";',loader:'js'}));
-  // Never contact a live trust/payment service from a downloaded preview.
-  b.onLoad({filter:/LandingPage\.tsx$/},args=>({contents:fs.readFileSync(args.path,'utf8').replace(/^const ENAMAD_HTML = .*;$/m,`const ENAMAD_HTML = '<span>نسخهٔ نمایشی</span>';`),loader:'tsx'}));
  }}] });
 let js=result.outputFiles.find(f=>f.path.endsWith('.js')).text;
 js=js.split('/behtan-logo.png').join(data('public/behtan-logo.png','image/png'));

@@ -117,7 +117,7 @@ test("training-only subscription disables nutrition generation but keeps shared 
     .getByRole("button", { name: "برنامه تمرینی مراجع", exact: true })
     .click();
   await page
-    .getByRole("button", { name: "تدوین اختصاصی متخصص", exact: true })
+    .getByRole("button", { name: "تنظیم دستی برنامه تمرینی", exact: true })
     .click();
   await expect(page.getByLabel("عنوان برنامه اختصاصی")).toBeEditable();
 });

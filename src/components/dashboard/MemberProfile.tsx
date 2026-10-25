@@ -1,5 +1,8 @@
+import {ProfileCompletion} from '@/member/ProfileCompletion';
+import {BodyReview} from '@/member/BodyReview';
+import {ExperienceCards} from '@/member/ExperienceCards';
 import { useEffect, useState } from "react";
-import { Activity, ChevronDown, ReceiptText, UserRound } from "lucide-react";
+import { Activity, ChevronDown, ReceiptText, UserRound, ScanLine, Send, ChevronLeft, Sparkles } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import type { UserProfile } from "@/types";
 
@@ -45,7 +48,7 @@ type Membership = {
 };
 function ProfileFacts({ profile }: { profile: EnteredProfile }) {
   return (
-    <dl className="grid grid-cols-3 gap-x-3 gap-y-5 text-center">
+    <dl className="account-facts">
       {[
         [`${n(profile.weight)} کیلو`, "وزن مبنای برنامه"],
         [`${n(profile.height)} سانت`, "قد"],
@@ -69,6 +72,7 @@ export function MemberProfile({
   profile: UserProfile;
   today: string;
 }) {
+  const [scan,setScan]=useState(false);
   const [history, setHistory] = useState<Membership | null>(null);
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -111,46 +115,20 @@ export function MemberProfile({
       Date.parse(s.expires_at) > Date.now(),
   );
   return (
-    <div className="space-y-6">
-      <section
-        aria-labelledby="member-profile-title"
-        className="rounded-3xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900"
-      >
-        <div className="flex items-center gap-3 mb-6">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">
-            <UserRound size={24} aria-hidden="true" />
-          </div>
-          <div className="min-w-0">
-            <h1
-              id="member-profile-title"
-              tabIndex={-1}
-              className="font-bold text-lg text-neutral-900 dark:text-neutral-100"
-            >
-              {profile.display_name?.trim()
-                ? `پروفایل ${profile.display_name.trim()}`
-                : "پروفایل من"}
-            </h1>
-            <p className="text-sm text-neutral-500 dark:text-neutral-400">
-              <bdi>{profile.phone}</bdi>
-            </p>
-          </div>
-        </div>
-        <div className="mb-6 flex items-center justify-between gap-3">
-          <span className="text-lg font-bold text-neutral-900 dark:text-neutral-100">
-            {goals[profile.goal ?? ""] ?? "هدف ثبت نشده"}
-          </span>
-          <span className="rounded-full bg-primary-50 px-3 py-1.5 text-xs text-primary-800 dark:bg-primary-900/30 dark:text-primary-200">
-            {budgets[profile.protein_budget_preference ?? ""] ??
-              "ترجیح ثبت نشده"}
-          </span>
-        </div>
-        <ProfileFacts profile={profile} />
-        <div className="mt-5 flex items-center gap-2 border-t border-neutral-100 pt-4 text-xs text-neutral-600 dark:border-neutral-800 dark:text-neutral-400">
-          <Activity size={16} aria-hidden="true" />
-          {levels[profile.activity_level ?? ""] ?? "تحرک ثبت نشده"}
-        </div>
+    <div className="member-profile-page account-native">
+      <section className="account-hero" aria-labelledby="member-profile-title">
+        <div className="account-identity"><span className="account-avatar"><UserRound size={30} aria-hidden="true"/></span><div><p className="account-eyebrow">به‌تن، همراه تو</p><h1 id="member-profile-title" tabIndex={-1}>{profile.display_name?.trim() || 'حساب من'}</h1><p className="account-phone"><bdi>{profile.phone}</bdi></p></div></div>
+        <div className="account-goal"><span><Sparkles size={16} aria-hidden="true"/>{goals[profile.goal ?? ''] ?? 'هدف ثبت نشده'}</span><small>{budgets[profile.protein_budget_preference ?? ''] ?? 'ترجیح ثبت نشده'}</small></div>
+        <ProfileFacts profile={profile}/>
+        <p className="account-activity"><Activity size={16} aria-hidden="true"/>{levels[profile.activity_level ?? ''] ?? 'تحرک ثبت نشده'}</p>
       </section>
-      <section aria-labelledby="membership-title" className="px-1">
+      <nav className="account-services" aria-label="خدمات حساب">
+        <a href="https://t.me/soroushkheradmand" target="_blank" rel="noopener noreferrer"><span className="account-service-icon"><Send size={21} aria-hidden="true"/></span><span><strong>پشتیبانی به‌تن</strong><small>در تلگرام همراهت هستیم</small></span><ChevronLeft size={18} aria-hidden="true"/></a>
+        <button type="button" onClick={()=>setScan(true)}><span className="account-service-icon is-peach"><ScanLine size={23} aria-hidden="true"/></span><span><strong>تحلیل ترکیب بدن</strong><small>بررسی تصویری · هر ۵ روز یک‌بار</small></span><ChevronLeft size={18} aria-hidden="true"/></button>
+      </nav>
+      {scan && <BodyReview profile={profile} onClose={()=>setScan(false)}/>}
+      <ProfileCompletion profile={profile}/>
+      <section aria-labelledby="membership-title" className="account-membership">
         <div className="flex items-center gap-2 mb-3">
           <ReceiptText
             size={18}
@@ -238,6 +216,7 @@ export function MemberProfile({
           </>
         )}
       </section>
+      <ExperienceCards userId={profile.id}/>
     </div>
   );
 }

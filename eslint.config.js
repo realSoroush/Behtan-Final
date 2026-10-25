@@ -7,10 +7,8 @@ import tsPlugin from '@typescript-eslint/eslint-plugin';
 
 export default [
   {
-    // TypeScript's project build emits these files beside vite.config.ts.
-    // They are generated artifacts, not source, and may legitimately contain
-    // declaration-level `any` from Vite's own public types.
-    ignores: ['dist', 'vite.config.js', 'vite.config.d.ts', '*.tsbuildinfo'],
+    // Build output and the generated local Supabase copy are not source.
+    ignores: ['dist', 'dist-admin', 'dist-pro', '.cache', '.local-supabase', 'vite.config.js', 'vite.config.d.ts', '*.tsbuildinfo'],
   },
   {
     files: ['**/*.{ts,tsx}'],
