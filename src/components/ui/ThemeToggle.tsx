@@ -1,3 +1,4 @@
+import {useEffect,useState} from 'react';
 import { Moon, Sun } from 'lucide-react';
 import { useTheme } from '@/theme/ThemeProvider';
 
@@ -7,7 +8,9 @@ interface ThemeToggleProps {
 
 export function ThemeToggle({ className = '' }: ThemeToggleProps) {
   const { isDark, toggleTheme } = useTheme();
-  const label = isDark ? 'تغییر به تم روشن' : 'تغییر به تم تیره';
+  const [mounted,setMounted]=useState(false);
+  useEffect(()=>setMounted(true),[]);
+  const label = mounted&&isDark ? 'تغییر به تم روشن' : 'تغییر به تم تیره';
 
   return (
     <button
@@ -17,7 +20,7 @@ export function ThemeToggle({ className = '' }: ThemeToggleProps) {
       title={label}
       className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border border-neutral-200 bg-white/80 text-neutral-600 shadow-sm backdrop-blur transition-all hover:bg-neutral-100 hover:text-neutral-900 active:scale-95 dark:border-neutral-700 dark:bg-neutral-900/80 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-white ${className}`}
     >
-      {isDark ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
+      <Sun size={18} aria-hidden="true" className="hidden dark:block"/><Moon size={18} aria-hidden="true" className="dark:hidden"/>
     </button>
   );
 }

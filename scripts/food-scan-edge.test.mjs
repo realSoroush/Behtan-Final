@@ -1,8 +1,9 @@
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
 import {writeFile,unlink} from 'node:fs/promises';
 const output=new URL('./.food-scan-edge-test.mjs',import.meta.url);
-await build({entryPoints:['supabase/functions/food-scan/index.ts'],outfile:output.pathname,bundle:true,platform:'node',format:'esm',plugins:[{name:'serve-test',setup(b){b.onResolve({filter:/^https:/},()=>({path:'serve',namespace:'test'}));b.onLoad({filter:/.*/,namespace:'test'},()=>({contents:'export function serve(handler){globalThis.foodScanHandler=handler}',loader:'js'}));}}]});
+await build({entryPoints:['supabase/functions/food-scan/index.ts'],outfile: fileURLToPath(output),bundle:true,platform:'node',format:'esm',plugins:[{name:'serve-test',setup(b){b.onResolve({filter:/^https:/},()=>({path:'serve',namespace:'test'}));b.onLoad({filter:/.*/,namespace:'test'},()=>({contents:'export function serve(handler){globalThis.foodScanHandler=handler}',loader:'js'}));}}]});
 const env={GEMINI_API_KEY:'test-key',SUPABASE_URL:'https://test.supabase.co',SUPABASE_ANON_KEY:'test-anon'};globalThis.Deno={env:{get:k=>env[k]}};
 const food={confidence:'medium',note:'تخمینی',foods:[{name:'برنج پخته',grams:125,kcalPer100:130,proteinPer100:2.7,carbsPer100:28,fatPer100:.3,fiberPer100:.4}]};let calls=[],mode='ok';const originalFetch=globalThis.fetch;
 globalThis.fetch=async(url,options)=>{calls.push(String(url));if(String(url).endsWith('/auth/v1/user'))return Response.json(mode==='noauth'?{}:{id:'u'},{status:mode==='noauth'?401:200});if(String(url).includes('/rpc/'))return Response.json(mode!=='quota');assert.equal(options.headers['x-goog-api-key'],'test-key');const request=JSON.parse(options.body);assert(request.systemInstruction);assert(!JSON.stringify(request).includes('gender'));return Response.json({candidates:[{content:{parts:[{text:JSON.stringify(mode==='bad'?{...food,confidence:'high'}:food)}]}}]});};

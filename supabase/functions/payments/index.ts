@@ -25,7 +25,7 @@ const db:Database={
   update:async(id,fields)=>{await rest(`payment_orders?id=eq.${id}`,'PATCH',fields);},
   rpc:<T>(name:string,args:Record<string,unknown>)=>rest<T>(`rpc/${name}`,'POST',args),
 };
-Deno.serve(paymentHandler({db,site,reconcileSecret:Deno.env.get('PAYMENT_RECONCILE_SECRET') ?? '',
+const handler=paymentHandler({db,site,requirePreflight:true,reconcileSecret:Deno.env.get('PAYMENT_RECONCILE_SECRET') ?? '',
   gateway:(mode,method,body)=>gatewayCall(mode,merchant,method,body),
   authenticate:async token=>{
     if(!token)return null;
@@ -36,4 +36,5 @@ Deno.serve(paymentHandler({db,site,reconcileSecret:Deno.env.get('PAYMENT_RECONCI
     const [profile]=await rest<UserProfile[]>(`user_profiles?id=eq.${id}&select=*`);
     return profile?.onboarding_completed===true && evaluateProfileMedicalEligibility(profile).canGenerateAutomaticPlan;
   },
-}));
+});
+Deno.serve(handler);

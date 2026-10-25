@@ -1,4 +1,7 @@
 export interface ScannedFood {
+  catalogId?: string;
+  preparationState?: 'ready'|'cooked'|'dry'|'raw';
+  source?: 'manual'|'photo';
   name: string;
   grams: number;
   kcalPer100: number;
@@ -17,7 +20,7 @@ export function parseFoodScanResult(value: unknown): FoodScanResult {
     if (!f || typeof f.name !== 'string' || !f.name.trim() || f.name.length > 80 || !bounded(f.grams,2000) || f.grams < 1 || !bounded(f.kcalPer100,950) || !bounded(f.proteinPer100,100) || !bounded(f.carbsPer100,100) || !bounded(f.fatPer100,100) || !bounded(f.fiberPer100,100) || f.proteinPer100+f.carbsPer100+f.fatPer100 > 105 || f.fiberPer100 > f.carbsPer100) throw Error('مقدارهای تحلیل معتبر نیستند. دوباره عکس بگیر.');
     const macroEnergy=4*f.proteinPer100+4*f.carbsPer100+9*f.fatPer100;
     if (Math.abs(f.kcalPer100-macroEnergy)>Math.max(30,macroEnergy*.35)) throw Error('انرژی و مواد مغذی تحلیل هماهنگ نیستند.');
-    return {name:f.name.trim(),grams:f.grams,kcalPer100:f.kcalPer100,proteinPer100:f.proteinPer100,carbsPer100:f.carbsPer100,fatPer100:f.fatPer100,fiberPer100:f.fiberPer100};
+    return {...(typeof f.catalogId==='string' && /^[a-zA-Z0-9_-]{1,100}$/.test(f.catalogId)?{catalogId:f.catalogId}:{}),...(f.preparationState && ['ready','cooked','dry','raw'].includes(f.preparationState)?{preparationState:f.preparationState}:{}),...(f.source==='manual'||f.source==='photo'?{source:f.source}:{}),name:f.name.trim(),grams:f.grams,kcalPer100:f.kcalPer100,proteinPer100:f.proteinPer100,carbsPer100:f.carbsPer100,fatPer100:f.fatPer100,fiberPer100:f.fiberPer100};
   });
   if (foods.reduce((s,f)=>s+f.grams,0)>5000) throw Error('مقدار کل غذا بیش از محدودهٔ قابل ثبت است.');
   return {foods,confidence:v.confidence,note:v.note.trim()};

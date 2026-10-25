@@ -1,0 +1,24 @@
+/* Shares onboarding brand tokens, including dark mode and native interaction states. */
+.billing-app .onboarding-topbar button{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.billing-panel{display:flex;flex-direction:column;gap:24px}
+.billing-heading h1{font-size:25px;line-height:1.7;font-weight:800;letter-spacing:-.4px;margin:6px 0}
+.billing-heading p,.billing-loading small{font-size:12px;color:var(--ob-muted)}
+.billing-loading{display:grid;gap:8px;text-align:center;padding:20px}
+.billing-notice,.billing-result{padding:18px;border:1px solid var(--ob-line);border-radius:20px;background:var(--ob-soft);font-size:13px}
+.billing-result{display:grid;gap:12px;overflow-wrap:anywhere}
+.billing-result h2{font-size:17px;font-weight:700;margin:0}
+.billing-primary{background:var(--ob-accent);color:#20341f;min-height:52px;border-radius:17px;padding:12px 18px;font-weight:700}
+.billing-text-button,.billing-refresh{min-height:44px;color:var(--ob-strong);font-size:12px}
+.billing-refresh{display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--ob-line);border-radius:15px;background:var(--ob-card)}
+.billing-refresh:disabled,.billing-result button:disabled{opacity:.5}
+.billing-orders{border-top:1px solid var(--ob-line);padding-top:20px;font-size:12px}
+.billing-orders summary{cursor:pointer;min-height:44px;font-weight:700;padding:8px 0}
+.billing-orders>div{display:grid;gap:12px}
+.billing-order{border:1px solid var(--ob-line);border-radius:18px;padding:16px;display:grid;gap:8px;overflow-wrap:anywhere}
+.billing-order>div:first-child{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.billing-order>div:first-child>span{border-radius:10px;background:var(--ob-soft);padding:3px 8px;font-size:10px;color:var(--ob-strong)}
+.billing-order>p{color:var(--ob-muted)}
+.billing-order-actions{display:flex;gap:16px;flex-wrap:wrap;color:var(--ob-strong);align-items:center}
+.billing-order-actions :is(a,button){min-height:44px;display:inline-flex;align-items:center;text-decoration:underline;text-underline-offset:5px}
+@media(max-width:700px){.billing-heading h1{font-size:22px}.billing-app .onboarding-topbar>div{gap:10px}.billing-app .onboarding-intro{display:none}.billing-app .onboarding-guide .companion-card{margin:0 0 6px}.billing-app .onboarding-save-note{display:none}}
+@media(prefers-reduced-motion:reduce){.billing-app button{transition:none}.billing-app .animate-spin{animation:none}}

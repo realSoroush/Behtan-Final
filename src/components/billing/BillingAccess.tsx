@@ -2,6 +2,11 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { paymentRequest, startCheckout, type BillingStatus, type PaymentOrder } from '@/lib/payments';
 import { Step11Paywall } from '@/components/onboarding/Step11Paywall';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { CompanionCard } from '@/components/companion/CompanionCard';
+import { APP_LOGO_PATH, APP_NAME_FA } from '@/constants/brand';
+import { ShieldCheck, RefreshCw, LogOut, Loader2 } from 'lucide-react';
+import '../onboarding/onboarding.css';
+import './billing.css';
 import { formatSubscriptionPrice } from '@/utils/subscriptionPlans';
 
 export function BillingAccess({children,onSignOut}:{children:ReactNode;onSignOut:()=>Promise<void>}) {
@@ -63,52 +68,66 @@ export function BillingAccess({children,onSignOut}:{children:ReactNode;onSignOut
   },[waitingForReturn,busy,token,refresh,returnAttempts]);
 
   if((!status && !error) || (token && (busy || waitingForReturn || confirmedReturn)))return (
-    <main dir="rtl" className="min-h-screen flex items-center justify-center bg-neutral-50 px-5 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100" aria-busy="true">
-      <div role="status" aria-live="polite" className="space-y-4 text-center">
-        <div aria-hidden="true" className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
-        <p className="font-bold">{token ? 'در حال تأیید پرداخت و آماده‌سازی برنامه شما…' : 'در حال بارگذاری برنامه شما…'}</p>
-        {token && <p className="text-sm text-neutral-500 dark:text-neutral-400">پس از تأیید، خودکار وارد برنامه می‌شوید.</p>}
+    <main dir="rtl" className="onboarding-app onboarding-loading" aria-busy="true">
+      <Loader2 size={30} className="animate-spin" aria-hidden="true" />
+      <div role="status" aria-live="polite" className="billing-loading">
+        <p>{token ? 'در حال بررسی پرداختت…' : 'در حال دریافت وضعیت اشتراکت…'}</p>
+        {token && <small>تا مشخص‌شدن نتیجه، پرداخت دیگری انجام نده.</small>}
       </div>
     </main>
   );
 
   if(active && !token)return <>
-    <div dir="rtl" className="bg-primary-50 px-4 py-2 text-center text-xs text-primary-800 dark:bg-primary-950 dark:text-black">
+    <div dir="rtl" className="bg-primary-50 px-4 py-2 text-center text-xs text-primary-800 dark:bg-primary-950 dark:text-primary-200">
       {status!.mode==='sandbox'?'حالت آزمایشی — پرداخت و اشتراک واقعی نیست.':'اشتراک فعال'}
       {' · تا '}{new Date(status!.active!.expires_at).toLocaleDateString('fa-IR')}
     </div>{children}
   </>;
-  return <main dir="rtl" className="min-h-screen bg-neutral-50 px-4 py-6 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
-    <div className="mx-auto max-w-lg space-y-5">
-      <div className="flex items-center justify-between"><strong>اشتراک به‌تن</strong><div className="flex items-center gap-4"><ThemeToggle/><button onClick={()=>void onSignOut()} className="text-sm text-neutral-500">خروج</button></div></div>
-      {status?.mode==='sandbox' && <p className="rounded-xl bg-amber-100 p-3 text-sm text-amber-900">حالت آزمایشی؛ وجه واقعی دریافت نمی‌شود و این اشتراک در حالت واقعی اعتبار ندارد.</p>}
-      {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm leading-7 text-red-700 dark:bg-red-950 dark:text-red-200">{error}</p>}
-      {token && <section className="space-y-3 rounded-3xl border border-neutral-200 p-5 dark:border-neutral-800" aria-live="polite">
-        <h1 className="text-xl font-bold">{order?.status==='paid'?'پرداخت و فعال‌سازی تأیید شد': 'بررسی نتیجه پرداخت'}</h1>
-        {order && <p>{order.planName} · {formatSubscriptionPrice(order.priceToman)}{order.priceToman>0?' تومان':''}</p>}
-        {order?.refId && <p className="break-all text-sm">شماره پیگیری: <bdi>{order.refId}</bdi></p>}
-        {order?.lastCode != null && order.lastCode < 0 && <p className="text-sm">کد آخرین پاسخ درگاه: <bdi>{order.lastCode}</bdi></p>}
-        {order?.status==='paid' && !active && <p className="text-sm leading-7 text-neutral-500">پرداخت تأیید شده؛ فعال‌شدن اشتراک هنوز تأیید نشده است. وضعیت را دوباره بررسی کنید.</p>}
-        {order?.status!=='paid' && <p className="text-sm leading-7 text-neutral-500">هنوز پرداخت تأییدشده‌ای برای این سفارش ثبت نشده است. اگر وجه کسر شده، ابتدا وضعیت را دوباره بررسی کنید.</p>}
-        <button className="rounded-xl bg-primary-500 px-4 py-3 font-bold text-white" disabled={busy} onClick={()=>void refresh(token)}>بررسی مجدد وضعیت</button>
-        <button className="block py-2 text-sm" onClick={closeResult}>{active?'ورود به برنامه':'بازگشت به اشتراک‌ها'}</button>
-      </section>}
-      {!token && !active && status && <>
-        <p className="text-sm leading-7 text-neutral-500">برای دسترسی به برنامه، یک اشتراک فعال نیاز دارید. اطلاعات قبلی شما محفوظ است.</p>
-        {!status.checkout_enabled ? <p>پرداخت هنوز فعال نشده است.</p> : <Step11Paywall checkout onComplete={async(_code,plan)=>{
-          if(!plan)return;
-          await startCheckout(plan);await refresh();
-        }}/>} 
-      </>}
-      {!token && status && status.orders.length>0 && <section className="space-y-3">
-        <h2 className="font-bold">سفارش‌های اخیر</h2>
-        {status.orders.slice(0,5).map(o=><div key={o.id} className="space-y-2 rounded-xl border border-neutral-200 p-3 text-sm dark:border-neutral-800">
-          <p>{o.planName} · {formatSubscriptionPrice(o.priceToman)}{o.priceToman>0?' تومان':''} · {o.status==='paid'?'تأییدشده':o.status==='failed'?'درخواست ناموفق':'در انتظار تأیید'}{o.mode==='sandbox'?' (آزمایشی)':''}</p>
-          {o.refId && <p className="break-all">شماره پیگیری: <bdi>{o.refId}</bdi></p>}
-          {o.status==='pending' && <div className="flex gap-5"><button disabled={busy} onClick={()=>void refresh(o.token)}>بررسی وضعیت</button>{o.paymentUrl && <a className="text-primary-600" href={o.paymentUrl}>ادامه پرداخت</a>}</div>}
-        </div>)}
-      </section>}
-      <button disabled={busy} onClick={()=>void refresh(token ?? undefined)} className="w-full rounded-xl border border-neutral-300 py-3 text-sm dark:border-neutral-700">{busy?'در حال بررسی…':'به‌روزرسانی وضعیت'}</button>
+  return <div className="onboarding-app billing-app" dir="rtl">
+    <header className="onboarding-topbar"><div>
+      <a className="onboarding-brand" href="/" aria-label="صفحهٔ اصلی به‌تن"><img src={APP_LOGO_PATH} alt=""/><strong>{APP_NAME_FA}</strong></a>
+      <span className="onboarding-topbar-label">یک قدم تا برنامهٔ خودت</span>
+      <ThemeToggle/>
+      <button type="button" onClick={()=>void onSignOut()} aria-label="خروج از حساب" title="خروج از حساب"><LogOut size={18}/></button>
+    </div></header>
+    <div className="onboarding-layout">
+      <aside className="onboarding-guide">
+        <div className="onboarding-intro"><span className="onboarding-eyebrow">آمادهٔ شروعی؟</span><h2>برنامهٔ تو،<br/>همراه روزهای تو.</h2><p>اشتراک مناسب خودت را انتخاب کن؛ قبل از پرداخت، امکان ساخت برنامه‌ات را بررسی می‌کنیم.</p></div>
+        <CompanionCard message={{mood:token?'thinking':'welcome',title:token?'با هم نتیجه را بررسی می‌کنیم.':'اطلاعاتت پیش ما محفوظ است.',body:token?'اگر وجه کسر شده، تا مشخص‌شدن نتیجه دوباره پرداخت نکن.':'نیازی به پاسخ دوباره به سؤال‌ها نیست؛ از همین‌جا ادامه بده.'}}/>
+        <p className="onboarding-save-note"><ShieldCheck size={16}/>پرداخت امن، بدون تمدید خودکار.</p>
+      </aside>
+      <main className="onboarding-panel billing-panel" aria-labelledby="billing-title">
+        <div className="billing-heading"><span className="onboarding-eyebrow">اشتراک به‌تن</span><h1 id="billing-title">{token?'نتیجهٔ پرداختت':'ادامهٔ مسیر، با برنامهٔ تو'}</h1><p>{token?'وضعیت سفارش را از درگاه بررسی می‌کنیم.':'پاسخ‌هایت ذخیره شده؛ اشتراک دلخواهت را انتخاب کن.'}</p></div>
+        {status?.mode==='sandbox' && <p className="billing-notice">حالت آزمایشی؛ وجه واقعی دریافت نمی‌شود.</p>}
+        {error && <p role="alert" className="onboarding-error">{error}</p>}
+        {token && <section className="billing-result" aria-live="polite">
+          <h2>{order?.status==='paid'?'پرداخت تأیید شد':order?.status==='failed'?'این پرداخت تکمیل نشده':'نتیجهٔ پرداخت هنوز مشخص نیست'}</h2>
+          {order && <p>{order.planName} · {formatSubscriptionPrice(order.priceToman)}{order.priceToman>0?' تومان':''}</p>}
+          {order?.refId && <p>شماره پیگیری: <bdi>{order.refId}</bdi></p>}
+          {order?.lastCode != null && order.lastCode < 0 && <p>کد پاسخ درگاه: <bdi>{order.lastCode}</bdi></p>}
+          {order?.status==='paid' && !active && <p>پرداختت تأیید شده؛ فعال‌شدن اشتراک را دوباره بررسی کن.</p>}
+          {order?.status!=='paid' && <p>اگر وجه کسر شده، ابتدا نتیجه را دوباره بررسی کن.</p>}
+          <button type="button" className="billing-primary" disabled={busy} onClick={()=>void refresh(token)}>بررسی دوبارهٔ پرداخت</button>
+          <button type="button" className="billing-text-button" onClick={closeResult}>{active?'ورود به برنامه':'بازگشت به اشتراک‌ها'}</button>
+        </section>}
+        {!token && !active && status && <>
+          {!status.checkout_enabled ? <p className="billing-notice">پرداخت فعلاً فعال نیست. اطلاعاتت محفوظ است.</p> : <Step11Paywall checkout onComplete={async(_code,plan)=>{
+            if(!plan)return;
+            await startCheckout(plan);await refresh();
+          }}/>}
+        </>}
+        {!token && status && status.orders.length>0 && <details className="billing-orders" open={status.orders.some(o=>o.status==='pending')}>
+          <summary>سفارش‌های اخیر</summary>
+          <div>{status.orders.slice(0,5).map(o=><article key={o.id} className="billing-order">
+            <div><strong>{o.planName}</strong><span>{o.status==='paid'?'تأییدشده':o.status==='failed'?'تکمیل‌نشده':'در حال بررسی'}</span></div>
+            <p>{formatSubscriptionPrice(o.priceToman)}{o.priceToman>0?' تومان':''}{o.mode==='sandbox'?' · آزمایشی':''}</p>
+            {o.refId && <p>شماره پیگیری: <bdi>{o.refId}</bdi></p>}
+            {o.status==='pending' && <div className="billing-order-actions"><button type="button" disabled={busy} onClick={()=>void refresh(o.token)}>بررسی پرداخت</button>{o.paymentUrl && <a href={o.paymentUrl}>ادامهٔ پرداخت</a>}</div>}
+          </article>)}</div>
+        </details>}
+        <button type="button" disabled={busy} onClick={()=>void refresh(token ?? undefined)} className="billing-refresh"><RefreshCw size={15} className={busy?'animate-spin':''}/>{busy?'در حال بررسی…':'به‌روزرسانی وضعیت اشتراک'}</button>
+      </main>
     </div>
-  </main>;
+    <footer className="onboarding-footer">به‌تن همراه توست؛ از همین‌جا ادامه می‌دهیم.</footer>
+  </div>;
 }

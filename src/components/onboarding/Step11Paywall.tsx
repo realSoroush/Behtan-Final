@@ -1,3 +1,6 @@
+import {TrainingSetup,useTrainingDraft} from '@/member/TrainingSetup';
+import {track} from '@/member/analytics';
+import {periodOffer} from '@/member/offers';
 import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, Check, Loader2, RefreshCw, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -104,7 +107,11 @@ function PlanCard({ plan, selected, onSelect, disabled }: PlanCardProps) {
 
 export function Step11Paywall({ onComplete, checkout = false }: { onComplete: (planCode: string | null, plan?: SubscriptionPlan) => Promise<void>; checkout?: boolean }) {
   const { data, updateData, prevStep, currentStep } = useOnboardingStore();
-  const { plans, loading, error, refetch } = useSubscriptionPlans();
+  useEffect(()=>track('paywall_view'),[]);
+  const [trainingInput,setTrainingInput]=useTrainingDraft();
+  const [period,setPeriod]=useState<14|30>(30);
+  const { plans:monthlyPlans, loading, error, refetch } = useSubscriptionPlans();
+  const plans=monthlyPlans.map(p=>periodOffer(p,period));
   const selectedPlan = plans.find((plan) => plan.code === data.selectedTier) ?? null;
   const [checking, setChecking] = useState(false);
   const checkingRef = useRef(false);
@@ -127,7 +134,7 @@ export function Step11Paywall({ onComplete, checkout = false }: { onComplete: (p
     try {
       const latestPlans = await refetch();
       if (!latestPlans) return;
-      const latestPlan = latestPlans.find((plan) => plan.code === selectedPlan.code);
+      const latestPlan = latestPlans.map(p=>periodOffer(p,period)).find((plan) => plan.code === selectedPlan.code);
       if (!latestPlan) {
         updateData({ selectedTier: null });
         setNotice('پلن انتخاب‌شده دیگر فعال نیست. لطفاً پلن دیگری انتخاب کنید.');
@@ -147,7 +154,8 @@ export function Step11Paywall({ onComplete, checkout = false }: { onComplete: (p
   };
 
   return (
-    <div className="space-y-6">
+    <fieldset disabled={checking} className="onboarding-step-fields space-y-6" aria-busy={checking}>
+      <div className='member-period billing-period' role='group' aria-label='مدت اشتراک'>{([14,30] as const).map(d=><button type='button' aria-pressed={period===d} disabled={checking} key={d} onClick={()=>setPeriod(d)}>{d===14?'دو هفته':'ماهانه'}</button>)}</div>
       {!checkout && <StepHeader
         step={currentStep}
         title="آمادهٔ شروعی؟"
@@ -199,6 +207,7 @@ export function Step11Paywall({ onComplete, checkout = false }: { onComplete: (p
         </div>
       )}
 
+      {selectedPlan?.code==='gold' && <section className="member-surface"><h2 className="font-bold">قبل از پرداخت، تمرین مناسب تو را آماده می‌کنیم</h2><TrainingSetup input={trainingInput} setInput={setTrainingInput}/></section>}
       <div className="flex justify-center gap-6 text-xs text-neutral-400 dark:text-neutral-500">
         <span>🔒 پرداخت امن</span>
         <span>تمدید خودکار ندارد</span>
@@ -206,12 +215,12 @@ export function Step11Paywall({ onComplete, checkout = false }: { onComplete: (p
 
       {notice && <p role="status" className="text-sm leading-6 text-neutral-600 dark:text-neutral-300">{notice}</p>}
 
-      <div className="onboarding-actions"><Button onClick={() => void completeSelection()} loading={checking} disabled={!selectedPlan || loading || Boolean(error)}>
+      <div className="onboarding-actions"><Button onClick={() => void completeSelection()} loading={checking} disabled={!selectedPlan || loading || Boolean(error) || (selectedPlan.code==='gold'&&!trainingInput.screening.confirmed)}>
         {selectedPlan
           ? `${selectedPlan.priceToman === 0 ? 'فعال‌سازی رایگان' : 'پرداخت و فعال‌سازی'} — پلن ${selectedPlan.name}`
           : 'پلن را انتخاب کنید'}
       </Button></div>
 
-    </div>
+    </fieldset>
   );
 }

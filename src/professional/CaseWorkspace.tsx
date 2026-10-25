@@ -1,3 +1,4 @@
+import { PanelSelect } from '@/components/ui/PanelSelect';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { caseApi } from "./caseApi";
 import {
@@ -427,7 +428,7 @@ function CaseDetail({
           <div className="pro-form-grid">
             <label>
               متخصص آزمایش
-              <select
+              <PanelSelect
                 aria-label="متخصص آزمایش"
                 value={practitioner}
                 onChange={(e) => setPractitioner(e.target.value)}
@@ -444,7 +445,7 @@ function CaseDetail({
                       {m.user_id === userId ? "خودم" : m.user_id.slice(0, 8)}
                     </option>
                   ))}
-              </select>
+              </PanelSelect>
             </label>
             <div className="pro-actions">
               <button
@@ -535,7 +536,7 @@ function CaseDetail({
             </h3>
             <label>
               تاریخچه
-              <select
+              <PanelSelect
                 aria-label="تاریخچهٔ اطلاعات"
                 disabled={busy}
                 value={viewRevision ?? ""}
@@ -552,7 +553,7 @@ function CaseDetail({
                     {new Date(h.recorded_at).toLocaleString("fa-IR")}
                   </option>
                 ))}
-              </select>
+              </PanelSelect>
             </label>
           </div>
           <CaseIntakeForm

@@ -11,6 +11,7 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
 const GEMINI_ENDPOINT =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
@@ -108,9 +109,9 @@ function jsonResponse(
   });
 }
 
-async function hasValidUserSession(req: Request): Promise<boolean> {
+async function hasValidUserSession(req: Request): Promise<string | null> {
   const authorization = req.headers.get('authorization');
-  if (!authorization || !/^Bearer\s+\S+$/i.test(authorization)) return false;
+  if (!authorization || !/^Bearer\s+\S+$/i.test(authorization)) return null;
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     throw new Error('Supabase auth environment is not configured');
   }
@@ -131,9 +132,9 @@ async function hasValidUserSession(req: Request): Promise<boolean> {
     clearTimeout(timeout);
   }
 
-  if (!response.ok) return false;
+  if (!response.ok) return null;
   const user: unknown = await response.json();
-  return isRecord(user) && typeof user.id === 'string' && user.id.length > 0;
+  return isRecord(user) && typeof user.id === 'string' && user.id.length > 0 ? user.id : null;
 }
 
 function parseRequestPayload(payload: unknown): BodyScanRequestPayload | null {
@@ -245,8 +246,17 @@ serve(async (req: Request) => {
     return jsonResponse(req, 413, { error: 'Request payload is too large' });
   }
 
+  let scanUser: string | null = null;
+  let lease: string | null = null;
+  const scanRpc = async (name: string, body: unknown) => {
+    if (!SUPABASE_SERVICE_ROLE_KEY) throw Error('Scan persistence unavailable');
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {method:'POST',headers:{Authorization:`Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,apikey:SUPABASE_SERVICE_ROLE_KEY,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(8000)});
+    if(!r.ok) throw Error('Scan persistence failed');
+    return r.json();
+  };
   try {
-    if (!(await hasValidUserSession(req))) {
+    scanUser = await hasValidUserSession(req);
+    if (!scanUser) {
       return jsonResponse(req, 401, { error: 'Authentication required' });
     }
 
@@ -278,14 +288,9 @@ serve(async (req: Request) => {
 
     // Reserve atomically before spending provider credits. Onboarding precedes
     // checkout, so this quota requires a verified account rather than a plan.
-    const quota = await fetch(`${SUPABASE_URL}/rest/v1/rpc/reserve_body_scan`, {
-      method: 'POST',
-      headers: { Authorization: req.headers.get('authorization')!, apikey: SUPABASE_ANON_KEY!, 'Content-Type': 'application/json' },
-      body: '{}',
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!quota.ok) return jsonResponse(req, 503, { error: 'Body scan quota unavailable' });
-    if (await quota.json() !== true) return jsonResponse(req, 429, { error: 'Body scan limit reached. Try again later.' });
+    const requestId = crypto.randomUUID();
+    if(await scanRpc('member_begin_body_scan',{p_user:scanUser,p_id:requestId}) !== true) return jsonResponse(req,429,{error:'Body scan limit reached. Try again later.'});
+    lease = requestId;
 
     const userContext = [
       `جنسیت=${requestPayload.gender}`,
@@ -354,6 +359,8 @@ serve(async (req: Request) => {
       return jsonResponse(req, 502, { error: 'Image analysis result failed validation' });
     }
 
+    await scanRpc('member_finish_body_scan',{p_user:scanUser,p_id:lease,p_result:validatedResult});
+    lease = null;
     return jsonResponse(req, 200, validatedResult);
   } catch (error) {
     if (error instanceof PayloadTooLargeError) return jsonResponse(req, 413, { error: 'Request payload is too large' });
@@ -363,5 +370,7 @@ serve(async (req: Request) => {
 
     console.error('[body-scan] Unexpected error type', error instanceof Error ? error.name : 'unknown');
     return jsonResponse(req, 500, { error: 'Unexpected body scan error' });
+  } finally {
+    if(lease && scanUser) await scanRpc('member_finish_body_scan',{p_user:scanUser,p_id:lease,p_result:null}).catch(()=>{});
   }
 });

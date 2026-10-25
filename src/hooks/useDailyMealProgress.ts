@@ -1,3 +1,4 @@
+import {track} from '@/member/analytics';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import type { Meal, MealSlot } from '@/types';
@@ -42,6 +43,7 @@ export function useDailyMealProgress(userId: string | undefined, localDateKey: s
         const { error: sbError } = await supabase.from('daily_meal_checkins').delete().eq('user_id',userId).eq('plan_date',localDateKey).eq('meal_slot',meal.slot);
         if (sbError) throw sbError;
       }
+      track(consumed?'meal_recorded':'meal_undone');
     } catch (persistError) {
       setSnapshots((current) => { const next={...current}; if (previous) next[meal.slot]=previous; else delete next[meal.slot]; return next; });
       setError('ثبت وضعیت این وعده انجام نشد. دوباره تلاش کنید.'); throw persistError;

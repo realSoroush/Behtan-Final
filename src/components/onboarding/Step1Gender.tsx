@@ -1,7 +1,5 @@
 import { StepHeader } from '@/components/ui/StepHeader';
 import { Button } from '@/components/ui/Button';
-import { Input, Select } from '@/components/ui/Input';
-import { useState } from 'react';
 import { UserRound } from 'lucide-react';
 import { OptionCard } from '@/components/ui/Card';
 import { useOnboardingStore } from '@/hooks/useOnboardingStore';
@@ -32,10 +30,7 @@ export const DEFAULT_CITIES = ['مرکز استان', 'شهرهای دیگر'];
 
 export function Step1Gender() {
   const { data, updateData, nextStep, currentStep, prevStep } = useOnboardingStore();
-  const cities = CITIES_BY_PROVINCE[data.province] ?? [];
-  const [customCity,setCustomCity]=useState(()=>Boolean(data.city&&!cities.includes(data.city)));
-
-  const canContinue = Boolean(data.displayName?.trim()) && !!data.gender && !!data.province && Boolean(data.city.trim());
+  const canContinue = Boolean(data.displayName?.trim()) && !!data.gender;
 
   const handleGender = (g: Gender) => {if(g===data.gender)return;updateData({
     gender: g,
@@ -46,7 +41,7 @@ export function Step1Gender() {
     safetyScreeningVersion: null,
     safetyAnswersConfirmed: false,
   });};
-  const handleProvince = (province: string) => {if(province===data.province)return;setCustomCity(false);updateData({ province, city: '' });};
+
 
   return (
     <div className="space-y-6">
@@ -81,26 +76,6 @@ export function Step1Gender() {
           />
         </div>
       </div>
-
-      {/* Province */}
-      <Select
-        label="استان"
-        value={data.province}
-        onChange={(e) => handleProvince(e.target.value)}
-        placeholder="استان را انتخاب کنید"
-        options={PROVINCES.map((p) => ({ value: p, label: p }))}
-      />
-
-      {/* City */}
-      {cities.length>0&&<Select
-        label="شهر"
-        value={customCity?'__other':data.city}
-        onChange={(e) => {const other=e.target.value==='__other';setCustomCity(other);updateData({ city: other?'':e.target.value });}}
-        placeholder="شهر را انتخاب کنید"
-        options={[...cities.map((c) => ({ value: c, label: c })),{value:'__other',label:'شهر من در فهرست نیست'}]}
-        disabled={!data.province}
-      />}
-      {(cities.length===0||customCity)&&<Input label="نام شهر" autoComplete="address-level2" maxLength={80} placeholder="نام شهرت را بنویس" value={data.city} disabled={!data.province} onChange={e=>updateData({city:e.target.value})}/>}
 
       <div className="onboarding-actions"><Button onClick={nextStep} disabled={!canContinue}>
         ادامه

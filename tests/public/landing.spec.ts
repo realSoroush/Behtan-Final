@@ -113,7 +113,7 @@ test("real auth handoff unmounts the wave and keeps the app theme", async ({
     .getByRole("button", { name: "ساخت برنامه شخصی ←", exact: true })
     .first()
     .click();
-  await expect(page).toHaveURL(/#auth$/);
+  await expect(page).toHaveURL(/app.html#auth$/);
   await expect(page.locator(".behtan-landing")).toHaveCount(0);
   await expect(page.locator(".wave-canvas")).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem("behtan-theme"))).toBe(

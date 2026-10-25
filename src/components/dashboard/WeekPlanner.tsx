@@ -1,3 +1,4 @@
+import {workoutForDate} from '@/member/nutrition';
 import { useState, useRef, useEffect } from "react";
 import type {
   DailyMealPlan,
@@ -23,7 +24,7 @@ type Schedule = {
 export function WeekPlanner({
   today,
   plan,
-  targets,
+  targetsForDay,
   profile,
   catalog,
   schedule,
@@ -32,6 +33,7 @@ export function WeekPlanner({
   today: string;
   plan: DailyMealPlan;
   targets: MacroTargets;
+  targetsForDay:(workout:boolean)=>MacroTargets;
   profile: UserProfile;
   catalog: NutritionCatalog;
   schedule: Schedule;
@@ -64,10 +66,10 @@ export function WeekPlanner({
           continue;
         }
         const next = generateDailyMealPlan(
-          targets,
+          targetsForDay(workoutForDate(date,profile.workout_weekdays,profile.workout_days??0)),
           profile.weight,
           profile.dietary_preferences_json,
-          false,
+          workoutForDate(date,profile.workout_weekdays,profile.workout_days??0),
           date + "-v0",
           {
             previousDay: historyOfMeals(previous.meals),
@@ -97,7 +99,7 @@ export function WeekPlanner({
     setError("");
     try {
       const next = generateDailyMealPlan(
-        targets,
+        targetsForDay(!current.isWorkoutDay),
         profile.weight,
         profile.dietary_preferences_json,
         !current.isWorkoutDay,
@@ -181,7 +183,7 @@ export function WeekPlanner({
         </p>
       )}
       <div className="week-view-switch" aria-label="نوع نمایش هفته"><button type="button" aria-pressed={view==='meals'} onClick={()=>setView('meals')}>وعده‌های روز</button><button type="button" aria-pressed={view==='ingredients'} onClick={()=>setView('ingredients')}>فهرست مواد</button></div>
-      {view==='ingredients'?<div className="week-ingredients"><div><h3>مواد لازم برای {readyPlans.length.toLocaleString('fa-IR')} روز آماده</h3><p>جمع مقدارهای درج‌شده در برنامه؛ شامل مواد پخته.</p></div><ul>{ingredients.map(item=><li key={item.id}><span>{item.name}</span><strong>{(item.isLiquid?item.grams:item.unitLabel==='گرم'?item.grams:item.units).toLocaleString('fa-IR',{maximumFractionDigits:1})}<small> {item.isLiquid?'میلی‌لیتر':item.unitLabel}</small>{!item.isLiquid&&item.unitLabel!=='گرم'&&<em>{Math.round(item.grams).toLocaleString('fa-IR')} گرم</em>}</strong></li>)}</ul></div>:current ? (
+      {view==='ingredients'?<div className="week-ingredients"><div><h3>مواد لازم برای {readyPlans.length.toLocaleString('fa-IR')} روز آماده</h3><p>جمع مقدارهای برنامه؛ وزن خشک و پختهٔ هر ماده را هنگام اندازه‌گیری بررسی کن.</p></div><ul>{ingredients.map(item=><li key={item.id}><span>{item.name}</span><strong>{(item.isLiquid?item.grams:item.unitLabel==='گرم'?item.grams:item.units).toLocaleString('fa-IR',{maximumFractionDigits:1})}<small> {item.isLiquid?'میلی‌لیتر':item.unitLabel}</small>{!item.isLiquid&&item.unitLabel!=='گرم'&&<em>{Math.round(item.grams).toLocaleString('fa-IR')} گرم</em>}</strong></li>)}</ul></div>:current ? (
         <>
           <div className="week-day-title">
             <h3>

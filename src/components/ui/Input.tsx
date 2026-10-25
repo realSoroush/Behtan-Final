@@ -1,3 +1,4 @@
+import { PanelSelect } from '@/components/ui/PanelSelect';
 import { useId, type InputHTMLAttributes, type SelectHTMLAttributes, type ReactNode } from 'react';
 
 // ============================================================================
@@ -79,7 +80,7 @@ export function Select({ label, error, options, placeholder, className = '', id,
           {label}
         </label>
       )}
-      <select
+      <PanelSelect
         id={controlId}
         data-ui="select"
         aria-invalid={Boolean(error) || undefined}
@@ -105,7 +106,7 @@ export function Select({ label, error, options, placeholder, className = '', id,
             {opt.label}
           </option>
         ))}
-      </select>
+      </PanelSelect>
       {error && <p id={`${controlId}-error`} className="text-sm text-red-500">{error}</p>}
     </div>
   );

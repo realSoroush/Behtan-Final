@@ -1,3 +1,4 @@
+import {win32,resolve} from 'node:path';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { createRequire } from 'node:module';
@@ -6,8 +7,9 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const require = createRequire(import.meta.url);
 const mocks = {
+  'analytics.ts': `export function track(){}`,
   'useAuth.ts': `export function useAuth(){return {user:{id:globalThis.lifecycleUserId},loading:false}}`,
-  'useUserProfile.ts': `export {useUserProfile} from '${root}/tests/public/onboarding-profile.mock.ts';`,
+  'useUserProfile.ts': `export {useUserProfile} from ${JSON.stringify(resolve(root,'tests/public/onboarding-profile.mock.ts'))};`,
   'useSubscriptionPlans.ts': `const plans=[{code:'test',name:'آزمایشی',theme:'green',priceToman:0,priceNote:'تست',durationDays:30,features:[]}];export function useSubscriptionPlans(){return {plans,loading:false,error:null,refetch:async()=>plans}}`,
   'payments.ts': `export async function startCheckout(){throw Error('Checkout is outside this test');}`,
   'geminiClient.ts': `export class BodyScanError extends Error{};export async function analyzeBodyScan(){globalThis.lifecycleAnalysisCalls++;throw Error('Unexpected AI call');}`,
@@ -22,7 +24,7 @@ const compiled = await build({
   plugins: [{name:'lifecycle-fixtures',setup(b){
     b.onResolve({filter:/^framer-motion$/},()=>({path:'motion',namespace:'test'}));
     b.onLoad({filter:/.*/,namespace:'test'},()=>({contents:`export const motion={div:'div',button:'button'};export const AnimatePresence=({children})=>children;export const useReducedMotion=()=>true;`,loader:'js'}));
-    b.onLoad({filter:/\.(ts|tsx)$/},args=>{const name=args.path.split('/').at(-1);if(name in mocks)return {contents:mocks[name],loader:name.endsWith('tsx')?'tsx':'ts',resolveDir:root};});
+    b.onLoad({filter:/\.(ts|tsx)$/},args=>{const name=win32.basename(args.path);if(name in mocks)return {contents:mocks[name],loader:name.endsWith('tsx')?'tsx':'ts',resolveDir:root};});
     b.onLoad({filter:/\.css$/},()=>({contents:'',loader:'js'}));
   }}],
 });

@@ -85,3 +85,33 @@
     max-height: 104px;
   }
 }
+
+/* Shared Behtan fields: use each surface's own light/dark palette. */
+:root { --behtan-field:#fffef8; --behtan-ink:#26382d; --behtan-line:#dce3d3; --behtan-soft:#edf2df; --behtan-focus:#4b7041; }
+.dark { --behtan-field:#152018; --behtan-ink:#f0f4e9; --behtan-line:#40513d; --behtan-soft:#24321e; --behtan-focus:#c6e894; }
+:is(.member-app,.member-dialog,.pro-shell,.onboarding-app) {
+ --behtan-field:var(--member-card,var(--pro-field,var(--ob-card,#fffef8)));
+ --behtan-ink:var(--member-ink,var(--pro-ink,var(--ob-ink,#26382d)));
+ --behtan-line:var(--member-line,var(--pro-line,var(--ob-line,#dce3d3)));
+ --behtan-soft:var(--member-soft,var(--pro-tint,var(--ob-soft,#edf2df)));
+ --behtan-focus:var(--member-strong,var(--pro-green,var(--ob-strong,#4b7041)));
+}
+:is(.member-app,.member-dialog,.pro-shell,.onboarding-app) :where(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]):not([data-ui]),textarea), input[data-ui=input] {
+ background:var(--behtan-field);color:var(--behtan-ink);border:1px solid var(--behtan-line);border-radius:16px;min-height:48px;padding:12px 14px;font:inherit;max-width:100%;box-sizing:border-box;transition:border-color .18s,box-shadow .18s;
+}
+:is(.member-app,.member-dialog,.pro-shell,.onboarding-app) textarea {min-height:100px;resize:vertical;}
+:is(.member-app,.member-dialog,.pro-shell,.onboarding-app) :is(input,textarea):focus-visible {outline:2px solid var(--behtan-focus);outline-offset:3px;}
+:is(.member-app,.member-dialog,.pro-shell,.onboarding-app) :is(input,textarea):disabled {opacity:.55;cursor:not-allowed;}
+:is(.member-app,.member-dialog,.pro-shell,.onboarding-app) :is(input[type=checkbox],input[type=radio]) {accent-color:var(--behtan-focus);width:20px;height:20px;min-height:20px;padding:0;flex-shrink:0;}
+:is(.member-app,.member-dialog,.pro-shell,.onboarding-app) input[type=range] {accent-color:var(--behtan-focus);}
+@media(max-width:640px){:is(.member-app,.member-dialog,.pro-shell,.onboarding-app) :is(input,textarea){font-size:16px;}}
+@media(prefers-reduced-motion:reduce){input,textarea{transition:none!important;}}
+
+/* Keep icon/suffix spacing supplied by the existing Input component. */
+input[data-ui=input]{padding-inline:1rem}
+input[data-ui=input].pr-10{padding-right:2.5rem}
+input[data-ui=input].pl-14{padding-left:3.5rem}
+
+:is(.member-app,.member-dialog,.pro-shell,.onboarding-app) input[data-ui=input]{background:var(--behtan-field);color:var(--behtan-ink);border-color:var(--behtan-line)}
+:is(.member-app,.member-dialog,.pro-shell,.onboarding-app) input::placeholder{color:var(--member-muted,var(--pro-soft,var(--ob-muted,#677666)));opacity:.85}
+:is(.member-app,.member-dialog,.pro-shell,.onboarding-app) :is(input,textarea)[placeholder]::placeholder{color:var(--member-muted,var(--pro-soft,var(--ob-muted,#677666)));opacity:.85}

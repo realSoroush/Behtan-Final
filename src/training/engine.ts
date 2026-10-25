@@ -192,7 +192,7 @@ export function trainingEligibility(
     !professional && (a.medical_conditions.length ||
     a.medications_present ||
     a.injuries_present ||
-    a.pregnancy_status !== "not_pregnant" ||
+    (a.gender === "female" && a.pregnancy_status !== "not_pregnant") ||
     a.eating_disorder_status !== "none")
   )
     fail("TRAINING_REVIEW_REQUIRED");

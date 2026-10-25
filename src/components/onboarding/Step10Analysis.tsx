@@ -287,12 +287,6 @@ export function Step10Analysis() {
                 value={displayResult.bodyFatPct == null ? 'اندازه‌گیری نشده' : `${toPersianDigits(displayResult.bodyFatPct)}٪`}
                 sub={displayResult.confidence ? `اطمینان: ${CONFIDENCE_LABELS[displayResult.confidence]}` : undefined}
               />
-              <StatCard
-                emoji="🎂"
-                label="سن بیولوژیک تخمینی"
-                value={displayResult.biologicalAge == null ? 'محاسبه نشده' : `${toPersianDigits(displayResult.biologicalAge)} سال`}
-                sub={displayResult.source === 'ai' ? 'نمایشی؛ در فرمول کالری استفاده نمی‌شود' : undefined}
-              />
               <StatCard emoji="🏗️" label="نوع بدن" value={BODY_TYPE_LABELS[displayResult.bodyType]} />
               <StatCard emoji="💪" label="توده عضلانی تخمینی" value={muscleLabel(displayResult.estimatedMuscleMass)} />
             </div>}

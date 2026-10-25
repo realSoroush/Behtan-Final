@@ -148,9 +148,11 @@ export function Step9BodyScan() {
   const canContinueManually = data.bodyScanSkipped && Boolean(data.manualBodyType);
 
   if (showManualSelection || data.bodyScanSkipped) {
-    return (
+    const skipToPlan=async()=>{const state=useOnboardingStore.getState();if(state.isSubmitting||!state.progressSaver)return;state.setSubmitting(true);try{const draft={...state.data,bodyScanSkipped:true,bodyScanImage:null,bodyScanResult:null};await state.progressSaver(11,draft);state.updateData(draft);state.setSubmitting(false);state.goToStep(11);}catch{state.setSubmitError('ذخیره انجام نشد. دوباره تلاش کن.');}finally{useOnboardingStore.getState().setSubmitting(false);}};
+  return (
       <div className="space-y-6">
-        <StepHeader
+        <button type='button' className='member-secondary w-full' disabled={isSubmitting} onClick={()=>void skipToPlan()}>اسکن را بعداً در پروفایل انجام می‌دهم</button>
+      <StepHeader
           step={currentStep}
           title="نوع بدن خود را انتخاب کنید"
           subtitle="بر اساس ساختار بدنی که در آینه می‌بینید، نزدیک‌ترین گزینه را انتخاب کنید."

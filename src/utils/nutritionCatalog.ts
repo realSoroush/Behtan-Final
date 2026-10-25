@@ -13,6 +13,7 @@ import type {
 } from '@/types';
 
 export interface FoodItemRow {
+  preparation_state?: 'ready'|'cooked'|'dry'|'raw';
   id: string;
   name: string;
   role: FoodRole;
@@ -89,6 +90,7 @@ export function buildNutritionCatalog(input: {
     .map((row) => ({
       id: row.id,
       name: row.name,
+      preparationState: row.preparation_state ?? (['soy_chunks','oats_dry','whey_protein','pea_protein'].includes(row.id)?'dry':row.id.includes('cooked')?'cooked':'ready'),
       role: row.role,
       emoji: row.emoji ?? '',
       unitLabel: row.unit_label,

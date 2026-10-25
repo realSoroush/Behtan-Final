@@ -56,3 +56,9 @@ backups/
 /roles.sql
 /data.sql
 /schema.sql
+
+.cache/
+vite.config.js
+vite.config.d.ts
+
+.local-supabase/

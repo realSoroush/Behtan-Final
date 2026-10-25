@@ -1,3 +1,4 @@
+import {track} from '@/member/analytics';
 import { CompanionCard } from '@/components/companion/CompanionCard';
 import { getOnboardingCompanion } from '@/components/companion/companionState';
 import { APP_LOGO_PATH, APP_NAME_FA } from '@/constants/brand';
@@ -73,6 +74,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   } = useOnboardingStore();
   const { user } = useAuth();
   const userId = user?.id;
+  useEffect(()=>{if(userId)track('onboarding_step',{step:currentStep});},[userId,currentStep]);
   const {
     profile,
     loading: profileLoading,
@@ -220,7 +222,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
     try {
       await upsertProfile(profilePayload);
-      await startCheckout(plan);
+      track('onboarding_complete');await startCheckout(plan);
       // Keep completion locked until the root App has refreshed its own
       // authoritative profile snapshot.
       await onComplete();

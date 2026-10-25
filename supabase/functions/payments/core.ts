@@ -21,6 +21,7 @@ export interface Dependencies {
   authenticate(token: string): Promise<{id: string; phone?: string; phone_confirmed_at?: string} | null>;
   eligible(userId: string): Promise<boolean>;
   gateway(mode: Mode, method: 'request'|'verify'|'inquiry', body: Record<string, unknown>): Promise<GatewayReply>;
+  requirePreflight?: boolean;
   site: string;
   reconcileSecret: string;
 }
@@ -61,7 +62,7 @@ export function presentOrder(order: Order) {
 export function paymentHandler(deps: Dependencies) {
   return async (req: Request): Promise<Response> => {
     const origin = req.headers.get('origin');
-    const allowed = !origin || [deps.site, 'https://www.behtan.fit', 'http://localhost:5173', 'http://localhost:4173'].includes(origin);
+    const allowed = !origin || [deps.site, 'https://www.behtan.fit', 'https://pro.behtan.fit', 'http://localhost:5173', 'http://localhost:4173', 'http://localhost:5175', 'http://127.0.0.1:5175'].includes(origin);
     const headers: Record<string,string> = { 'Content-Type':'application/json', 'Cache-Control':'no-store', Vary:'Origin',
       'Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info', 'Access-Control-Allow-Methods':'POST, GET, OPTIONS' };
     if (origin && allowed) headers['Access-Control-Allow-Origin']=origin;
@@ -95,8 +96,10 @@ export function paymentHandler(deps: Dependencies) {
         }
         return reply({checked});
       }
+      if(body.action==='create' && deps.requirePreflight)return reply({error:'APP_UPDATE_REQUIRED'},409);
       const user=await deps.authenticate(bearer);
       if (!user) return reply({error:'UNAUTHORIZED'},401);
+      if (body.action==='capabilities') return reply({checkoutProtocol:2});
       if (body.action==='status') {
         const [settings,subscriptions,orders]=await Promise.all([
           deps.db.settings(),deps.db.subscriptions(user.id),deps.db.orders(`user_id=eq.${user.id}&order=created_at.desc&limit=10`),
@@ -113,13 +116,13 @@ export function paymentHandler(deps: Dependencies) {
         const [updated]=await deps.db.orders(`id=eq.${order.id}&limit=1`);
         return reply({order:presentOrder(updated)});
       }
-      if (body.action!=='create' || typeof body.planCode!=='string' || !/^[a-z][a-z0-9_-]{0,39}$/.test(body.planCode)
+      if (!['create','create_v2','pro_checkout'].includes(body.action) || typeof body.planCode!=='string' || !/^[a-z][a-z0-9_-]{0,39}$/.test(body.planCode)
         || !Number.isSafeInteger(body.priceToman) || body.priceToman<0 || !Number.isInteger(body.durationDays)) return reply({error:'INVALID_REQUEST'},400);
-      if (!await deps.eligible(user.id)) return reply({error:'PROFILE_INELIGIBLE'},403);
+      if (body.action!=='pro_checkout' && !await deps.eligible(user.id)) return reply({error:'PROFILE_INELIGIBLE'},403);
       const settings=await deps.db.settings();
       // Live charges require ownership proven by a completed Supabase phone OTP.
       if (settings.mode==='live' && (!user.phone_confirmed_at || !/^\+?989\d{9}$/.test(user.phone ?? ''))) return reply({error:'VERIFIED_PHONE_REQUIRED'},403);
-      const order=await deps.db.rpc<Order>('billing_begin_order', {p_user:user.id,p_plan:body.planCode,p_price:body.priceToman,p_days:body.durationDays});
+      const order=body.action==='pro_checkout' ? await deps.db.rpc<Order>('pro_begin_checkout',{p_user:user.id,p_code:body.planCode,p_months:body.durationDays/30,p_price:body.priceToman}) : body.action==='create_v2' ? await deps.db.rpc<Order>('member_begin_order',{p_user:user.id,p_plan:body.planCode,p_price:body.priceToman,p_days:body.durationDays,p_preflight:body.preflight,p_upgrade:body.upgrade===true}) : await deps.db.rpc<Order>('billing_begin_order', {p_user:user.id,p_plan:body.planCode,p_price:body.priceToman,p_days:body.durationDays});
       // Check the authoritative order mode too, if an admin switched modes between reads.
       if (order.mode==='live' && (!user.phone_confirmed_at || !/^\+?989\d{9}$/.test(user.phone ?? ''))) {
         await deps.db.update(order.id,{status:'failed'});
@@ -133,7 +136,7 @@ export function paymentHandler(deps: Dependencies) {
       try {
         const result=await deps.gateway(order.mode,'request',{
           amount:order.amount_rial,currency:'IRR',description:`اشتراک ${order.plan_name} به‌تن`,
-          callback_url:`${deps.site}/api/payment-callback?token=${order.callback_token}`,
+          callback_url:`${deps.site}/api/payment-callback?token=${order.callback_token}${body.action==='pro_checkout'?'&return=pro':''}`,
           metadata:{order_id:order.id,auto_verify:false,...(user.phone ? {mobile:user.phone} : {})},
         });
         if (result.code!==100 || !authorityValid(result.authority) || result.authority[0] !== (order.mode==='live'?'A':'S')) {
@@ -150,7 +153,7 @@ export function paymentHandler(deps: Dependencies) {
     } catch (error) {
       if(error instanceof PayloadTooLargeError) return reply({error:'INVALID_REQUEST'},413);
       const message=error instanceof Error ? error.message : '';
-      const code=['CHECKOUT_DISABLED','ALREADY_ACTIVE','PLAN_UNAVAILABLE','OFFER_CHANGED','CHECKOUT_BUSY','PENDING_ORDER_EXISTS','RATE_LIMITED'].find(c=>message.includes(c));
+      const code=['CHECKOUT_DISABLED','ALREADY_ACTIVE','PLAN_UNAVAILABLE','OFFER_CHANGED','CHECKOUT_BUSY','PENDING_ORDER_EXISTS','PENDING_ORDER_REVIEW_REQUIRED','PROFILE_CHANGED','PRO_PLAN_CHANGE_REQUIRES_SUPPORT','RATE_LIMITED','TRIAL_USED','PREFLIGHT_REQUIRED','TRAINING_REVIEW_REQUIRED','INVALID_UPGRADE','INVALID_PERIOD'].find(c=>message.includes(c));
       return reply({error:code ?? 'PAYMENT_UNAVAILABLE'},code ? 409 : 503);
     }
   };

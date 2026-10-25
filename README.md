@@ -1,117 +1,132 @@
-# به‌تن (Behtan)
+# به‌تن | Behtan
 
-Persian RTL nutrition-planning SPA built with React, TypeScript, Vite and Supabase.
-Nutrition targets, meal generation, portion limits and food swaps are deterministic;
-AI is limited to the optional Body Scan path.
+برنامهٔ فارسی و راست‌به‌چپ برای برنامه‌ریزی غذا، ثبت مصرف، پیگیری وزن و تمرین؛ همراه با پنل مستقل متخصصان و ادمین.
 
-## Current MVP architecture
+**وضعیت این شاخه:** نسخهٔ توسعه برای بازبینی محلی. انتشار یا اجرای Migration روی دیتابیس اصلی، بخشی از این بسته نیست. راهنمای جاری: [اصلاحات نسخهٔ سوم](docs/release/MARKET_READY_V3_FA.md) و [نصب محلی](docs/release/MARKET_READY_DEV_FA.md).
 
-- **Auth:** Supabase Phone OTP with a signed Send SMS Hook, SMS.ir Verify API and mandatory Cloudflare Turnstile
-- **Profiles/onboarding:** `user_profiles` with RLS; onboarding progress is saved to Supabase on every Next
-- **Nutrition catalog:** Supabase is the production source of truth
-  - `food_items`
-  - `food_substitutes`
-  - `meal_templates`
-  - `meal_template_slots`
-- **Nutrition engine:** deterministic TypeScript engine with calorie/macro, allergy/diet, portion-realism and swap guardrails
-- **Body Scan:** ephemeral browser image -> authenticated Supabase Edge Function -> Gemini; raw photos are not persisted and no AI is used for meal math
+## محصول
 
-## Setup
+- **اپ کاربران:** برنامهٔ غذایی قطعی و قابل آزمون، جایگزینی غذا، برنامهٔ هفته، ثبت و بازگرداندن وعده، ثبت نخوردن وعده، ثبت دستی غذا و تخمین از عکس، روند وزن و بازخورد، اسکن بدن اختیاری، و تمرین برای اشتراک واجد دسترسی.
+- **اشتراک‌ها:** آزمایشی یک‌بارمصرف سه‌روزه، تغذیه، تغذیه و تمرین. قیمت ماهانه در دیتابیس است؛ دورهٔ ۱۴روزه نصف قیمت با گردکردن رو به بالای تومان دارد. ارتقای تغذیه به ترکیبی، مابه‌تفاوت قیمت همان دوره را می‌گیرد و پایان دوره را نگه می‌دارد. ارتقای Trial یک خرید کامل است.
+- **Pro:** ورود OTP، ثبت نام و حوزهٔ کاری، آزمایش با سقف سه پرونده در مجموع، خرید از کاتالوگ Pro، پرونده و نسخه‌ها، برنامهٔ تغذیه/تمرین، تدوین اختصاصی و PDF. ثبت‌نام حوزهٔ کاری، تأیید صلاحیت حرفه‌ای نیست. White Label خدمت قراردادی جداگانه است و در پلن‌های استاندارد ارائه نمی‌شود.
+- **ادمین:** کاربران، پرداخت‌ها و سوابق، مدیریت Pro، تجربیات کاربران، نبض بیزینس و ویرایش منوهای غذایی با مواد استاندارد.
 
-```bash
-npm install
-cp .env.example .env
+## فناوری و معماری
+
+| بخش | فناوری و مرز مسئولیت |
+| --- | --- |
+| رابط | React 18، TypeScript، Vite، Tailwind، Framer Motion، Lucide، Rive |
+| زبان و برند | فارسی RTL، IRANSansX، تم روشن/تیره و هویت سبز به‌تن |
+| هویت و داده | Supabase Auth Phone OTP، PostgreSQL، RLS و RPCهای محدود |
+| پرداخت | زرین‌پال؛ قیمت و تسویه در سرور/دیتابیس؛ محیط sandbox و live جدا |
+| منطق غذا و تمرین | موتورهای TypeScript مشترک با تست‌های عددی و محدودیت‌های دامنه |
+| تصویر | Edge Function با رضایت کاربر، محدودیت حجم و سهمیه؛ عکس خام ذخیره نمی‌شود |
+| سئو | HTML عمومی از پیش رندرشده برای دو صفحه، canonical، sitemap، robots و دادهٔ ساختاریافته |
+
+اعداد کالری و ماکرو از موتور قطعی محاسبه می‌شوند. تحلیل عکس تخمینی است؛ سن بیولوژیک از UI حذف شده و چربی تصویری مبنای فرمول کالری نیست. این نرم‌افزار جایگزین پزشک یا متخصص نیست.
+
+## ساختار مخزن
+
+```text
+src/components/     رابط اپ، آنبوردینگ، لندینگ و اجزای مشترک
+src/member/         قابلیت‌های کاربران، محاسبهٔ مشترک، تمرین و تحلیل تعامل
+src/admin/          رابط مدیریت با کنترل دسترسی سروری
+src/professional/   پنل متخصصان و قراردادهای ارتباطی
+src/training/       موتور تمرین و آموزش حرکات
+src/utils/          موتور تغذیه، کاتالوگ و قواعد دامنه
+src/services/auth/  واسط هویت و Supabase OTP
+server/            مرزهای HTTP و سرویس‌های محرمانه
+api/               ورودی توابع Vercel
+supabase/functions/ توابع تصویر، پرداخت و پیامک
+supabase/migrations/ تغییرات نسخه‌دار دیتابیس
+scripts/           تست‌ها، بکاپ و ابزارهای نگهداری
+public/            فونت، هویت بصری، آموزش تمرین و فایل‌های سئو
+```
+
+## اجرای توسعه
+
+Node.js نسخهٔ ۲۴ LTS و npm لازم است. برای بررسی محلی، از Supabase محلی یا پروژهٔ staging جداگانه استفاده کن؛ تغییر `.env` به‌تنهایی دیتابیس اصلی را کپی نمی‌کند.
+
+```powershell
+npm ci
+Copy-Item .env.example .env
 npm run dev
 ```
 
-Required client environment variables:
+مقادیر عمومی لازم در `.env`:
 
-```text
-VITE_SUPABASE_URL=...
-VITE_SUPABASE_ANON_KEY=...
-VITE_TURNSTILE_SITE_KEY=...
+```dotenv
+VITE_SUPABASE_URL=https://YOUR_STAGING_PROJECT.supabase.co
+VITE_SUPABASE_ANON_KEY=YOUR_STAGING_ANON_KEY
+VITE_TURNSTILE_SITE_KEY=YOUR_SITE_KEY
 ```
 
-## Supabase database
+برای API جدید در توسعه، این مقادیر **فقط سمت سرور** لازم‌اند:
 
-For a new database, use `supabase/schema.sql`, then seed the nutrition catalog:
-
-```text
-supabase/seed_nutrition_catalog.sql
+```dotenv
+MEMBER_RELEASE_ENABLED=true
+SUPABASE_SERVICE_ROLE_KEY=YOUR_STAGING_SERVICE_ROLE_KEY
 ```
 
-For an existing Behtan database, apply migrations in order:
+کلید service role، کلید مدل، کلید زرین‌پال و امضای SMS نباید پیشوند `VITE_` بگیرند. این فایل را commit نکن. برای app جدید از `vite.config.ts` استفاده می‌شود؛ خروجی config در `.cache/` تولید می‌شود و دیگر فایل JS قدیمی کنار منبع قرار نمی‌گیرد.
 
-```text
-supabase/migrations/20260825_001_nutrition_catalog.sql
-supabase/migrations/20260825_002_security_auth_cleanup.sql
-...
-supabase/migrations/20260906_012_body_scan_privacy.sql
-supabase/migrations/20260907_013_subscription_plans.sql
-supabase/migrations/20260907_014_zarinpal_billing.sql
-supabase/migrations/20260908_015_production_auth_billing.sql
+```powershell
+npm run dev:admin
+npm run dev:pro
 ```
 
-Verification queries:
+Pro از تنظیمات و پرچم‌های سروری مستند در `docs/professional/` استفاده می‌کند. آدرس‌های محلی معمولاً ۵۱۷۳، ۵۱۷۴ و ۵۱۷۵ هستند. تغییر توابع پرداخت و اسکن فقط با Vite روی سرویس ابری اعمال نمی‌شود؛ آن‌ها را باید در محیط محلی Supabase یا staging جدا اجرا کرد. API جدید member در Vite اپ اصلی متصل است؛ پرداخت همچنان Edge Function است.
 
-```text
-supabase/verify_nutrition_catalog.sql
-supabase/verify_security_cleanup.sql
-```
+## دیتابیس
 
-The removed legacy `food_exchanges` export is preserved for future data harvesting at:
+`supabase/schema.sql` مبنای تاریخی schema تا فاز احراز هویت/پرداخت است، نه snapshot کامل آخرین محصول. برای محیط خالی با Auth آمادهٔ Supabase، مبنا و seed تغذیه و سپس Migrationهای ۰۱۶ به بعد به ترتیب لازم‌اند. برای دیتابیس موجود، فقط Migrationهای اجرا‌نشده اعمال شوند. دستور reset روی دیتابیس موجود ممنوع است.
 
-```text
-supabase/archive/food_exchanges_legacy_backup.sql
-```
+جدول‌های اصلی:
 
-It is **not** read by production code.
+| دامنه | جدول‌های اصلی |
+| --- | --- |
+| حساب و برنامه | `user_profiles`, `member_meal_schedule`, `daily_plan_snapshots`, `daily_meal_checkins`, `member_skipped_meals` |
+| کاتالوگ | `food_items`, `food_substitutes`, `meal_templates`, `meal_template_slots`, `nutrition_protein_policy` |
+| خرید | `subscription_plans`, `payment_orders`, `user_subscriptions`, `member_trial_claims`, `member_preflights` |
+| تجربه و سنجش | `user_progress_entries`, `member_experiences`, `product_events` |
+| تمرین و سهمیه | `member_training_plans`, `member_body_scan_usage`, `member_compute_usage` |
+| Pro | `pro_applications`, `pro_organizations`, `pro_memberships`, `pro_workspace_licenses` و جدول‌های پرونده/نسخه/برنامه |
 
-## Phone OTP requirement
+در این شاخه Migrationهای **۰۳۵ تا ۰۳۹** اضافه شده‌اند؛ همگی فقط روی clone/local بررسی شوند. ویرایش منوها به مواد موجود اشاره می‌کند و اطلاعات تغذیه‌ای مواد را ویرایش نمی‌کند. متادیتای خشک/پخته، ضریب تبدیل آب یا تغییر عدد غذایی نیست.
 
-Before deploying the secure auth code:
+## تست و build
 
-1. Enable **Authentication -> Providers -> Phone** in Supabase.
-2. Deploy `supabase/functions/send-sms` and configure it as the **Send SMS HTTP Hook**.
-3. Configure `SMS_IR_API_KEY`, `SMS_IR_TEMPLATE_ID`, `SMS_IR_PARAMETER_NAME` and the Hook signing secret only as Edge Function secrets.
-4. Confirm that a real Iranian `+98` number receives and verifies an OTP.
-
-The production deployment order is documented in `PRODUCTION_AUTH_PAYMENT_SETUP.md`.
-
-Do not reintroduce synthetic-email or phone-derived passwords.
-
-## Body Scan deployment
-
-1. Apply `supabase/migrations/20260906_012_body_scan_privacy.sql`. It adds consent metadata and removes any legacy Base64 photo from onboarding drafts.
-   Run `supabase/verify_body_scan_privacy.sql` afterward; all three count queries must return zero.
-2. Set `GEMINI_API_KEY` as a Supabase Edge Function secret.
-3. If a Vercel preview origin is used, add it to the comma-separated `BODY_SCAN_ALLOWED_ORIGINS` Edge Function secret.
-4. Deploy with JWT verification enabled: `supabase functions deploy body-scan`.
-
-The camera requires HTTPS (localhost is allowed for development). Behtan stores only the validated estimate and consent metadata, never the raw image.
-
-## Tests
-
-```bash
-npm run test:data
-npm run test:security
-npm run test:auth
-npm run test:swap
-npm run test:menus
-npm run test:portions
-npm run test:nutrition
-npm run test:onboarding
-npm run test:age
-npm run test:brand
-npm run test:body-scan
+```powershell
+npm run test:market
 npm run test:production
+npm run test:onboarding:lifecycle
+npm run test:nutrition
+npm run test:medical-safety
+npm run test:training
 npm run build
+npm run build:admin
+npm run build:pro
 ```
 
-## Production data rules
+`test:market` مرز HTTP واقعی محلی، محاسبات مشترک، SQL با نقش‌های واقعی در PGlite، قیمت/Trial/ارتقا، دسترسی ادمین و Pro را بررسی می‌کند. PGlite جای PostgreSQL بومی، تست هم‌زمانی و اتصال زندهٔ Supabase را نمی‌گیرد. تست‌های Playwright در تنظیمات مستقل public/Pro/admin نگهداری می‌شوند. بعضی قراردادهای قدیمی مرورگر باید در بازبینی این انتشار با UI جدید تطبیق داده شوند؛ نتیجهٔ سبز CI قبلی، تأیید این شاخه نیست.
 
-- Browser clients can read only active nutrition catalog rows after authentication.
-- Browser clients cannot insert/update/delete nutrition catalog data.
-- A user can read/update only their own `user_profiles` row.
-- Catalog edits are performed in Supabase Dashboard or trusted server/service-role tooling.
-- `.env` and service-role keys must never be committed or exposed to Vite/browser code.
+## بکاپ و انتشار
+
+قبل از تغییر دیتابیس اصلی، آرشیو کامل PostgreSQL و تعریف نقش‌ها گرفته و در محیط کاملاً جدا بازیابی شود:
+
+```powershell
+npm run backup:full
+npm run backup:full:verify -- "ABSOLUTE_BACKUP_DIRECTORY"
+```
+
+این دستورها نیازمند PostgreSQL client و متغیرهای محرمانهٔ `BEHTAN_DATABASE_URL` و `BEHTAN_RESTORE_URL` هستند. خروجی در `backups/` نگهداری و از Git خارج است. حالت پیش‌فرض TLS برابر verify-full است و گواهی معتبر سرور لازم است. آرشیو دیتابیس شامل فایل‌های واقعی Storage، تنظیمات داشبورد و Secretهای Edge/Vercel نیست؛ آن‌ها جدا پشتیبان‌گیری می‌شوند. checksum یا فهرست آرشیو به‌تنهایی اثبات بازیابی نیست.
+
+فعلاً Merge، deploy یا Migration production انجام نده. مراحل بازبینی در [راهنمای انتشار توسعه](docs/release/MARKET_READY_DEV_FA.md) آمده است.
+
+## امنیت و محدودیت‌ها
+
+احراز هویت OTP، Turnstile، اعتبارسنجی ورودی، محدودیت حجم/تعداد درخواست، RLS، RPCهای service-only و عدم ثبت عکس/توکن در telemetry از مرزهای امنیتی‌اند. JWT امضاشده است؛ «رمزنگاری‌شده» خواندن همهٔ توکن‌ها دقیق نیست. TLS و رمزنگاری دیسک/بکاپ به تنظیمات سرویس میزبانی نیز وابسته‌اند و از روی کد قابل تضمین مطلق نیستند.
+
+رویدادهای محصول فقط نام رویداد، مرحله، منبع و شناسهٔ تصادفی جلسه را دارند؛ نام، وزن، بیماری، عکس، متن آزاد و JWT وارد آن‌ها نمی‌شوند. تأیید خرید و درآمد از تراکنش سروری خوانده می‌شوند، نه ادعای مرورگر. آمار پیش از شروع سنجش بازسازی نمی‌شود.
+
+مستندات قدیمی در `docs/` سابقهٔ فازها هستند. مرجع این شاخه README و راهنمای نسخهٔ جدید است. سیاست اقتصادی، شرایط بازگشت وجه، حذف حساب و متن جامع حریم خصوصی طبق دامنهٔ درخواست این انتشار تغییر نکرده‌اند.

@@ -17,11 +17,11 @@ const {store,PROVINCES,Step1Gender,Step2Physical,Step6Medical,Step7Dietary,Onboa
 assert.equal(PROVINCES.length,31);assert.equal(new Set(PROVINCES).size,31);assert(PROVINCES.includes('کردستان'));
 const render=(component,props={})=>{Object.assign(store.getInitialState(),store.getState());return renderToStaticMarkup(createElement(component,props));};
 store.getState().hydrateFromDraft('test-user',1,{displayName:'کاربر نمونه',gender:'male',province:'کردستان',city:'سنندج'});
-let html=render(Step1Gender);assert(html.includes('نام شهر'));assert(html.includes('سنندج'));assert(!html.includes('شهرهای دیگر'));
+let html=render(Step1Gender);assert(!html.includes('نام شهر'));assert(html.includes('چه اسمی صدات کنیم؟'));assert.equal(store.getState().data.city,'سنندج');
 html=render(Step2Physical);assert(html.includes('inputMode="decimal"'));assert(!html.includes('type="number"'));assert(html.includes('role="progressbar"'));
 store.getState().updateData({gender:'male',medicalConditions:['kidney_disease'],pregnancyStatus:'not_applicable',eatingDisorderStatus:'none',safetyAnswersConfirmed:true,safetyScreeningVersion:1});
 html=render(Step6Medical);assert(html.includes('برنامه خودکار برای شما صادر نمی‌شود'));assert(!html.includes('>ادامه</button>'));
 html=render(Step7Dietary);assert(html.includes('بادام زمینی'));assert(html.includes('onboarding-actions'));
 html=render(OnboardingReview,{data:{...store.getState().data,height:178,weight:125.5,goal:'weight_loss'}});assert(html.includes('۱۲۵٫۵'));assert(html.includes('کاهش وزن'));
 for(const Component of [Input,Select]){html=render(Component,{label:'فیلد آزمایشی',error:'خطای آزمایشی',options:[{value:'a',label:'گزینه'}]});const id=html.match(/id="([^"]+)"/)[1];assert(html.includes(`for="${id}"`));assert(html.includes(`aria-describedby="${id}-error"`));assert(html.includes('aria-invalid="true"'));}
-console.log('✓ Onboarding: Persian/Arabic decimal input, ten stable visible steps, reverse navigation, all 31 provinces, real city entry, linked field errors, review values and preserved medical hard-stop');
+console.log('✓ Onboarding: Persian/Arabic decimal input, ten stable visible steps, reverse navigation, preserved geography data with deferred optional questions, linked field errors, review values and preserved medical hard-stop');

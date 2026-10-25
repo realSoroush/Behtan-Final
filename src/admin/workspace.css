@@ -3,3 +3,23 @@
 .admin-workbench .pro-header button.pro-theme{width:44px;height:44px;padding:0;flex-shrink:0}.admin-workbench button svg{flex-shrink:0}
 
 .admin-pro-commercial{border-top:1px solid var(--pro-line,#d8e3dc);padding-top:24px;margin:28px 0}.admin-pro-commercial-head{display:flex;align-items:center;justify-content:space-between;gap:18px}.admin-pro-offer-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px}.admin-pro-offer-grid article{padding:20px;border:1px solid #a8bca444;border-radius:15px;display:grid;gap:13px}.admin-pro-offer-grid small,.admin-pro-offer-grid span{font-size:11px;opacity:.7}.admin-pro-wide{grid-column:1/-1}.admin-pro-module-editor{border-block:1px solid #a8bca444;margin:25px 0;padding:20px 0}.admin-pro-offer-editor label{display:grid;gap:8px}.admin-pro-offer-editor input,.admin-pro-offer-editor textarea{width:100%;padding:12px;border:1px solid #a8bca466;border-radius:10px;background:transparent;color:inherit}.admin-pro-offer-editor input[type=checkbox]{width:auto}.admin-pro-offer-editor fieldset{border:0;padding:0;margin-bottom:20px}@media(max-width:700px){.admin-pro-offer-grid{grid-template-columns:1fr}.admin-pro-commercial-head{display:block}}
+
+/* Catalog and analytics additions share the Professional workbench palette. */
+.admin-workbench select{min-height:46px;background:var(--pro-field);color:var(--pro-ink);border:1px solid var(--pro-line);border-radius:12px;padding:10px 12px;font:inherit;max-width:100%;min-width:0}
+.admin-workbench select option{background:var(--pro-surface);color:var(--pro-ink)}
+.admin-workbench input[type=checkbox]{min-height:0;width:18px;height:18px;margin:0;accent-color:var(--pro-green);padding:0}
+.admin-workbench label:has(>input[type=checkbox]){display:flex;align-items:center;gap:9px;flex:0 1 auto}
+.admin-workbench .admin-menu-editor>p{font-size:12px;line-height:2;color:var(--pro-soft);max-width:78ch}
+.admin-workbench .admin-menu-editor>.admin-tools>select{width:100%}
+.admin-workbench .admin-menu-form{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.admin-workbench .admin-menu-form>label{margin:0}.admin-workbench .admin-menu-form>*+*{margin-top:0}
+.admin-workbench .admin-menu-ingredient{grid-column:1/-1;display:grid;grid-template-columns:minmax(180px,2fr) minmax(150px,1fr) auto;gap:12px;padding:16px;border:1px solid var(--pro-line);border-radius:16px;background:var(--pro-field);margin:0}
+.admin-workbench .admin-menu-ingredient select{width:100%;background:var(--pro-surface)}
+.admin-workbench .admin-menu-ingredient input[type=number]{width:110px;background:var(--pro-surface)}
+.admin-workbench .admin-menu-ingredient button{color:var(--pro-soft);border-color:var(--pro-line)}
+.admin-workbench .admin-card>h3{font-size:14px;font-weight:700;margin-top:24px;margin-bottom:12px}
+.admin-workbench :is(input,select,button):focus-visible{outline:2px solid var(--pro-green);outline-offset:3px}
+@media(max-width:700px){.admin-workbench .admin-menu-form{grid-template-columns:1fr}.admin-workbench .admin-menu-ingredient{grid-template-columns:1fr}.admin-workbench .admin-menu-ingredient input[type=number]{width:100%}.admin-workbench .admin-card{padding:18px}}
+
+/* Same field geometry as the member and Pro form system. */
+.admin-workbench :is(input:not([type=checkbox]):not([type=radio]):not([type=range]),textarea){border-radius:16px;min-height:48px}
