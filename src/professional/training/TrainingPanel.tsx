@@ -1,3 +1,4 @@
+import {trainingLine} from '../studioModel';
 import {AuthoredPlanEditor} from '../AuthoredPlanEditor';
 import type {AuthoredContent} from '../authoredPlan';
 import { useEffect, useRef, useState } from "react";
@@ -55,7 +56,11 @@ export function TrainingPanel({
   canWrite,
   onBusy,
   name,
+  onDirty,
+  onSaved,
 }: {
+  onDirty?: (value:boolean)=>void;
+  onSaved?: () => void;
   name: string;
   org: string;
   record: string;
@@ -63,7 +68,11 @@ export function TrainingPanel({
   canWrite: boolean;
   onBusy: (v: boolean) => void;
 }) {
+  const [authoredBusy,setAuthoredBusy]=useState(false),[authoredDirty,setAuthoredDirty]=useState(false),[engineDirty,setEngineDirty]=useState(false);
+  const dirtyNotify=useRef(onDirty);dirtyNotify.current=onDirty;
   const [mode,setMode]=useState<'engine'|'authored'>('authored'),[seed,setSeed]=useState<AuthoredContent|undefined>();
+  useEffect(()=>{dirtyNotify.current?.(mode==='authored'?authoredDirty:engineDirty);},[mode,authoredDirty,engineDirty]);
+  useEffect(()=>()=>dirtyNotify.current?.(false),[]);
   const [input, setInput] = useState<TrainingInput>(initialTrainingInput),
     [rows, setRows] = useState<TrainingSnapshot[]>([]),
     [page, setPage] = useState(0),
@@ -145,6 +154,7 @@ export function TrainingPanel({
     }
   }
   function change(p: Partial<TrainingInput>) {
+    setEngineDirty(true);
     setInput((v) => ({ ...v, ...p }));
     request.current = crypto.randomUUID();
     setError("");
@@ -164,10 +174,10 @@ export function TrainingPanel({
       ["dumbbells", "long_band", "stable_platform"].includes(e),
   );
   const previewStale = selected && selected.intake_revision !== revision;
-  if(mode==='authored')return <div className="training-panel"><div className="pro-module-tabs"><button aria-pressed={false} onClick={()=>{if(window.confirm('با تغییر مسیر، ویرایش‌های ثبت‌نشدهٔ دستی بسته می‌شوند. ادامه می‌دهید؟'))setMode('engine');}}><WandSparkles size={17}/>تمرین‌دهی خودکار</button><button aria-pressed={true}><SlidersHorizontal size={17}/>تنظیم دستی برنامه تمرینی</button></div><AuthoredPlanEditor org={org} record={record} revision={revision} kind="training" name={name} canWrite={canWrite} onBusy={onBusy} seed={seed}/></div>;
+  if(mode==='authored')return <div className="training-panel"><div className="pro-module-tabs"><button disabled={authoredBusy} aria-pressed={false} onClick={()=>{if(!authoredDirty||window.confirm('با تغییر مسیر، ویرایش‌های ثبت‌نشدهٔ دستی بسته می‌شوند. ادامه می‌دهید؟'))setMode('engine');}}><WandSparkles size={17}/>تمرین‌دهی خودکار</button><button aria-pressed={true}><SlidersHorizontal size={17}/>تنظیم دستی برنامه تمرینی</button></div><AuthoredPlanEditor org={org} record={record} revision={revision} kind="training" name={name} canWrite={canWrite} onBusy={value=>{setAuthoredBusy(value);onBusy(value);}} onDirty={setAuthoredDirty} onSaved={onSaved} seed={seed}/></div>;
   return (
     <div className="training-panel" aria-busy={busy}>
-      <div className="pro-module-tabs"><button aria-pressed={true}><WandSparkles size={17}/>تمرین‌دهی خودکار</button><button disabled={busy} onClick={()=>{setSeed(undefined);setMode('authored');}}><SlidersHorizontal size={17}/>تنظیم دستی برنامه تمرینی</button></div><div className="training-intro">
+      <div className="pro-module-tabs"><button aria-pressed={true}><WandSparkles size={17}/>تمرین‌دهی خودکار</button><button disabled={busy} onClick={()=>{if(engineDirty&&!window.confirm('تنظیمات ثبت‌نشده موتور بسته شوند؟'))return;setSeed(undefined);setMode('authored');}}><SlidersHorizontal size={17}/>تنظیم دستی برنامه تمرینی</button></div><div className="training-intro">
         <span className="training-badge">
           <Dumbbell size={16} /> تمرین، قدم‌به‌قدم
         </span>
@@ -379,6 +389,7 @@ export function TrainingPanel({
                   created_at: result.plan.created_at,
                   approved_at: null,
                 });
+                setEngineDirty(false);
                 await load(0);
                 setNotice(
                   "پیش‌نویس آماده است؛ حرکات و مقدار تمرین را قبل از تأیید بررسی کن.",
@@ -393,7 +404,7 @@ export function TrainingPanel({
       </details>
       {selected && (
         <section ref={previewRef} className="training-preview">
-          <button disabled={busy||!canWrite} onClick={()=>{setSeed({version:1,title:'برنامه تمرینی اختصاصی',notes:selected.plan.notes.join('\n'),reviewed:false,sections:selected.plan.weeks.flatMap(w=>w.sessions.map(s=>({title:'هفته '+w.week+' · '+s.title,lines:s.lines.map(l=>({name:l.exercise.name,details:l.sets+' ست · '+l.reps.join(' تا ')+' تکرار · '+l.rest_seconds+' ثانیه استراحت'}))})))});setMode('authored');}}>ساخت نسخه اختصاصی از این پیش‌نویس</button><div className="training-preview-head">
+          <button disabled={busy||!canWrite} onClick={()=>{setSeed({version:1,title:'برنامه تمرینی اختصاصی',notes:selected.plan.notes.join('\n'),reviewed:false,sections:selected.plan.weeks.flatMap(w=>w.sessions.map(s=>({title:'هفته '+w.week+' · '+s.title,lines:s.lines.map(l=>{const line=trainingLine(l.exercise.name);line.training!.sets=l.sets;line.training!.reps=l.reps[0];line.training!.rest=l.rest_seconds;line.details='بازه تکرار پیشنهادی: '+l.reps.join(' تا ');return line;})})))});setMode('authored');}}>ساخت نسخه اختصاصی از این پیش‌نویس</button><div className="training-preview-head">
             <div>
               <small>
                 {selected.approved_at ? "تأییدشده" : "پیش‌نویس برای بازبینی"}

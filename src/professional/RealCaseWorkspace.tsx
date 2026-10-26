@@ -1,4 +1,6 @@
+import {fromPrintedPlan} from './studioModel';
 import {AuthoredPlanEditor} from './AuthoredPlanEditor';
+import {AuthoredPlanArchive} from './AuthoredPlanArchive';
 import type {AuthoredContent} from './authoredPlan';
 import {TrainingPanel} from './training/TrainingPanel';
 import {PanelModal} from "@/components/ui/PanelModal";
@@ -42,9 +44,13 @@ const today = () =>
 export function RealCaseWorkspace({
   org,
   roles,
+  view = "cases",
+  onDirty,
 }: {
   org: string;
   roles: ProRole[];
+  view?: string;
+  onDirty?: (value:boolean)=>void;
 }) {
   const [rows, setRows] = useState<CaseSummary[]>([]),
     [selected, setSelected] = useState<string | null>(null),
@@ -96,6 +102,8 @@ export function RealCaseWorkspace({
       <RealCaseDetail
         key={selected}
         org={org}
+        view={view}
+        onDirty={onDirty}
         initialId={selected === "new" ? null : selected}
         onBack={() => {
           setSelected(null);
@@ -106,7 +114,7 @@ export function RealCaseWorkspace({
   return (
     <section className="pro-panel pro-record-workspace pro-directory">
       <div className="pro-toolbar pro-directory-heading">
-        <div><p className="pro-section-kicker">مراجعان شما</p><h2>هر پرونده، یک مسیر تازه.</h2></div>
+        <div><p className="pro-section-kicker">{view === "training" ? "انتخاب مراجع برای برنامه تمرینی" : view === "nutrition" ? "انتخاب مراجع برای برنامه غذایی" : view === "history" ? "انتخاب مراجع برای مشاهده سوابق" : "مراجعان شما"}</p><h2>هر پرونده، یک مسیر تازه.</h2></div>
         <div className="pro-actions">
           <button disabled={busy} onClick={() => void load()}>
             <RefreshCw size={16} className={busy ? "pro-spin" : ""} /> دریافت مجدد
@@ -153,11 +161,19 @@ function RealCaseDetail({
   org,
   initialId,
   onBack,
+  view,
+  onDirty,
 }: {
   org: string;
   initialId: string | null;
   onBack: () => void;
+  view: string;
+  onDirty?: (value:boolean)=>void;
 }) {
+  const [authoredDirty,setAuthoredDirty]=useState(false),[trainingDirty,setTrainingDirty]=useState(false);
+  const [authoredArchiveVersion,setAuthoredArchiveVersion]=useState(0);
+  const openedView=useRef("");
+  const dirtyCallback=useRef(onDirty);dirtyCallback.current=onDirty;
   const [authoredOpen,setAuthoredOpen]=useState(false),[authoredBusy,setAuthoredBusy]=useState(false),[authoredSeed,setAuthoredSeed]=useState<AuthoredContent|undefined>();
   const [trainingOpen,setTrainingOpen]=useState(false),[trainingBusy,setTrainingBusy]=useState(false);
   const [previewOpen,setPreviewOpen]=useState(false),[scanOpen,setScanOpen]=useState(false),[scanBusy,setScanBusy]=useState(false);
@@ -193,6 +209,15 @@ function RealCaseDetail({
     planKey = useRef(crypto.randomUUID()),
     generationKey = useRef(crypto.randomUUID());
   const dirty = !saved || JSON.stringify(form) !== saved;
+  useEffect(()=>{dirtyCallback.current?.(dirty||authoredDirty||trainingDirty);return()=>dirtyCallback.current?.(false);},[dirty,authoredDirty,trainingDirty]);
+  useEffect(()=>{
+    if(!id||!saved||locked||openedView.current===view)return;
+    openedView.current=view;
+    if(view==='training')setTrainingOpen(true);
+    if(view==='nutrition'){setAuthoredSeed(undefined);setAuthoredOpen(true);}
+    if(view==='history')document.getElementById('pro-saved-programs')?.scrollIntoView({block:'start'});
+  },[id,saved,locked,view]);
+
   const hydrate = useCallback(
     async (record: string) => {
       const [c, h, p, status] = await Promise.all([
@@ -234,7 +259,7 @@ function RealCaseDetail({
     return () => {
       mounted.current = false;
     };
-  }, [initialId, hydrate]);
+  }, [initialId, hydrate, org]);
   useEffect(() => {
     if (!id) return;
     let active = true;
@@ -396,8 +421,12 @@ function RealCaseDetail({
         <button className="pro-module-card" disabled={busy} onClick={()=>setTrainingOpen(true)} aria-label="برنامه تمرینی مراجع"><span className="pro-module-symbol"><Dumbbell size={22}/></span><span><strong>تمرین مراجع</strong><small>{access?.modules?.training?'جلسات، حرکات و برنامه اختصاصی':'مشاهده سوابق تمرین'}</small></span><ArrowUpLeft size={18}/></button>
         <button className="pro-module-card" disabled={busy} onClick={()=>setScanOpen(true)} aria-label="تحلیل تصویری بدن و گزارش‌ها"><span className="pro-module-symbol"><ScanLine size={22}/></span><span><strong>گزارش بدن</strong><small>عکس‌ها، ارزیابی و گزارش‌های ثبت‌شده</small></span><ArrowUpLeft size={18}/></button>
       </div>}
-      {id&&authoredOpen&&<PanelModal title="تدوین اختصاصی برنامه غذایی" busy={authoredBusy} onClose={()=>setAuthoredOpen(false)}><AuthoredPlanEditor org={org} record={id} revision={revision} kind="nutrition" name={form.display_name} canWrite={Boolean(access?.can_write&&access?.modules?.nutrition)&&!archived&&!dirty&&!stale&&!connectionWarning} onBusy={setAuthoredBusy} seed={authoredSeed}/></PanelModal>}
-      {id&&!locked&&trainingOpen&&<PanelModal title="برنامه تمرینی مراجع" busy={trainingBusy} onClose={()=>setTrainingOpen(false)}><TrainingPanel org={org} record={id} revision={revision} name={form.display_name} canWrite={Boolean(access?.can_write&&access?.modules?.training)&&!archived&&!dirty&&!stale&&!connectionWarning} onBusy={setTrainingBusy}/></PanelModal>}
+      {id&&authoredOpen&&<PanelModal title="تدوین اختصاصی برنامه غذایی" busy={authoredBusy} onClose={()=>{if(!authoredDirty||window.confirm("تغییرات ثبت‌نشده برنامه غذایی کنار گذاشته شوند؟"))setAuthoredOpen(false);}}><AuthoredPlanEditor org={org} record={id} revision={revision} kind="nutrition" name={form.display_name} canWrite={Boolean(access?.can_write&&access?.modules?.nutrition)&&!archived&&!dirty&&!stale&&!connectionWarning} onBusy={setAuthoredBusy} onDirty={setAuthoredDirty} onSaved={()=>setAuthoredArchiveVersion(v=>v+1)} intake={form} seed={authoredSeed} onGenerate={async()=>{
+        if(!id||dirty||stale||connectionWarning||archived||!access?.can_write||!access?.modules?.nutrition)throw new Error('PRO_STALE_REVISION');
+        const result=await realCaseApi.generatePlan(org,id,revision,1,date,notes,generationKey.current);
+        generationKey.current=crypto.randomUUID();return fromPrintedPlan(result.plan);
+      }}/></PanelModal>}
+      {id&&!locked&&trainingOpen&&<PanelModal title="برنامه تمرینی مراجع" busy={trainingBusy} onClose={()=>{if(!trainingDirty||window.confirm("تغییرات ثبت‌نشده برنامه تمرینی کنار گذاشته شوند؟"))setTrainingOpen(false);}}><TrainingPanel org={org} record={id} revision={revision} name={form.display_name} canWrite={Boolean(access?.can_write&&access?.modules?.training)&&!archived&&!dirty&&!stale&&!connectionWarning} onBusy={setTrainingBusy} onDirty={setTrainingDirty} onSaved={()=>setAuthoredArchiveVersion(v=>v+1)}/></PanelModal>}
       {id&&scanOpen&&<PanelModal title="تحلیل تصویری بدن" busy={scanBusy} onClose={()=>setScanOpen(false)}><BodyScanPanel org={org} record={id} revision={revision} canWrite={Boolean(access?.can_write)&&!archived&&!dirty&&!stale&&!connectionWarning} onBusy={setScanBusy}/></PanelModal>}
       <nav className="pro-case-path" aria-label="مسیر آماده‌سازی برنامه">
         <a href="#pro-intake-editor"><span>۱</span>اطلاعات مراجع</a>
@@ -598,7 +627,7 @@ function RealCaseDetail({
                 )}
                 {plan && previewOpen && (
                   <>
-                    <PanelModal title="برنامه غذایی مراجع" busy={busy} onClose={()=>setPreviewOpen(false)}>{error&&<p role="alert" className="pro-error">{error}</p>}{notice&&<p role="status" className="pro-success">{notice}</p>}{busy&&<p role="status">در حال انجام…</p>}<PlanPreview plan={plan} /><button disabled={busy||!access?.can_write||!access?.modules?.nutrition||dirty||stale} onClick={()=>{setAuthoredSeed({version:1,title:'برنامه غذایی اختصاصی',notes:plan.notes,reviewed:false,sections:plan.days.flatMap(d=>d.slots.map(slot=>({title:(d.workout?'روز تمرین · ':'روز استراحت · ')+slot.label,lines:slot.options.map((m,i)=>({name:'منو '+(i+1),details:m.components.map(c=>c.foodItem.name+' '+Math.round(c.grams)+' گرم').join(' + ')}))})))});setPreviewOpen(false);setAuthoredOpen(true);}}>ساخت نسخه اختصاصی از این برنامه</button>{planId&&id&&<ReportAttachment org={org} record={id} plan={planId} revision={plan.intake_revision} canWrite={Boolean(access?.can_write)&&!archived}/>}
+                    <PanelModal title="برنامه غذایی مراجع" busy={busy} onClose={()=>setPreviewOpen(false)}>{error&&<p role="alert" className="pro-error">{error}</p>}{notice&&<p role="status" className="pro-success">{notice}</p>}{busy&&<p role="status">در حال انجام…</p>}<PlanPreview plan={plan} /><button disabled={busy||!access?.can_write||!access?.modules?.nutrition||dirty||stale} onClick={()=>{setAuthoredSeed(fromPrintedPlan(plan));setPreviewOpen(false);setAuthoredOpen(true);}}>تدوین منوی اول هر وعده در استودیوی تغذیه</button>{planId&&id&&<ReportAttachment org={org} record={id} plan={planId} revision={plan.intake_revision} canWrite={Boolean(access?.can_write)&&!archived}/>}
                     <div className="pro-actions">
                       <button
                         disabled={busy || archived || Boolean(planId) || dirty || stale || !access?.can_write || !access?.modules?.nutrition}
@@ -619,7 +648,8 @@ function RealCaseDetail({
                   </>
                 )}
                 <div id="pro-saved-programs" className="pro-block-heading pro-saved-heading"><span className="pro-block-icon"><FileText size={21} /></span><div><small>آرشیو مراجع</small><h3>برنامه‌های ذخیره‌شده</h3></div></div>
-                {!plans.length && <p>هنوز برنامه‌ای ذخیره نشده است.</p>}
+                <h4>برنامه‌های خودکار تغذیه</h4>
+                {!plans.length && <p>هنوز برنامهٔ خودکار ذخیره نشده است.</p>}
                 <ul className="pro-cases">
                   {plans.map((p) => (
                     <li key={p.id}>
@@ -645,6 +675,7 @@ function RealCaseDetail({
                   ))}
                 </ul>
                 <div className="pro-actions"><button disabled={busy||plansPage===0} onClick={()=>void run(async()=>{const r=await realCaseApi.plans(org,id,plansPage-1);setPlans(r.rows);setPlansPage(p=>p-1);})}>برنامه‌های جدیدتر</button><span>صفحه {(plansPage+1).toLocaleString('fa-IR')} · {plansTotal.toLocaleString('fa-IR')} برنامه</span><button disabled={busy||(plansPage+1)*10>=plansTotal} onClick={()=>void run(async()=>{const r=await realCaseApi.plans(org,id,plansPage+1);setPlans(r.rows);setPlansPage(p=>p+1);})}>برنامه‌های قدیمی‌تر</button></div>
+                <AuthoredPlanArchive key={`${org}:${id}:${authoredArchiveVersion}`} org={org} record={id} name={form.display_name} />
               </section>
             </>
           )}
