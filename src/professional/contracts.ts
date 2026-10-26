@@ -22,6 +22,7 @@ export function canCreateSandboxPatient(roles: ProRole[]): boolean {
 }
 export function proErrorMessage(error: unknown): string {
   const code = error instanceof Error ? error.message : String(error);
+  if(code.includes('PRO_CATALOG_UNAVAILABLE'))return 'کاتالوگ یا سیاست محاسبات تغذیه در دسترس نیست؛ تنظیمات سرویس و داده‌های کاتالوگ را بررسی کنید.';
   if(code.includes('PRO_MODULE_DISABLED'))return 'ماژول تغذیه در اشتراک این پنل فعال نیست؛ سوابق و خروجی‌های قبلی در دسترس‌اند.';
   if(code.includes('PRO_CASE_ARCHIVED'))return 'این پرونده بایگانی شده است؛ ابتدا آن را از بایگانی بازگردانید.';
   if (code.includes('PRO_SERVER_CREDENTIAL_INVALID')) return 'کلید سروری پنل معتبر نیست؛ تنظیمات Vercel باید اصلاح شود.';

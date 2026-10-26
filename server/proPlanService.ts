@@ -25,7 +25,7 @@ export async function processPlanRequest(body: unknown, token: string, deps: Pla
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new ProServerError('PRO_INVALID_REQUEST');
   const b = body as Record<string, unknown>;
   const keys = b.action === 'generate' ? ['action','org','record','revision','key','date','count','notes']
-    : b.action === 'save' ? ['action','org','record','revision','key','draft'] : [];
+    : b.action === 'catalog' ? ['action','org','record','revision','key'] : b.action === 'save' ? ['action','org','record','revision','key','draft'] : [];
   if (!keys.length || Object.keys(b).some(k => !keys.includes(k)) || keys.some(k => !(k in b))
       || !uuid(b.org) || !uuid(b.record) || !uuid(b.key) || !Number.isSafeInteger(b.revision) || Number(b.revision) < 1)
     throw new ProServerError('PRO_INVALID_REQUEST');
@@ -47,6 +47,7 @@ export async function processPlanRequest(body: unknown, token: string, deps: Pla
   // Always use the user's JWT for RLS reads. Never accept answers/targets from the request.
   const current = await deps.readCase(token, b.org, b.record);
   if (current.revision !== b.revision) throw new ProServerError('PRO_STALE_REVISION', 409);
+  if(b.action==='catalog'){const {catalog}=await deps.loadNutrition(token);return {foods:catalog.foods};}
   const request: DraftRequest = { date:b.date as string, count:b.count as number, notes:(b.notes as string).trim() };
   // A future program date must not make a currently ineligible client eligible.
   if (!proNutritionDraftAllowed(current.answers, new Date())

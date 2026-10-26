@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import type { OnboardingData, UserProfile } from '@/types';
 import { toPersistedOnboardingDraft } from '@/utils/bodyScanPrivacy';
@@ -21,6 +21,7 @@ interface UseUserProfileReturn {
 }
 
 export function useUserProfile(userId: string | undefined): UseUserProfileReturn {
+  const requestSequence = useRef(0);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [fetching, setFetching] = useState(false);
   const [loadedUserId, setLoadedUserId] = useState<string | null>(null);
@@ -33,34 +34,30 @@ export function useUserProfile(userId: string | undefined): UseUserProfileReturn
 
   const fetch = useCallback(async () => {
     if (!userId) {
+      requestSequence.current++;
       setProfile(null);
       setLoadedUserId(null);
       setFetching(false);
       return;
     }
 
-    setFetching(true);
-    setError(null);
-
-    const { data, error: sbError } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
-
-    if (sbError) {
-      setError('خطا در دریافت اطلاعات پروفایل.');
-    } else {
-      setProfile(data ?? null);
+    const sequence = ++requestSequence.current;
+    setFetching(true); setError(null);
+    try {
+      const {data, error: sbError} = await supabase.from('user_profiles').select('*').eq('id', userId).abortSignal(AbortSignal.timeout(15000)).maybeSingle();
+      if (sequence !== requestSequence.current) return;
+      if (sbError) setError('اطلاعات پروفایل دریافت نشد؛ دوباره تلاش کن.');
+      else setProfile(data ?? null);
+    } catch {
+      if (sequence === requestSequence.current) setError('ارتباط با پروفایل برقرار نشد؛ دوباره تلاش کن.');
+    } finally {
+      if (sequence === requestSequence.current) {setLoadedUserId(userId);setFetching(false);}
     }
-
-    setLoadedUserId(userId);
-    setFetching(false);
   }, [userId]);
 
   useEffect(() => {
     void fetch();
-    const refresh=()=>void fetch();window.addEventListener('member-profile-changed',refresh);return()=>window.removeEventListener('member-profile-changed',refresh);
+    const refresh=()=>void fetch();window.addEventListener('member-profile-changed',refresh);return()=>{requestSequence.current++;window.removeEventListener('member-profile-changed',refresh);};
   }, [fetch]);
 
   const upsertProfile = useCallback(async (partial: Partial<UserProfile>) => {

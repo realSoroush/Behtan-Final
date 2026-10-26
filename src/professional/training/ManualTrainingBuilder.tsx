@@ -1,20 +1,93 @@
-import {useRef,useState} from 'react';
-import {ArrowUp,ArrowDown,GripVertical,Plus,Trash2} from 'lucide-react';
-import {PanelSelect} from '@/components/ui/PanelSelect';
-import {EXERCISES} from '@/training/catalog';
-import type {AuthoredContent} from '../authoredPlan';
+import { useRef, useState } from 'react';
+import { ArrowUp, ArrowDown, GripVertical, Plus, Trash2 } from 'lucide-react';
+import { PanelSelect } from '@/components/ui/PanelSelect';
+import type { AuthoredContent, AuthoredLine } from '../authoredPlan';
+import { trainingGroups, trainingLine, groupLabel, normalizedSearch, lineDescription, fa, moveItem, type GroupKind } from '../studioModel';
+import { EXERCISE_GROUPS, MANUAL_EXERCISES } from './exerciseLibrary';
 import './manual-training.css';
-const extra=['پرس سینه هالتر','پرس بالا سینه دمبل','فلای سینه دمبل','کراس اور سیم‌کش','شنا روی زمین','پرس سرشانه دمبل','نشر جانب دمبل','نشر خم دمبل','فیس پول سیم‌کش','شراگ دمبل','لت دست باز','لت دست جمع','بارفیکس کمکی','پارویی هالتر','پارویی تک دمبل','قایقی سیم‌کش','ددلیفت رومانیایی دمبل','هیپ تراست','پل باسن','اسکوات هالتر','اسکوات جام','اسکوات اسمیت','لانج معکوس','لانج راه‌رفتنی','اسپلیت اسکوات بلغاری','جلوپا دستگاه','پشت پا نشسته','پشت پا خوابیده','ساق پا ایستاده','ساق پا نشسته','جلو بازو هالتر','جلو بازو دمبل تناوبی','جلو بازو چکشی','جلو بازو سیم‌کش','پشت بازو سیم‌کش','پشت بازو دمبل بالای سر','پشت بازو هالتر خوابیده','پلانک','پلانک جانبی','ددباگ','بردداگ','کرانچ','کرانچ معکوس','پالوف پرس','راه رفتن روی تردمیل','دوچرخه ثابت','الپتیکال','راه رفتن کشاورزی'];
-export const MANUAL_EXERCISES=[...new Set([...EXERCISES.map(e=>e.name),...extra])];
-export function ManualTrainingBuilder({content,mutate}:{content:AuthoredContent;mutate:(fn:(d:AuthoredContent)=>void)=>void}){
- const [day,setDay]=useState(0),[search,setSearch]=useState('');const drag=useRef<{day:number;line:number}|null>(null);
- const current=Math.min(day,content.sections.length-1),session=content.sections[current];
- function move(from:number,to:number){mutate(d=>{const [line]=d.sections[current].lines.splice(from,1);d.sections[current].lines.splice(to,0,line);});}
- function add(name:string){mutate(d=>{const s=d.sections[current];if(s.lines.length===1&&!s.lines[0].name)s.lines=[];if(s.lines.length<30)s.lines.push({name,details:'3 ست · 12 تکرار · 60 ثانیه استراحت'});});}
- return <div className="manual-training"><div className="manual-toolbar"><label>تعداد روزهای برنامه<PanelSelect aria-label="تعداد روزهای برنامه" value={content.sections.length} onChange={e=>{const count=Number(e.target.value);if(count<content.sections.length&&!window.confirm('جلسات انتهایی و حرکات آن‌ها حذف شوند؟'))return;mutate(d=>{while(d.sections.length<count)d.sections.push({title:`جلسه ${d.sections.length+1}`,lines:[{name:'',details:''}]});d.sections=d.sections.slice(0,count);});setDay(0);}}>{[1,2,3,4,5,6,7].map(n=><option key={n} value={n}>{n.toLocaleString('fa-IR')} روز</option>)}</PanelSelect></label><p>بانک حرکات مخصوص تدوین مربی است؛ انتخاب و حجم تمرین با شماست.</p></div>
- <nav className="manual-days" aria-label="جلسات تمرین">{content.sections.map((s,i)=><button type="button" key={i} aria-pressed={current===i} onClick={()=>setDay(i)}>{s.title||`جلسه ${i+1}`}</button>)}</nav>
- <div className="manual-workspace"><aside className="manual-library"><h4>بانک حرکات · {MANUAL_EXERCISES.length.toLocaleString('fa-IR')}</h4><input aria-label="جستجوی حرکت" placeholder="نام حرکت را جستجو کن…" value={search} onChange={e=>setSearch(e.target.value)}/><div>{MANUAL_EXERCISES.filter(n=>n.includes(search.trim())).map(n=><button type="button" key={n} disabled={session.lines.length>=30} onClick={()=>add(n)}><Plus size={15}/>{n}</button>)}</div><p>حرکت دیگری می‌خواهی؟</p><button type="button" disabled={session.lines.length>=30} onClick={()=>add('حرکت اختصاصی مربی')}>افزودن حرکت اختصاصی</button></aside>
- <section className="manual-session"><label>نام جلسه<input aria-label="نام جلسه تمرین" maxLength={100} value={session.title} onChange={e=>mutate(d=>{d.sections[current].title=e.target.value;})}/></label><p className="pro-muted">برای جابه‌جایی بکش؛ روی موبایل از فلش‌ها استفاده کن.</p>{session.lines.map((l,j)=><article className="manual-exercise" key={j} data-line-index={j}><header><span className="manual-grip" title="برای جابه‌جایی بکش" style={{touchAction:'none',cursor:'grab'}} onPointerDown={e=>{drag.current={day:current,line:j};e.currentTarget.setPointerCapture(e.pointerId);}} onPointerCancel={()=>{drag.current=null;}} onPointerUp={e=>{const target=document.elementsFromPoint(e.clientX,e.clientY).map(n=>n.closest<HTMLElement>('[data-line-index]')).find(Boolean);if(drag.current?.day===current&&target){const to=Number(target.dataset.lineIndex);if(Number.isInteger(to))move(drag.current.line,to);}drag.current=null;e.currentTarget.releasePointerCapture(e.pointerId);}}><GripVertical size={17}/></span><input aria-label={`نام حرکت ${j+1}`} maxLength={300} value={l.name} placeholder="حرکت را از بانک اضافه کن" onChange={e=>mutate(d=>{d.sections[current].lines[j].name=e.target.value;})}/></header><div className="manual-dose">{['ست','تکرار','استراحت (ثانیه)'].map((label,k)=><label key={label}>{label}<input aria-label={`${label} حرکت ${j+1}`} type="number" min={1} max={k===0?20:k===1?300:1800} value={l.details.match(/\d+/g)?.[k]??''} onChange={e=>mutate(d=>{const values=l.details.split('\n')[0].replace(/[۰-۹]/g,c=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c))).match(/\d+/g)??['3','12','60'];const notes=l.details.includes('\n')?'\n'+l.details.split('\n').slice(1).join('\n'):'';values[k]=e.target.value;d.sections[current].lines[j].details=`${values[0]??3} ست · ${values[1]??12} تکرار · ${values[2]??60} ثانیه استراحت${notes}`;})}/></label>)}</div><label>دستور مربی<textarea aria-label={`دستور حرکت ${j+1}`} maxLength={2000} value={l.details} onChange={e=>mutate(d=>{d.sections[current].lines[j].details=e.target.value;})}/></label><footer><button type="button" aria-label={`بالا بردن حرکت ${j+1}`} disabled={!j} onClick={()=>move(j,j-1)}><ArrowUp size={16}/></button><button type="button" aria-label={`پایین بردن حرکت ${j+1}`} disabled={j===session.lines.length-1} onClick={()=>move(j,j+1)}><ArrowDown size={16}/></button><button type="button" aria-label={`حذف حرکت ${j+1}`} onClick={()=>mutate(d=>{d.sections[current].lines.splice(j,1);if(!d.sections[current].lines.length)d.sections[current].lines.push({name:'',details:''});})}><Trash2 size={16}/></button></footer></article>)}</section>
- </div></div>;
+export { MANUAL_EXERCISES };
+type Drag = { section: number; line: number } | { name: string };
+export function ManualTrainingBuilder({ content, mutate }: { content: AuthoredContent; mutate: (fn: (d: AuthoredContent) => void) => void }) {
+  const [day, setDay] = useState(0), [search, setSearch] = useState(''), [category, setCategory] = useState('همه'), [subcategory, setSubcategory] = useState('همه');
+  const [target, setTarget] = useState(''), [newKind, setNewKind] = useState<GroupKind>(1), [notice, setNotice] = useState('');
+  const drag = useRef<Drag | null>(null);
+  const current = Math.min(day, content.sections.length - 1), session = content.sections[current];
+  const groups = trainingGroups(session), selected = groups.find(g => g.id === target) || groups[groups.length - 1];
+  const parents = ['همه', ...new Set(EXERCISE_GROUPS.map(g => g.parent))];
+  const visible = EXERCISE_GROUPS.filter(g => (category === 'همه' || g.parent === category) && (subcategory === 'همه' || subcategory === g.name)).map(g => ({ ...g, exercises: g.exercises.filter(n => normalizedSearch(n).includes(normalizedSearch(search))) })).filter(g => g.exercises.length);
+  function add(name: string, group = selected) {
+    if (!group) { mutate(d => d.sections[current].lines.push(trainingLine(name))); return; }
+    const free = group.indices.find(i => !session.lines[i].name.trim());
+    if (free === undefined) { setNotice('گروه انتخاب‌شده کامل است؛ یک گروه جدید بسازید یا گروه دیگری را انتخاب کنید.'); return; }
+    mutate(d => { d.sections[current].lines[free].name = name; }); setNotice('');
+  }
+  function addGroup() {
+    if (session.lines.length + newKind > 30) return;
+    const id = crypto.randomUUID();
+    mutate(d => { for (let i = 0; i < newKind; i++) d.sections[current].lines.push(trainingLine('', newKind, id)); });
+    setTarget(id); setNotice('');
+  }
+  function moveGroup(from: number, to: number) {
+    const ordered = groups.map(g => g.indices.map(i => session.lines[i]));
+    moveItem(ordered, from, to); mutate(d => { d.sections[current].lines = ordered.flat(); });
+  }
+  function drop(to: number) {
+    const from = drag.current; drag.current = null;
+    if (!from) return;
+    if ('name' in from) { add(from.name, groups.find(g => g.indices.includes(to))); return; }
+    if (from.section !== current || from.line === to) return;
+    const sourceGroup = groups.find(g => g.indices.includes(from.line)), toGroup = groups.find(g => g.indices.includes(to));
+    if (!sourceGroup || !toGroup) return;
+    mutate(d => {
+      const lines = d.sections[current].lines;
+      // Swapping slots preserves each group's capacity and identity, including cross-group moves.
+      const a = lines[from.line], b = lines[to], aGroup = a.training!, bGroup = b.training!;
+      lines[to] = { ...a, training: { ...aGroup, group: bGroup.group, kind: bGroup.kind } };
+      lines[from.line] = { ...b, training: { ...bGroup, group: aGroup.group, kind: aGroup.kind } };
+    });
+  }
+  return <div className="manual-training studio-training">
+    <div className="manual-toolbar"><label>تعداد روزهای برنامه<PanelSelect aria-label="تعداد روزهای برنامه" value={content.sections.length} onChange={e => {
+      const count = Number(e.target.value);
+      if (count < content.sections.length && !window.confirm('جلسات انتهایی و حرکات آن‌ها حذف شوند؟')) return;
+      mutate(d => { while (d.sections.length < count) d.sections.push({ title: `جلسه ${d.sections.length + 1}`, lines: [trainingLine()] }); d.sections = d.sections.slice(0, count); });
+      setDay(0); setTarget('');
+    }}>{Array.from({ length: Math.max(7, content.sections.length) }, (_, i) => i + 1).map(n => <option key={n} value={n}>{fa(n)} روز</option>)}</PanelSelect></label><p>جلسه را انتخاب کنید، گروه بسازید و حرکت‌ها را از بانک اضافه کنید.</p></div>
+    <nav className="manual-days" aria-label="جلسات تمرین">{content.sections.map((s, i) => <button type="button" key={i} aria-pressed={current === i} onClick={() => { setDay(i); setTarget(''); }}>{s.title || `جلسه ${fa(i + 1)}`}</button>)}</nav>
+    {notice && <p role="status" className="studio-notice">{notice}</p>}
+    <div className="studio-columns">
+      <aside className="studio-bank manual-library"><h4>بانک حرکات</h4><small>{fa(MANUAL_EXERCISES.length)} نام یکتا · دسته‌بندی عضلات</small>
+        <input type="search" aria-label="جستجوی حرکت" placeholder="نام حرکت…" value={search} onChange={e => setSearch(e.target.value)} />
+        <div className="studio-categories" aria-label="عضله">{parents.map(c => <button type="button" key={c} aria-pressed={category === c} onClick={() => { setCategory(c); setSubcategory('همه'); }}>{c}</button>)}</div>
+        {category !== 'همه' && <label>زیرگروه عضلانی<PanelSelect aria-label="زیرگروه عضلانی" value={subcategory} onChange={e => setSubcategory(e.target.value)}><option>همه</option>{EXERCISE_GROUPS.filter(g => g.parent === category).map(g => <option key={g.name}>{g.name}</option>)}</PanelSelect></label>}
+        <div className="studio-bank-list">{visible.map(g => <section key={g.parent + g.name}><h5>{g.parent} / {g.name}</h5>{g.exercises.map(n => <button type="button" key={n} draggable onDragStart={e => { drag.current = { name: n }; e.dataTransfer.setData('text/plain', n); }} onDragEnd={() => { drag.current = null; }} onClick={() => add(n)}><span>{n}</span><Plus size={16} /></button>)}</section>)}{!visible.length && <p className="studio-empty">حرکتی پیدا نشد.</p>}</div>
+        <button type="button" onClick={() => add('حرکت اختصاصی مربی')}>+ حرکت اختصاصی</button>
+      </aside>
+      <section className="studio-editor manual-session"><div className="studio-row"><h4>جلسه {fa(current + 1)}</h4><span className="studio-pill">{fa(session.lines.filter(l => l.name.trim()).length)} حرکت</span></div>
+        <label>نام جلسه<input aria-label="نام جلسه تمرین" maxLength={100} value={session.title} onChange={e => mutate(d => { d.sections[current].title = e.target.value; })} /></label>
+        <div className="studio-row studio-group-actions"><label>نوع گروه<PanelSelect aria-label="نوع گروه جدید" value={newKind} onChange={e => setNewKind(Number(e.target.value) as GroupKind)}>{[1, 2, 3].map(k => <option key={k} value={k}>{groupLabel(k)}</option>)}</PanelSelect></label><button type="button" disabled={session.lines.length + newKind > 30} onClick={addGroup}><Plus size={16} />گروه جدید</button></div>
+        <p className="studio-help">گروه مقصد را انتخاب کنید؛ سپس حرکت اضافه کنید. کشیدن بین دو جایگاه، حرکت‌ها را جابه‌جا می‌کند.</p>
+        {groups.map((g, gi) => <section key={g.id} className={'studio-training-group' + (selected?.id === g.id ? ' is-selected' : '')} aria-label={`گروه تمرینی ${gi + 1}`} onClick={() => setTarget(g.id)}>
+          <div className="studio-row"><button type="button" aria-pressed={selected?.id === g.id} onClick={() => setTarget(g.id)}>{groupLabel(g.kind)} {fa(gi + 1)}</button><span className="studio-group-order"><button type="button" aria-label={`بالا بردن گروه ${gi + 1}`} disabled={gi === 0} onClick={() => moveGroup(gi, gi - 1)}><ArrowUp size={15} /></button><button type="button" aria-label={`پایین بردن گروه ${gi + 1}`} disabled={gi === groups.length - 1} onClick={() => moveGroup(gi, gi + 1)}><ArrowDown size={15} /></button><button type="button" aria-label={`حذف گروه ${gi + 1}`} onClick={() => { if (g.indices.some(i => session.lines[i].name) && !window.confirm('گروه و همه حرکت‌های آن حذف شوند؟')) return; mutate(d => { d.sections[current].lines = d.sections[current].lines.filter((_, i) => !g.indices.includes(i)); }); }}><Trash2 size={15} /></button></span></div>
+          <label className="studio-group-kind">نوع گروه<PanelSelect aria-label={`نوع گروه ${gi + 1}`} value={g.kind} onChange={e => {
+            const kind = Number(e.target.value) as GroupKind;
+            if (kind < g.kind && g.indices.slice(kind).some(i => session.lines[i].name.trim()) && !window.confirm('حرکت‌های اضافه از این گروه حذف شوند؟')) return;
+            if (session.lines.length + kind - g.kind > 30) { setNotice('حداکثر ۳۰ حرکت در هر جلسه.'); return; }
+            mutate(d => { const lines = d.sections[current].lines, next: AuthoredLine[] = g.indices.slice(0, kind).map(i => ({ ...lines[i], training: { ...lines[i].training!, kind } })); while (next.length < kind) next.push(trainingLine('', kind, g.id)); lines.splice(g.indices[0], g.indices.length, ...next); });
+          }}>{[1, 2, 3].map(k => <option key={k} value={k}>{groupLabel(k)}</option>)}</PanelSelect></label>
+          {g.indices.map((j, position) => { const line = session.lines[j], dose = line.training!; return <article className="manual-exercise" key={position} data-line-index={j} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); e.stopPropagation(); drop(j); }}>
+            <header><span className="manual-grip" title="برای جابه‌جایی بکش" draggable onDragStart={e => { drag.current = { section: current, line: j }; e.dataTransfer.setData('text/plain', String(j)); }} onDragEnd={() => { drag.current = null; }}><GripVertical size={17} /></span><input aria-label={`نام حرکت ${j + 1}`} maxLength={300} value={line.name} placeholder="حرکت را از بانک اضافه کن" onChange={e => mutate(d => { d.sections[current].lines[j].name = e.target.value; })} /></header>
+            <div className="manual-dose">{([['sets', 'ست', 1, 20], ['reps', 'تکرار', 1, 300], ['rest', 'استراحت (ثانیه)', 0, 1800]] as const).map(([k, label, min, max]) => <label key={k}>{label}<input aria-label={`${label} حرکت ${j + 1}`} type="number" min={min} max={max} step={1} value={Number.isNaN(dose[k]) ? '' : dose[k]} onChange={e => mutate(d => { d.sections[current].lines[j].training![k] = e.target.value === '' ? NaN : Number(e.target.value); })} /></label>)}</div>
+            <label>دستور مربی<textarea aria-label={`دستور حرکت ${j + 1}`} maxLength={2000} rows={2} value={line.details} onChange={e => mutate(d => { d.sections[current].lines[j].details = e.target.value; })} /></label>
+            <footer><small>{g.kind > 1 ? 'مرتبط با حرکت‌های همین گروه' : 'اجرای مستقل'}</small><button type="button" aria-label={`بالا بردن حرکت ${j + 1}`} disabled={position === 0} onClick={() => { drag.current = { section: current, line: j }; drop(g.indices[position - 1]); }}><ArrowUp size={16} /></button><button type="button" aria-label={`پایین بردن حرکت ${j + 1}`} disabled={position === g.indices.length - 1} onClick={() => { drag.current = { section: current, line: j }; drop(g.indices[position + 1]); }}><ArrowDown size={16} /></button><button type="button" aria-label={`حذف حرکت ${j + 1}`} onClick={() => mutate(d => { d.sections[current].lines[j] = trainingLine('', g.kind, g.id); })}><Trash2 size={16} /></button></footer>
+          </article>; })}
+        </section>)}
+        {!groups.length && <p className="studio-empty">یک گروه بسازید و حرکت‌ها را اضافه کنید.</p>}
+      </section>
+      <AuthoredLivePreview content={{ ...content, sections: [session] }} />
+    </div>
+  </div>;
 }
-export function AuthoredLivePreview({content}:{content:AuthoredContent}){return <aside className="authored-live-preview" aria-label="پیش‌نمایش زنده برنامه"><small>پیش‌نمایش زنده · هنوز ثبت نشده</small><h3>{content.title}</h3>{content.sections.map((s,i)=><section key={i}><h4>{s.title}</h4>{s.lines.filter(l=>l.name).map((l,j)=><p key={j}><strong>{j+1}. {l.name}</strong><span>{l.details}</span></p>)}</section>)}<p>{content.notes}</p></aside>;}
+export function AuthoredLivePreview({ content, name, saved = false }: { content: AuthoredContent; name?: string; saved?: boolean }) {
+  return <aside className="authored-live-preview" aria-label="پیش‌نمایش زنده برنامه"><small>{saved ? 'نسخه ثبت‌شده' : 'خروجی زنده · تغییرات را ثبت کنید'}</small><h3>{content.title}</h3>{name && <p>{name}</p>}{content.sections.map((s, i) => <section key={i}><h4>{s.title}</h4>{trainingGroups(s).map((g, gi) => <div className="studio-preview-group" key={g.id}>{s.lines[g.indices[0]]?.training && <small>{groupLabel(g.kind)} {fa(gi + 1)}</small>}{g.indices.map(j => { const l = s.lines[j]; return l.name ? <p key={j}><strong>{l.name}</strong><span>{lineDescription(l)}</span></p> : <p key={j}><small>جایگاه خالی</small></p>; })}</div>)}</section>)}<p>{content.notes}</p></aside>;
+}

@@ -24,7 +24,7 @@ test('public prices and local meal demo never write account data',async({page})=
  await page.locator('#eat-demo').click();await page.locator('#confirm-eat').click();
  await expect(page.locator('#eat-demo')).toHaveAttribute('aria-pressed','true');
  await page.locator('#eat-demo').click();await expect(page.locator('#eat-demo')).toHaveAttribute('aria-pressed','false');
- await expect(page.locator('#start a.btn')).toHaveAttribute('href','/app.html#auth');
+ await expect(page.locator('#start a.btn')).toHaveAttribute('href','/app');
  await expect(page.locator('.enamad-link')).toHaveAttribute('href',/trustseal\.enamad\.ir\/\?id=7609793/);
  expect(errors).toEqual([]);expect(writes).toEqual([]);
 });
@@ -40,7 +40,7 @@ test('Pro uses actual catalog periods and links to the existing panel',async({pa
  await expect(page.locator('#pro-price-grid .pro-price')).toHaveCount(1);
  await expect(page.locator('#pro-price-grid')).toContainText('۱۰۰٬۰۰۰');
  await page.getByRole('button',{name:'۳ ماهه',exact:true}).click();await expect(page.locator('#pro-price-grid')).toContainText('۲۸۰٬۰۰۰');
- await expect(page.locator('#pro-price-grid a')).toHaveAttribute('href','https://pro.behtan.fit');
+ await expect(page.locator('#pro-price-grid a')).toHaveAttribute('href','https://pro.behtan.fit/?plan=training&months=3');
  await expect(page.locator('.white-label a.btn')).toContainText('درخواست دموی رایگان');
  await expect(page.locator('.white-label a.btn')).toHaveAttribute('href',/^https:\/\/t\.me\/soroushkheradmand/);
 });

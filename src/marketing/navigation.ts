@@ -28,3 +28,14 @@ img.addEventListener("error", () => {
 });
 
 if(img.complete&&!img.naturalWidth)img.hidden=true;
+
+document.addEventListener('click', event => {
+  const link = (event.target as Element).closest<HTMLAnchorElement>('a[href^="#"]');
+  if (!link || event.defaultPrevented || (event as MouseEvent).button !== 0 || (event as MouseEvent).metaKey || (event as MouseEvent).ctrlKey || (event as MouseEvent).shiftKey || (event as MouseEvent).altKey) return;
+  const href = link.getAttribute('href');
+  if (!href || href === '#pro' || href === '#auth') return;
+  const target = document.getElementById(href.slice(1));
+  if (!target) return;
+  event.preventDefault(); close();
+  target.scrollIntoView({block:'start', behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
+});

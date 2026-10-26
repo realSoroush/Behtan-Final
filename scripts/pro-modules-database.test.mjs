@@ -198,7 +198,7 @@ export async function testModulesDatabase({ db, asUser, rpc, equal, denied }) {
     sections: [
       {
         title: "جلسه اول",
-        lines: [{ name: "حرکت اختصاصی", details: "دستور بررسی‌شده متخصص" }],
+        lines: [{ name: "حرکت اختصاصی", details: "دستور بررسی‌شده متخصص", training: {group:"superset",kind:2,sets:4,reps:12,rest:60} }, {name:"حرکت دوم",details:"مرتبط",training:{group:"superset",kind:2,sets:3,reps:15,rest:75}}],
       },
     ],
   };
@@ -330,17 +330,19 @@ export async function testModulesDatabase({ db, asUser, rpc, equal, denied }) {
   );
   // Nutrition module works and authored content cannot be rewritten once stored.
   const dietKey = randomUUID();
+  const dietContent={...content,sections:[{title:"صبحانه",nutritionDay:"rest",lines:[{name:"ماده کاتالوگ",details:"",food:{id:"catalog-food",grams:125,gramsPerUnit:100,basis:"پخته",kcal:130,protein:3,carbs:28,fat:0.3}}]}],nutritionTargets:{rest:{kcal:2100,protein:150,carbs:250,fat:60}}};
   equal(
     await rpc("pro_save_authored_plan", [
       org,
       rec,
       1,
       "nutrition",
-      content,
+      dietContent,
       dietKey,
     ]),
     dietKey,
   );
+  equal((await db.query("select content from pro_authored_plans where id=$1",[dietKey])).rows[0].content,dietContent,"catalog grams, macros and separate day survive SQL save and reopen");
   await db.exec("reset role");
   await denied(
     () =>
@@ -382,7 +384,7 @@ export async function testModulesDatabase({ db, asUser, rpc, equal, denied }) {
       rec,
       1,
       "nutrition",
-      content,
+      dietContent,
       dietKey,
     ]),
     dietKey,

@@ -302,6 +302,9 @@ export async function setup(
     if(route.request().method()==='GET'){await route.fulfill({json:{ready:true,missing:[],scope:'configuration-only'}});return;}
     const b = route.request().postDataJSON();
     if (!active) { await route.fulfill({status:403,json:{error:'PRO_ACCESS_DENIED'}}); return; }
+    if (b.action === 'catalog') {
+      await route.fulfill({json:{foods:f.FOOD_ITEMS}});return;
+    }
     if (b.action === 'generate') {
       if (!draftMap.has(b.key)) {
         installTestNutritionCatalog();

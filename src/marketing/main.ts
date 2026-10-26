@@ -53,7 +53,7 @@ function renderPro() {
     const price = el("div", fa(o.prices[String(month)]) + " ", "pro-amount");
     price.append(el("small", "تومان"));
     const a = el("a", "انتخاب این اشتراک ←", "btn");
-    a.href = "https://pro.behtan.fit";
+    a.href = "https://pro.behtan.fit/?plan=" + encodeURIComponent(o.code) + "&months=" + month;
     c.append(
       el("h3", o.title),
       el("small", o.subtitle),
@@ -83,7 +83,7 @@ function renderMember() {
       );
     if (o.price_toman) p.append(el("small", "تومان"));
     const a = el("a", "شروع برنامهٔ من ←", "btn");
-    a.href = "/app.html#auth";
+    a.href = "/app?plan=" + encodeURIComponent(o.code) ;
     c.append(
       el("h3", o.name),
       p,
@@ -239,7 +239,7 @@ const content = createRefreshTask(
 function updateCanonical() {
   const pro =
     location.hash.startsWith("#pro") ||
-    (!location.hash && location.pathname.startsWith("/professionals"));
+    location.pathname.startsWith("/professionals");
   document
     .querySelector('link[rel="canonical"]')
     ?.setAttribute(
@@ -272,7 +272,7 @@ const channel = db
   });
 void refresh();
 void content();
-const timer = setInterval(() => {
+let timer = setInterval(() => {
   void refresh();
   void content();
 }, 15000);
@@ -286,11 +286,15 @@ window.addEventListener("online", () => {
   void refresh();
   void content();
 });
-window.addEventListener("pagehide", () => {
+window.addEventListener("pagehide", (event) => {
   stopped = true;
-  if (channel) void db?.removeChannel(channel);
+  if (channel && !event.persisted) void db?.removeChannel(channel);
   clearInterval(timer);
 });
 window.addEventListener("pageshow", (e) => {
-  if (e.persisted) location.reload();
+  if (e.persisted) {
+    stopped = false;
+    void refresh(); void content();
+    timer = setInterval(() => { void refresh(); void content(); }, 15000);
+  }
 });

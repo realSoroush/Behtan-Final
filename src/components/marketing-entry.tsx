@@ -5,7 +5,7 @@ export function MarketingEntry({
 }: {
   professional?: boolean;
 }) {
-  const href = "/site.html" + (professional ? "#pro" : "");
+  const href = (professional ? "/professionals" : "/");
   useEffect(() => {
     window.location.replace(href);
   }, [href]);

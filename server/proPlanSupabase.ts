@@ -24,7 +24,7 @@ export function supabasePlanDependencies(): PlanDependencies {
   const call = async <T>(name: string, args: Record<string,unknown>): Promise<T> => {
     const { data, error, status } = await admin.rpc(name, args).abortSignal(AbortSignal.timeout(12000)).retry(false);
     if (error) {
-      if(status===401)throw new ProServerError('PRO_SERVER_CREDENTIAL_INVALID',503);
+      if(status===401 || ((status===403 || error.code==='42501') && !error.message.includes('PRO_')))throw new ProServerError('PRO_SERVER_CREDENTIAL_INVALID',503);
       databaseError(error,status);
     }
     return data as T;
@@ -54,13 +54,17 @@ export function supabasePlanDependencies(): PlanDependencies {
       return data as { answers:RealIntake; revision:number };
     },
     async loadNutrition(token) {
-      const db = userClient(token);
+      // Called only after verifyToken + RLS readCase + current Pro entitlement.
+      // Nutrition catalog is shared reference data, not a patient's B2C account.
+      // B2C billing policies intentionally remain unchanged.
+      void token;
+      const db = admin;
       // Explicit ranges avoid PostgREST's default 1,000-row truncation.
       async function rows(table: string, order: string) {
         const result: unknown[] = [];
         for (let start = 0; start < 50000; start += 500) {
-          const { data, error, status } = await db.from(table).select('*').order(order).order(table === 'food_substitutes' ? 'substitute_food_item_id' : order).range(start,start+499);
-          if (error) databaseError(error,status);
+          const { data, error, status } = await db.from(table).select('*').order(order).order(table === 'food_substitutes' ? 'substitute_food_item_id' : order).range(start,start+499).abortSignal(AbortSignal.timeout(12000)).retry(false);
+          if (error) throw new ProServerError(status===401||status===403 ? 'PRO_SERVER_CREDENTIAL_INVALID' : 'PRO_CATALOG_UNAVAILABLE',503);
           result.push(...(data ?? []));
           if (!data || data.length < 500) return result;
         }
@@ -68,13 +72,13 @@ export function supabasePlanDependencies(): PlanDependencies {
       }
       const [foodRows, substituteRows, templateRows, slotRows, policy] = await Promise.all([
         rows('food_items','id'), rows('food_substitutes','food_item_id'), rows('meal_templates','id'),
-        rows('meal_template_slots','id'), db.from('nutrition_protein_policy').select('*').eq('id','default').single(),
+        rows('meal_template_slots','id'), db.from('nutrition_protein_policy').select('*').eq('id','default').abortSignal(AbortSignal.timeout(12000)).retry(false).single(),
       ]);
-      if (policy.error) databaseError(policy.error,policy.status);
-      return {
+      if (policy.error) throw new ProServerError(policy.status===401||policy.status===403 ? 'PRO_SERVER_CREDENTIAL_INVALID' : 'PRO_CATALOG_UNAVAILABLE',503);
+      try { return {
         catalog:buildNutritionCatalog({ foodRows:foodRows as FoodItemRow[], substituteRows:substituteRows as FoodSubstituteRow[], templateRows:templateRows as MealTemplateRow[], slotRows:slotRows as MealTemplateSlotRow[] }),
         policy:buildProteinEnginePolicy(policy.data as ProteinEnginePolicyRow),
-      };
+      }; } catch { throw new ProServerError('PRO_CATALOG_UNAVAILABLE',503); }
     },
     stage: x => call<ServerDraft>('pro_stage_server_plan', {
       p_org:x.org,p_record:x.record,p_revision:x.revision,p_actor:x.actor,p_key:x.key,p_request:x.request,p_plan:x.plan,
