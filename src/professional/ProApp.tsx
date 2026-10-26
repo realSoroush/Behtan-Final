@@ -1,10 +1,11 @@
+import {StudioOverview,type ProView} from './StudioOverview';
+import './studio-shell.css';
 import {track} from '../member/analytics';
 import {ProOnboarding} from './ProOnboarding';
 import {paymentRequest} from '../lib/payments';
-import {PanelModal} from "@/components/ui/PanelModal";
 import { ProSubscription } from "./ProSubscription";
 import { PanelSelect } from "@/components/ui/PanelSelect";
-import { ArrowUpLeft, FolderHeart, LifeBuoy, LogOut, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowUpLeft, FolderHeart, LifeBuoy, LogOut, ShieldCheck, Sparkles, LayoutDashboard, CreditCard, Settings } from "lucide-react";
 import { ProServiceCheck } from './ProServiceCheck';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
@@ -17,7 +18,16 @@ import {
   type ProOrganization,
 } from "./contracts";
 import { RealCaseWorkspace } from "./RealCaseWorkspace";
+const navigation = [
+  {id:'overview',label:'نمای کلی',icon:LayoutDashboard},{id:'cases',label:'مراجعان',icon:FolderHeart},
+  {id:'subscription',label:'اشتراک و ظرفیت',icon:CreditCard},
+  {id:'settings',label:'حساب و تنظیمات',icon:Settings},
+] as const;
 export function ProApp() {
+  const [view,setView]=useState<ProView>('cases');
+  const unsaved=useRef(false);
+  function navigate(next:ProView){setView(next);}
+  const markDirty=useCallback((dirty:boolean)=>{unsaved.current=dirty;},[]);
   const { user, loading, signOut } = useAuth();
   const authenticatedUserId = user?.id;
   useEffect(()=>{if(authenticatedUserId)track('app_open',{source:'pro'});},[authenticatedUserId]);
@@ -45,7 +55,7 @@ export function ProApp() {
         </a>
         <div className="pro-sidebar-section">پنل برنامه‌دهی</div>
         <nav aria-label="ناوبری اصلی">
-          <a href="#pro-workspace" className="pro-nav-link" aria-current="page"><FolderHeart size={20} />فضای کاری<ArrowUpLeft size={15} /></a>
+          {navigation.map(({id,label,icon:Icon})=><button key={id} type="button" className="pro-nav-link" aria-current={view===id?'page':undefined} onClick={()=>navigate(id)}><Icon size={19}/>{label}{view===id&&<ArrowUpLeft size={15}/>}</button>)}
           <a href="#pro-support" className="pro-nav-link"><LifeBuoy size={20} />راهنمای استفاده</a>
         </nav>
         <div className="pro-sidebar-note">
@@ -61,16 +71,18 @@ export function ProApp() {
           <div className="pro-actions">
             <a className="pro-help-link" href="#pro-support" aria-label="راهنمای استفاده"><LifeBuoy size={18} /></a>
             <ThemeToggle className="pro-theme" />
-            <button className="pro-signout" aria-label="خروج" onClick={() => void signOut()}><LogOut size={17} /><span>خروج</span></button>
+            <button className="pro-signout" aria-label="خروج" onClick={() => {if(!unsaved.current||window.confirm("تغییرات ثبت‌نشده دارید. از حساب خارج شوید؟"))void signOut();}}><LogOut size={17} /><span>خروج</span></button>
           </div>
         </header>
-        <Workspace key={user.id} userId={user.id} />
+        <nav className="studio-mobile-nav" aria-label="ناوبری پنل در موبایل">{navigation.map(({id,label,icon:Icon})=><button type="button" key={id} aria-current={view===id?'page':undefined} onClick={()=>navigate(id)}><Icon size={17}/>{label}</button>)}</nav>
+        <Workspace key={user.id} userId={user.id} phone={user.phone||''} view={view} navigate={navigate} onDirty={markDirty}/>
       </div>
     </div>
   );
 }
-function Workspace({ userId }: { userId: string }) {
-  const [panel,setPanel]=useState("cases"),[subscriptionBusy,setSubscriptionBusy]=useState(false);
+function Workspace({userId,phone,view,navigate,onDirty}:{userId:string;phone:string;view:ProView;navigate:(view:ProView)=>void;onDirty:(dirty:boolean)=>void}) {
+  const unsaved=useRef(false);
+  const markDirty=useCallback((dirty:boolean)=>{unsaved.current=dirty;onDirty(dirty);},[onDirty]);
   const [orgs, setOrgs] = useState<ProOrganization[]>([]),
     [members, setMembers] = useState<ProMembership[]>([]),
     [selected, setSelected] = useState(""),
@@ -94,7 +106,6 @@ function Workspace({ userId }: { userId: string }) {
         setOrgs([]);
         setMembers([]);
         setSelected("");
-        setPanel("cases");
         return;
       }
       const data = await proApi.workspaces();
@@ -173,14 +184,14 @@ function Workspace({ userId }: { userId: string }) {
         </div>
         {orgs.length > 0 && <label className="pro-select pro-workspace-picker">
           <span>فضای کاری</span>
-          <PanelSelect aria-label="فضای کاری" value={selected} onChange={(e) => setSelected(e.target.value)} disabled={busy}>
+          <PanelSelect aria-label="فضای کاری" value={selected} onChange={(e) => {if(!unsaved.current||window.confirm("تغییرات ثبت‌نشده کنار گذاشته و فضای کاری عوض شود؟"))setSelected(e.target.value);}} disabled={busy}>
             {orgs.map((o) => <option key={o.id} value={o.id}>{o.name === "کلینیک آزمایشی" ? "فضای کاری به‌تن" : o.name}</option>)}
           </PanelSelect>
         </label>}
       </section>
       {error && (
         <p className="pro-error" role="alert">
-          {error}
+          {error}<button disabled={busy} onClick={()=>void load()}>تلاش مجدد</button>
         </p>
       )}
       {busy && <p role="status">در حال دریافت فضای کاری…</p>}
@@ -194,9 +205,11 @@ function Workspace({ userId }: { userId: string }) {
       )}
       {orgs.length > 0 && (
         <>
-          <nav className="pro-workspace-tabs" aria-label="بخش‌های فضای کاری"><button aria-pressed={panel==='cases'} onClick={()=>setPanel('cases')}>مراجعان و برنامه‌ها</button><button aria-pressed={panel==='subscription'} onClick={()=>setPanel('subscription')}>اشتراک و ظرفیت</button></nav>
-          <div><RealCaseWorkspace key={selected} org={selected} roles={roles} /></div>
-          {panel==='subscription'&&<PanelModal title="اشتراک و ظرفیت" busy={subscriptionBusy} onClose={()=>setPanel('cases')}><ProSubscription onBusy={setSubscriptionBusy} key={selected} org={selected}/><details><summary>انتخاب یا ارتقای اشتراک</summary><ProOnboarding existing onComplete={()=>void load()}/></details></PanelModal> }
+          {view==='overview'&&<StudioOverview key={selected} org={selected} navigate={navigate}/>}
+          <div hidden={!['cases','training','nutrition','history'].includes(view)}><RealCaseWorkspace key={selected} org={selected} roles={roles} view={view} onDirty={markDirty}/></div>
+          {view==='subscription'&&<section className="studio-subscription"><h2>اشتراک و ظرفیت</h2><ProSubscription key={selected} org={selected}/><details><summary>انتخاب یا ارتقای اشتراک</summary><ProOnboarding existing onComplete={()=>void load()}/></details></section>}
+          {view==='settings'&&<section className="pro-panel studio-settings"><h2>حساب و تنظیمات</h2><dl><div><dt>فضای کاری</dt><dd>{orgs.find(o=>o.id===selected)?.name}</dd></div><div><dt>شماره حساب</dt><dd dir="ltr">{phone||'ثبت نشده'}</dd></div><div><dt>نقش شما</dt><dd>{roles.map(r=>({owner:'مالک',practitioner:'کارشناس',assistant:'دستیار'}[r])).join('، ')}</dd></div><div><dt>منطقه زمانی</dt><dd>تهران</dd></div></dl><div className="studio-row"><span>ظاهر روشن / تیره</span><ThemeToggle/></div><a className="pro-nav-link" href="#pro-support"><LifeBuoy size={18}/>راهنمای استفاده</a></section>}
+
         </>
       )}
       <section id="pro-support" className="pro-support">

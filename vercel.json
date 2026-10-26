@@ -18,6 +18,10 @@
   },
   "rewrites": [
     {
+      "source": "/app",
+      "destination": "/app.html"
+    },
+    {
       "source": "/professionals",
       "destination": "/professionals/index.html"
     },
@@ -51,6 +55,18 @@
           "value": "camera=(self), microphone=(), geolocation=()"
         }
       ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/app.html",
+      "destination": "/app",
+      "permanent": false
+    },
+    {
+      "source": "/site.html",
+      "destination": "/",
+      "permanent": false
     }
   ]
 }

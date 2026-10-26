@@ -60,7 +60,7 @@ test('subscription section preserves an unsaved intake',async({page})=>{
  await setup(page,{existing:true});await page.goto('/');await page.getByRole('button',{name:'بازکردن پرونده',exact:true}).click();
  const name=page.getByRole('textbox',{name:'نام مراجع',exact:true});await name.fill('ویرایش محفوظ');
  await page.getByRole('button',{name:'اشتراک و ظرفیت',exact:true}).click();await expect(page.getByRole('heading',{name:'اشتراک و ظرفیت',exact:true})).toBeVisible();
- await page.getByRole('button',{name:'بستن پنجره',exact:true}).click();await expect(name).toHaveValue('ویرایش محفوظ');
+ await page.getByRole('button',{name:'مراجعان',exact:true}).click();await expect(name).toHaveValue('ویرایش محفوظ');
 });
 
 test('renewal request shows confirmation and prevents repeat requests',async({page})=>{

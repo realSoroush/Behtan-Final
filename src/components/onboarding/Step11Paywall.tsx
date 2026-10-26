@@ -111,6 +111,15 @@ export function Step11Paywall({ onComplete, checkout = false }: { onComplete: (p
   const [trainingInput,setTrainingInput]=useTrainingDraft();
   const [period,setPeriod]=useState<14|30>(30);
   const { plans:monthlyPlans, loading, error, refetch } = useSubscriptionPlans();
+  useEffect(() => {
+    if (loading || error || typeof location === 'undefined') return;
+    const requested = new URLSearchParams(location.search).get('plan');
+    if (requested && monthlyPlans.some(p => p.code === requested)) {
+      updateData({selectedTier: requested as typeof data.selectedTier});
+      const url = new URL(location.href); url.searchParams.delete('plan');
+      history.replaceState(null, '', url.pathname + url.search + url.hash);
+    }
+  }, [loading, error, monthlyPlans, updateData]);
   const plans=monthlyPlans.map(p=>periodOffer(p,period));
   const selectedPlan = plans.find((plan) => plan.code === data.selectedTier) ?? null;
   const [checking, setChecking] = useState(false);

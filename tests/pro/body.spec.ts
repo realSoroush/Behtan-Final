@@ -18,23 +18,15 @@ const report = {
   consent_version: 1,
   photo_count: 1,
 };
-test("subscription opens in a focus-trapped dialog and Escape restores navigation", async ({
-  page,
-}) => {
+test("subscription navigation keeps the directory available and exposes the selected section", async ({ page }) => {
   await setup(page, { existing: true });
   await page.goto("/");
-  const button = page.getByRole("button", {
-    name: "اشتراک و ظرفیت",
-    exact: true,
-  });
+  const button=page.getByRole("button",{name:"اشتراک و ظرفیت",exact:true});
   await button.click();
-  await expect(page.getByRole("dialog")).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "اشتراک و ظرفیت", exact: true }).last(),
-  ).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(button).toBeFocused();
+  await expect(page.getByRole("heading",{name:"اشتراک و ظرفیت",exact:true})).toBeVisible();
+  await expect(button).toHaveAttribute("aria-current","page");
+  await page.getByRole("button",{name:"مراجعان",exact:true}).click();
+  await expect(page.getByRole("button",{name:"بازکردن پرونده",exact:true})).toBeVisible();
 });
 test("body report is optional, approved explicitly and no AI body fat is invented", async ({
   page,

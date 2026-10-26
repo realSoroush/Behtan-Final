@@ -3,7 +3,7 @@ import {readFile,access} from 'node:fs/promises';
 const text=p=>readFile(new URL('../'+p,import.meta.url),'utf8');
 const [app,html]=await Promise.all([text('src/App.tsx'),text('site.html')]);
 assert.match(app,/<MarketingEntry professional \/>/);
-assert.match(app,/authRequested \? <PhoneAuth onBack=\{closeAuth\} \/> : <MarketingEntry \/>/);
+assert(app.includes('[\"/app\", \"/app.html\"].includes(location.pathname)'));
 assert(!app.includes('VITE_MARKETING_V2'));
 for(const old of ['src/components/landing','src/components/professionals'])await assert.rejects(access(new URL('../'+old,import.meta.url)));
 assert(html.includes('trustseal.enamad.ir/logo.aspx?id=7609793'));
@@ -16,3 +16,5 @@ await import('./landing-catalog-database.test.mjs');
 console.log('PASS: sole marketing design, authentication handoff, catalogs, accessible mobile menu and eNamad.');
 
 await import('./marketing-database.test.mjs');
+
+await import('./public-route-regressions.test.mjs');

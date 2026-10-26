@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "test:pro:studio": "node --experimental-strip-types scripts/pro-studio.test.mjs && node --experimental-strip-types scripts/pro-catalog-adapter.test.mjs",
     "test:onboarding:lifecycle": "node scripts/onboarding-lifecycle.test.mjs",
     "test:companion": "node --experimental-strip-types scripts/companion-state.test.mjs",
     "export:companion-preview": "node scripts/package-companion-preview.mjs",

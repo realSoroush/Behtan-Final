@@ -14,8 +14,14 @@ export function ProOnboarding({
   const [step, setStep] = useState(1),
     [name, setName] = useState(""),
     [field, setField] = useState("nutrition"),
-    [code, setCode] = useState(existing ? "nutrition" : "trial"),
-    [months, setMonths] = useState(1),
+    [code, setCode] = useState(() => {
+      const plan = new URLSearchParams(location.search).get('plan');
+      return ['training','nutrition','combined'].includes(plan || '') ? plan! : existing ? 'nutrition' : 'trial';
+    }),
+    [months, setMonths] = useState(() => {
+      const value = Number(new URLSearchParams(location.search).get('months'));
+      return [1,3,6,12].includes(value) ? value : 1;
+    }),
     [offers, setOffers] = useState<ProOffer[]>([]),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");

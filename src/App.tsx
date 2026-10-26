@@ -12,7 +12,7 @@ import { evaluateProfileMedicalEligibility } from '@/utils/medicalEligibility';
 const BillingAccess=lazy(()=>import('@/components/billing/BillingAccess').then(m=>({default:m.BillingAccess})));
 
 function isAuthRequested() {
-  return typeof window !== 'undefined' && window.location.hash === '#auth';
+  return typeof window !== 'undefined' && (window.location.hash === '#auth' || new URLSearchParams(window.location.search).get('auth') === '1');
 }
 
 /**
@@ -25,12 +25,13 @@ function isAuthRequested() {
  * send a completed user back into onboarding.
  */
 function AppContent() {
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading, error: authError, signOut } = useAuth();
   const authenticatedUserId = user?.id;
   useEffect(()=>{if(authenticatedUserId)track('app_open');},[authenticatedUserId]);
   const {
     profile,
     loading: profileLoading,
+    error: profileError,
     refetch: refetchProfile,
     upsertProfile,
   } = useUserProfile(user?.id);
@@ -50,12 +51,14 @@ function AppContent() {
   }, [user]);
 
   const closeAuth = () => {
-    if (window.location.hash === '#auth') window.history.pushState(null, '', window.location.pathname + window.location.search);
+    if (["/app", "/app.html"].includes(location.pathname)) {location.assign("/");return;}
+    if ((window.location.hash === '#auth' || new URLSearchParams(window.location.search).get('auth') === '1')) window.history.pushState(null, '', window.location.pathname + window.location.search);
     setAuthRequested(false);
     window.scrollTo({ top: 0, behavior: 'auto' });
   };
 
   if (window.location.pathname.replace(/\/$/, '') === '/professionals') return <MarketingEntry professional />;
+  if (authError || (user && profileError && !profileLoading)) return <main dir="rtl" className="min-h-screen flex flex-col items-center justify-center gap-4 p-6"><p role="alert">{authError || profileError}</p><button className="rounded-xl bg-primary-600 text-white px-5 py-3" onClick={() => authError ? location.reload() : void refetchProfile()}>تلاش دوباره</button></main>;
   if (authLoading || (user && profileLoading)) {
     return (
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 flex items-center justify-center">
@@ -68,7 +71,7 @@ function AppContent() {
   }
 
   if (!user) {
-    return authRequested ? <PhoneAuth onBack={closeAuth} /> : <MarketingEntry />;
+    return (authRequested || ["/app", "/app.html"].includes(location.pathname)) ? <PhoneAuth onBack={closeAuth} /> : <MarketingEntry />;
   }
 
   if (!profile || profile.onboarding_completed !== true) {

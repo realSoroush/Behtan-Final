@@ -69,6 +69,9 @@ export function useAuth(): UseAuthReturn {
 
   useEffect(() => {
     let mounted = true;
+    const timer = setTimeout(() => {
+      if (mounted) setState(current => current.loading ? {...current, loading:false, error:'بررسی ورود طول کشید؛ اتصال را بررسی کن و دوباره تلاش کن.'} : current);
+    }, 20000);
 
     authAdapter
       .getSession()
@@ -77,6 +80,7 @@ export function useAuth(): UseAuthReturn {
         setState((current) => ({
           ...current,
           session,
+          error: null,
           user: session?.user ?? null,
           loading: false,
         }));
@@ -97,6 +101,7 @@ export function useAuth(): UseAuthReturn {
       setState((current) => ({
         ...current,
         session,
+        error: null,
         user: session?.user ?? null,
         loading: false,
       }));
@@ -104,6 +109,7 @@ export function useAuth(): UseAuthReturn {
 
     return () => {
       mounted = false;
+      clearTimeout(timer);
       unsubscribe();
     };
   }, []);

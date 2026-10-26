@@ -57,6 +57,7 @@ export const realCaseApi = {
       p_answers: a,
       p_key: key,
     }),
+  catalog: (org:string,record:string,revision:number)=>planRequest<{foods:import('@/types').FoodItem[]}>({action:'catalog',org,record,revision,key:crypto.randomUUID()}),
   generatePlan: (org: string, id: string, revision: number, count: number, date: string, notes: string, key: string) =>
     planRequest<{ draft_id: string; plan: PrintedPlan }>({ action:'generate', org, record:id, revision, count, date, notes, key }),
   savePlan: async (org: string, id: string, revision: number, draft: string, key: string) =>
