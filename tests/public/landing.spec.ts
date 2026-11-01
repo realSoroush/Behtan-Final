@@ -28,6 +28,33 @@ test('public prices and local meal demo never write account data',async({page})=
  await expect(page.locator('.enamad-link')).toHaveAttribute('href',/trustseal\.enamad\.ir\/\?id=7609793/);
  expect(errors).toEqual([]);expect(writes).toEqual([]);
 });
+test('eNamad badge and verification navigation send the site origin',async({page})=>{
+ const referrers:{logo?:string;verification?:string}={};
+ await page.unroute('**/trustseal.enamad.ir/**');
+ // Context routing also intercepts the popup's first navigation request.
+ await page.context().route('https://trustseal.enamad.ir/**',async route=>{
+  const request=route.request();
+  if(new URL(request.url()).pathname==='/logo.aspx'){
+   referrers.logo=request.headers()['referer'];
+   await route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="70" height="76"><rect width="70" height="76" fill="#aaa"/></svg>'});
+  }else{
+   referrers.verification=request.headers()['referer'];
+   await route.fulfill({contentType:'text/html',body:'<!doctype html><title>eNamad test verification</title>'});
+  }
+ });
+ await page.goto('/site.html');
+ const badge=page.locator('.enamad-link');
+ await expect(badge).toHaveAttribute('referrerpolicy','origin');
+ await expect(badge).not.toHaveAttribute('rel',/noopener|noreferrer/);
+ await badge.scrollIntoViewIfNeeded();
+ await expect.poll(()=>referrers.logo).toBe('http://127.0.0.1:5173/');
+ const popupEvent=page.waitForEvent('popup');await badge.click();const popup=await popupEvent;
+ await expect(popup).toHaveTitle('eNamad test verification');
+ expect(referrers.verification).toBe('http://127.0.0.1:5173/');
+ // Modern target=_blank retains implicit opener isolation without an explicit rel.
+ expect(await popup.evaluate(()=>window.opener===null)).toBe(true);
+ await popup.close();
+});
 test('footer shows office and professional contact channels on both public views',async({page})=>{
  await page.goto('/site.html');
  const footer=page.locator('footer.behtan-contact-footer');
