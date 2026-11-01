@@ -3,3 +3,5 @@
 
 #marketing-shell{display:contents}
 @media print{body>#marketing-shell{display:contents!important}#marketing-shell>*{display:none!important}#marketing-shell>#output-dialog{display:block!important}}
+
+.behtan-contact-footer{flex-wrap:wrap}.behtan-office-address{flex-basis:100%;font-style:normal;line-height:2;overflow-wrap:anywhere;border-top:1px solid var(--line);padding-top:18px}.behtan-office-address strong{font-size:12px;font-weight:700;margin-inline-end:5px}.behtan-contact-footer .pro-footer-links{line-height:2;gap:12px 18px}

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { setup, fillNew } from "./real-fixture";
+import { setup, fillNew, specialist } from "./real-fixture";
 test("create actual record, save, generate menus, save plan and print Persian PDF", async ({
   page,
 }, info) => {
@@ -38,6 +38,9 @@ test("create actual record, save, generate menus, save plan and print Persian PD
   await expect(popup.locator("h1")).toContainText("برنامه غذایی");
   await expect(popup.locator("header")).toContainText("مراجع تست");
   await expect(popup.locator("table").first()).toBeVisible();
+  await expect(popup.getByRole('region', {name:'مشخصات متخصص',exact:true})).toContainText(specialist.full_name);
+  await expect(popup.getByRole('region', {name:'مشخصات متخصص',exact:true})).toContainText(specialist.contact_phone);
+  await expect(popup.getByRole('region', {name:'مشخصات متخصص',exact:true})).toContainText(specialist.address);
 });
 test("new record starts without mock identity or measurements", async ({
   page,

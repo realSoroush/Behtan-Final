@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { setup, org, record, base } from './real-fixture';
+import { setup, org, record, base, specialist } from './real-fixture';
 import type { AuthoredSnapshot } from '../../src/professional/authoredPlan';
 import { foodTotals, nutritionTotals } from '../../src/professional/studioModel';
 async function arrange(page: Page, lostResponse = false, workout = false) {
@@ -77,7 +77,11 @@ test('linked groups: fill, reorder, retry lost response, reopen immutable versio
   await page.getByRole('button', { name: 'ساخت نسخه جدید', exact: true }).click();
   await expect(page.getByRole('spinbutton', { name: 'ست حرکت 1', exact: true })).toHaveValue('4');
   const popup = page.waitForEvent('popup'); await page.getByRole('button', { name: 'PDF', exact: true }).click();
-  const print = await popup; await expect(print.locator('body')).toContainText('تریپل‌ست'); await expect(print.locator('body')).toContainText('مراجع تست'); await print.pdf({path:test.info().outputPath('training.pdf'),format:'A4',printBackground:true}); await print.close();
+  const print = await popup; await expect(print.locator('body')).toContainText('تریپل‌ست'); await expect(print.locator('body')).toContainText('مراجع تست');
+  await expect(print.getByRole('region', {name:'مشخصات متخصص',exact:true})).toContainText(specialist.full_name);
+  await expect(print.getByRole('region', {name:'مشخصات متخصص',exact:true})).toContainText(specialist.contact_phone);
+  await expect(print.getByRole('region', {name:'مشخصات متخصص',exact:true})).toContainText(specialist.address);
+  await print.pdf({path:test.info().outputPath('training.pdf'),format:'A4',printBackground:true}); await print.close();
   await page.locator('.studio-columns').evaluate(e=>e.scrollIntoView({block:'start'})); await page.screenshot({ path: test.info().outputPath('training-studio.png'), animations: 'disabled' });
   expect(state.errors).toEqual([]);
 });

@@ -28,6 +28,18 @@ test('public prices and local meal demo never write account data',async({page})=
  await expect(page.locator('.enamad-link')).toHaveAttribute('href',/trustseal\.enamad\.ir\/\?id=7609793/);
  expect(errors).toEqual([]);expect(writes).toEqual([]);
 });
+test('footer shows office and professional contact channels on both public views',async({page})=>{
+ await page.goto('/site.html');
+ const footer=page.locator('footer.behtan-contact-footer');
+ await expect(footer.locator('address')).toContainText('مازندران، ساری، خیابان فرهنگ، نبش فرهنگ ۱۷، مجتمع تجاری شهر، واحد ۴۰۱');
+ for(const [name,href] of [['اینستاگرام پرو','https://Instagram.com/behtan_pro'],['واتس‌اپ','https://wa.me/989115391016'],['تلگرام','https://T.me/+989115391016']]){
+  const link=footer.getByRole('link',{name,exact:true});await expect(link).toHaveAttribute('href',href);await expect(link).toHaveAttribute('rel',/noopener/);
+ }
+ await page.goto('/site.html#pro');
+ await expect(page.locator('#pro-page')).toBeVisible();
+ await expect(footer.locator('address')).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+});
 test('catalog failure retries without displaying stale or invented prices',async({page})=>{
  let failed=true;
  await page.route('**/rest/v1/rpc/public_subscription_catalog',r=>r.fulfill(failed?{status:503,json:{message:'offline'}}:{json:catalog}));

@@ -1,4 +1,5 @@
 import { mealDescription, roundFa, type PrintedPlan } from "./menuPlan.ts";
+import { specialistHtml, type SpecialistIdentity } from './specialistProfile.ts';
 const escape = (s: unknown) =>
   String(s ?? "").replace(
     /[&<>"']/g,
@@ -7,14 +8,14 @@ const escape = (s: unknown) =>
         c
       ]!,
   );
-export function printedPlanHtml(p: PrintedPlan, origin: string): string {
+export function printedPlanHtml(p: PrintedPlan, origin: string, specialist?: SpecialistIdentity): string {
   return (
     '<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><title>برنامه غذایی ' +
     escape(p.display_name) +
     "</title><style>" +
-    '@font-face{font-family:Behtan;src:url("' +
+    '@font-face{font-display:swap;font-family:Behtan;src:url("' +
     escape(origin) +
-    '/fonts/IRANSansX-Regular.woff") format("woff");font-weight:400}@font-face{font-family:Behtan;src:url("' +
+    '/fonts/IRANSansX-Regular.woff") format("woff");font-weight:400}@font-face{font-display:swap;font-family:Behtan;src:url("' +
     escape(origin) +
     '/fonts/IRANSansX-Bold.woff") format("woff");font-weight:700}' +
     "@page{size:A4;margin:14mm}*{box-sizing:border-box}body{font:11px/1.9 Behtan,sans-serif;color:#172d25;margin:0}header{border-bottom:2px solid #176b50;padding-bottom:12px;margin-bottom:16px}h1{font-size:22px;margin:0}h2{font-size:17px;margin:12px 0}h3{font-size:13px;margin:12px 0 4px}p{margin:5px 0}.meta{color:#53665c}.targets{padding:10px;background:#edf5ef;border-radius:8px}table{width:100%;border-collapse:collapse;margin-bottom:10px}td,th{border:1px solid #d6e0d9;padding:7px;text-align:right;vertical-align:top}th{background:#edf5ef;font-weight:700}td:first-child{width:11%;white-space:nowrap}tbody tr:nth-child(even){background:#f5f8f5}tr{break-inside:avoid}thead{display:table-header-group}h2,h3{break-after:avoid}.day+.day{break-before:page}.macros{display:block;color:#54665b;font-size:9px}.notes{white-space:pre-wrap;border-right:3px solid #176b50;padding-right:10px}.footer{border-top:1px solid #d6e0d9;margin-top:16px;padding-top:8px;color:#66756c;font-size:9px}" +
@@ -24,7 +25,7 @@ export function printedPlanHtml(p: PrintedPlan, origin: string): string {
     escape(new Date(p.date + "T12:00:00").toLocaleDateString("fa-IR")) +
     " · نسخه اطلاعات: " +
     roundFa(p.intake_revision) +
-    "</p></header>" +
+    "</p></header>" + specialistHtml(specialist) +
     p.days
       .map(
         (d) =>
