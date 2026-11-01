@@ -44,7 +44,7 @@ export function AuthoredPlanArchive({ org, record, name }: { org: string; record
       <div><strong>{p.content.title}</strong><small>{p.kind === 'training' ? 'تمرین اختصاصی' : 'تغذیه اختصاصی'} · {new Date(p.recorded_at).toLocaleString('fa-IR')} · نسخه پرونده {p.intake_revision.toLocaleString('fa-IR')}</small></div>
       <div className="pro-actions">
         <button type="button" onClick={() => setViewing(viewing?.id === p.id ? null : p)}>مشاهده برنامه اختصاصی</button>
-        <button type="button" onClick={() => { setPrintError(''); void printAuthored(p, name).catch(e => setPrintError(e instanceof Error ? e.message : 'خروجی PDF انجام نشد؛ دوباره تلاش کنید.')); }}><FileDown size={16} />PDF برنامه اختصاصی</button>
+        <button type="button" onClick={() => { setPrintError(''); void printAuthored(p, name, org).catch(e => setPrintError(e instanceof Error ? e.message : 'خروجی PDF انجام نشد؛ دوباره تلاش کنید.')); }}><FileDown size={16} />PDF برنامه اختصاصی</button>
       </div>
     </article>)}
     {viewing && <section className="studio-snapshot" aria-label="مشاهده برنامه اختصاصی ذخیره‌شده">

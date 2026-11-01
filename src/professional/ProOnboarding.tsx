@@ -4,17 +4,17 @@ import { memberRpc } from "../member/api";
 import { paymentRequest, type PaymentOrder } from "../lib/payments";
 import { DURATIONS, offerPrice, type ProOffer } from "./modules";
 import { track } from "../member/analytics";
+import { registrationField, type SpecialistProfile } from './specialistProfile';
 export function ProOnboarding({
   onComplete,
+  profile,
   existing = false,
 }: {
   onComplete: () => void;
+  profile: SpecialistProfile;
   existing?: boolean;
 }) {
-  const [step, setStep] = useState(1),
-    [name, setName] = useState(""),
-    [field, setField] = useState("nutrition"),
-    [code, setCode] = useState(() => {
+  const [code, setCode] = useState(() => {
       const plan = new URLSearchParams(location.search).get('plan');
       return ['training','nutrition','combined'].includes(plan || '') ? plan! : existing ? 'nutrition' : 'trial';
     }),
@@ -35,8 +35,8 @@ export function ProOnboarding({
     setError("");
     try {
       await memberRpc("pro_register", {
-        p_name: name,
-        p_field: field,
+        p_name: profile.full_name,
+        p_field: registrationField(profile.profession),
         p_trial: code === "trial",
       });
       track("pro_signup", { source: "pro" });
@@ -73,45 +73,10 @@ export function ProOnboarding({
     <section className="pro-empty pro-panel space-y-5">
       <h1 className="text-2xl font-bold">فضای کاری خودت را بساز</h1>
       <p>
-        شمارهٔ تماس با ورود پیامکی تأیید شده است. نام و حوزهٔ کارت را کامل کن.
+        {profile.full_name}، مشخصات حرفه‌ای شما ثبت شده است. اشتراک مناسب خود را انتخاب کنید.
       </p>
       {error && <p role="alert">{error}</p>}
-      {step === 1 ? (
-        <>
-          <label>
-            نام متخصص
-            <input
-              className="w-full rounded-xl border p-3 bg-transparent"
-              value={name}
-              maxLength={100}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </label>
-          <label>
-            حوزهٔ کاری
-            <PanelSelect value={field} onChange={(e) => setField(e.target.value)}>
-              {[
-                ["nutrition", "تغذیه"],
-                ["training", "مربی تمرین"],
-                ["clinic", "کلینیک"],
-                ["gym", "باشگاه"],
-              ].map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </PanelSelect>
-          </label>
-          <button
-            className="pro-primary"
-            disabled={!name.trim()}
-            onClick={() => setStep(2)}
-          >
-            دیدن اشتراک‌ها
-          </button>
-        </>
-      ) : (
-        <>
+      <>
           <label>
             مدت دوره
             <PanelSelect
@@ -165,15 +130,7 @@ export function ProOnboarding({
                 ? "ساخت پنل آزمایشی"
                 : "پرداخت و ساخت پنل"}
           </button>
-          <button
-            className="pro-secondary"
-            disabled={busy}
-            onClick={() => setStep(1)}
-          >
-            بازگشت
-          </button>
-        </>
-      )}
+      </>
     </section>
   );
 }

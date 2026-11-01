@@ -334,6 +334,7 @@ export async function testMarketDatabase({ db }) {
   await db.exec("reset role");
   await import('./market-regressions-database.mjs').then(m=>m.regressions({db,user,other,as,store,org}));
   await import('./market-v3-database.mjs').then(m=>m.v3Regressions({db,as,store}));
+  await import('./pro-specialist-profile-database.test.mjs').then(m=>m.testSpecialistProfiles({db}));
   console.log(
     "PASS market SQL: migrations, admin gates, RPC privilege boundaries, catalog/profile-bound preflight, forged prices, half-price, single-use trial, verified/idempotent settlement, dynamic upgrade with original expiry, Pro trial provisioning, analytics minimization",
   );

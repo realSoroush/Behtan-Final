@@ -21,6 +21,7 @@ import type {
 } from "../../training/types";
 import { ExerciseMedia } from "../../training/ExerciseMedia";
 import { printTraining } from "../../training/print";
+import { specialistApi } from '../specialistApi';
 import { trainingApi, trainingError } from "./api";
 import "../../training/training.css";
 const localToday = () =>
@@ -565,7 +566,7 @@ export function TrainingPanel({
             )}
             <button
               disabled={busy || !selected.approved_at}
-              onClick={() => void run(() => printTraining(selected.plan))}
+              onClick={() => void run(() => printTraining(selected.plan, () => specialistApi.forPlan(org, 'training', selected.id)))}
             >
               <FileDown size={17} />
               PDF برنامه تمرینی

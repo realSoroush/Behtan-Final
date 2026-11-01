@@ -2,6 +2,9 @@ import {StudioOverview,type ProView} from './StudioOverview';
 import './studio-shell.css';
 import {track} from '../member/analytics';
 import {ProOnboarding} from './ProOnboarding';
+import { SpecialistProfileForm } from './SpecialistProfileForm';
+import { specialistApi } from './specialistApi';
+import type { SpecialistProfile } from './specialistProfile';
 import {paymentRequest} from '../lib/payments';
 import { ProSubscription } from "./ProSubscription";
 import { PanelSelect } from "@/components/ui/PanelSelect";
@@ -81,6 +84,8 @@ export function ProApp() {
   );
 }
 function Workspace({userId,phone,view,navigate,onDirty}:{userId:string;phone:string;view:ProView;navigate:(view:ProView)=>void;onDirty:(dirty:boolean)=>void}) {
+  const [profile, setProfile] = useState<SpecialistProfile | null>(null);
+  const [profileNotice, setProfileNotice] = useState('');
   const unsaved=useRef(false);
   const markDirty=useCallback((dirty:boolean)=>{unsaved.current=dirty;onDirty(dirty);},[onDirty]);
   const [orgs, setOrgs] = useState<ProOrganization[]>([]),
@@ -98,6 +103,13 @@ function Workspace({userId,phone,view,navigate,onDirty}:{userId:string;phone:str
     setBusy(true);
     setError("");
     try {
+      const specialist = await specialistApi.get();
+      if (seq.current !== n) return;
+      setProfile(specialist);
+      if (!specialist.completed) {
+        setAllowed(null); setOrgs([]); setMembers([]); setSelected('');
+        return;
+      }
       const access = await proApi.status();
       if (seq.current !== n) return;
       setAllowed(access);
@@ -167,6 +179,11 @@ function Workspace({userId,phone,view,navigate,onDirty}:{userId:string;phone:str
       setBusy(false);
     }
   }
+  if (!profile?.completed) return <main id="pro-workspace" tabIndex={-1}>
+    {error && <p className="pro-error" role="alert">{error}<button disabled={busy} onClick={() => void load()}>تلاش مجدد</button></p>}
+    {!profile && busy && <p role="status">در حال دریافت مشخصات حرفه‌ای…</p>}
+    {profile && <SpecialistProfileForm initial={profile} onSaved={saved => { setProfile(saved); void load(); }} />}
+  </main>;
   const roles =
     members.find(
       (m) =>
@@ -196,7 +213,7 @@ function Workspace({userId,phone,view,navigate,onDirty}:{userId:string;phone:str
       )}
       {busy && <p role="status">در حال دریافت فضای کاری…</p>}
       {allowed === false && (
-        hadAccess.current ? <p role="alert" className="pro-error">دسترسی این حساب به پنل فعال نیست.</p> : <ProOnboarding onComplete={()=>void load()}/>
+        hadAccess.current ? <p role="alert" className="pro-error">دسترسی این حساب به پنل فعال نیست.</p> : <ProOnboarding profile={profile} onComplete={()=>void load()}/>
       )}
       {allowed && !orgs.length && !busy && !error && (
         <button className="pro-primary" onClick={() => void create()}>
@@ -207,8 +224,8 @@ function Workspace({userId,phone,view,navigate,onDirty}:{userId:string;phone:str
         <>
           {view==='overview'&&<StudioOverview key={selected} org={selected} navigate={navigate}/>}
           <div hidden={!['cases','training','nutrition','history'].includes(view)}><RealCaseWorkspace key={selected} org={selected} roles={roles} view={view} onDirty={markDirty}/></div>
-          {view==='subscription'&&<section className="studio-subscription"><h2>اشتراک و ظرفیت</h2><ProSubscription key={selected} org={selected}/><details><summary>انتخاب یا ارتقای اشتراک</summary><ProOnboarding existing onComplete={()=>void load()}/></details></section>}
-          {view==='settings'&&<section className="pro-panel studio-settings"><h2>حساب و تنظیمات</h2><dl><div><dt>فضای کاری</dt><dd>{orgs.find(o=>o.id===selected)?.name}</dd></div><div><dt>شماره حساب</dt><dd dir="ltr">{phone||'ثبت نشده'}</dd></div><div><dt>نقش شما</dt><dd>{roles.map(r=>({owner:'مالک',practitioner:'کارشناس',assistant:'دستیار'}[r])).join('، ')}</dd></div><div><dt>منطقه زمانی</dt><dd>تهران</dd></div></dl><div className="studio-row"><span>ظاهر روشن / تیره</span><ThemeToggle/></div><a className="pro-nav-link" href="#pro-support"><LifeBuoy size={18}/>راهنمای استفاده</a></section>}
+          {view==='subscription'&&<section className="studio-subscription"><h2>اشتراک و ظرفیت</h2><ProSubscription key={selected} org={selected}/><details><summary>انتخاب یا ارتقای اشتراک</summary><ProOnboarding existing profile={profile} onComplete={()=>void load()}/></details></section>}
+          {view==='settings'&&<section className="pro-panel studio-settings"><h2>حساب و تنظیمات</h2><dl><div><dt>فضای کاری</dt><dd>{orgs.find(o=>o.id===selected)?.name}</dd></div><div><dt>شماره حساب</dt><dd dir="ltr">{phone||'ثبت نشده'}</dd></div><div><dt>نقش شما</dt><dd>{roles.map(r=>({owner:'مالک',practitioner:'کارشناس',assistant:'دستیار'}[r])).join('، ')}</dd></div><div><dt>منطقه زمانی</dt><dd>تهران</dd></div></dl><div className="studio-row"><span>ظاهر روشن / تیره</span><ThemeToggle/></div><details><summary>ویرایش مشخصات حرفه‌ای و اطلاعات PDF</summary><SpecialistProfileForm key={JSON.stringify(profile)} initial={profile} editing onSaved={saved=>{setProfile(saved);setProfileNotice("مشخصات حرفه‌ای ذخیره شد.");}} /></details>{profileNotice&&<p role="status" className="pro-success">{profileNotice}</p>}<a className="pro-nav-link" href="#pro-support"><LifeBuoy size={18}/>راهنمای استفاده</a></section>}
 
         </>
       )}

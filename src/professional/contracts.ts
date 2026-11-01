@@ -22,6 +22,7 @@ export function canCreateSandboxPatient(roles: ProRole[]): boolean {
 }
 export function proErrorMessage(error: unknown): string {
   const code = error instanceof Error ? error.message : String(error);
+  if (code.includes('PRO_INVALID_PROFILE')) return 'نام و نام خانوادگی، شماره تماس، رسته کاری و آدرس را کامل و معتبر وارد کنید.';
   if(code.includes('PRO_CATALOG_UNAVAILABLE'))return 'کاتالوگ یا سیاست محاسبات تغذیه در دسترس نیست؛ تنظیمات سرویس و داده‌های کاتالوگ را بررسی کنید.';
   if(code.includes('PRO_MODULE_DISABLED'))return 'ماژول تغذیه در اشتراک این پنل فعال نیست؛ سوابق و خروجی‌های قبلی در دسترس‌اند.';
   if(code.includes('PRO_CASE_ARCHIVED'))return 'این پرونده بایگانی شده است؛ ابتدا آن را از بایگانی بازگردانید.';

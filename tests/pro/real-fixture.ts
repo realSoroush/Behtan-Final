@@ -15,6 +15,7 @@ const fixture = JSON.parse(
 export const user = "10000000-0000-4000-8000-000000000001",
   org = "20000000-0000-4000-8000-000000000001",
   record = "30000000-0000-4000-8000-000000000001";
+export const specialist = { completed: true, full_name: 'متخصص تست به‌تن', contact_phone: '09111234567', profession: 'nutritionist', province: 'مازندران', city: 'ساری', address: 'خیابان فرهنگ، واحد ۴۰۱' };
 const f = fixture as any;
 const foods = f.FOOD_ITEMS.map((x: any) => {
   const r = f.PORTION_RULES[x.id];
@@ -115,8 +116,10 @@ export const base = {
 };
 export async function setup(
   page: Page,
-  { existing = false, role = "owner", allowed = true, emptyOrg = false } = {},
+  { existing = false, role = "owner", allowed = true, emptyOrg = false, profileComplete = true } = {},
 ) {
+  let professional = { ...specialist, completed: profileComplete, ...(profileComplete ? {} : { full_name: '', profession: '', province: '', city: '', address: '' }) };
+  const profileRequests: Record<string, string>[] = [];
   const cases: any[] = existing
     ? [
         {
@@ -181,7 +184,14 @@ export async function setup(
     if (offline) { await route.abort('failed'); return; }
     const b = req.postDataJSON();
     let data: any = [];
-    if (path.endsWith("/pro_pilot_status")) data = active;
+    if (path.endsWith('/pro_specialist_profile')) data = professional;
+    else if (path.endsWith('/pro_save_specialist_profile')) {
+      profileRequests.push(b);
+      professional = { completed: true, full_name: b.p_full_name.trim(), contact_phone: b.p_contact_phone, profession: b.p_profession, province: b.p_province.trim(), city: b.p_city.trim(), address: b.p_address.trim() };
+      data = professional;
+    }
+    else if (path.endsWith('/pro_plan_specialist')) data = professional;
+    else if (path.endsWith("/pro_pilot_status")) data = active;
     else if (path.endsWith("/pro_organizations"))
       data = active ? organizations : [];
     else if (path.endsWith("/pro_create_sandbox_organization")) {
@@ -325,6 +335,7 @@ export async function setup(
     }
   });
   return {
+    profileRequests,
     cases,
     expire: () => {writable=false;},
     draftMap,

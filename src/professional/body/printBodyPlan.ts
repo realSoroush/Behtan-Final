@@ -2,6 +2,7 @@ import { printedPlanHtml } from "../printPlan.ts";
 import type { PrintedPlan } from "../menuPlan.ts";
 import { bodyAppendixHtml } from "./appendix.ts";
 import { bodyApi } from "./api";
+import { specialistApi } from '../specialistApi';
 export async function printPlanWithBody(
   p: PrintedPlan,
   org: string,
@@ -12,8 +13,8 @@ export async function printPlanWithBody(
   popup.opener = null;
   popup.document.body.textContent = "در حال آماده‌سازی خروجی…";
   try {
-    const report = await bodyApi.forPlan(org, planId);
-    const html = printedPlanHtml(p, window.location.origin);
+    const [report, specialist] = await Promise.all([bodyApi.forPlan(org, planId), specialistApi.forPlan(org, 'nutrition', planId)]);
+    const html = printedPlanHtml(p, window.location.origin, specialist);
     popup.document.open();
     popup.document.write(
       report
