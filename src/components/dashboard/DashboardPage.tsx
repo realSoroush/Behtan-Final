@@ -10,7 +10,7 @@ import { MemberMealConfirmation } from './MemberMealConfirmation';
 import { isCurrentMealConfirmation, type PendingMealConfirmation } from '@/utils/memberMealConfirmation';
 import { FoodScanPanel } from './FoodScanPanel';
 import { scannedMeal, type FoodScanResult } from '@/utils/foodScan';
-import { changeMemberMeal } from '@/utils/changeMemberMeal';
+import { changeMemberMeal, MealChangeUnavailableError } from '@/utils/changeMemberMeal';
 import { ProgressJournal } from './ProgressJournal';
 import { MemberAnalytics } from './MemberAnalytics';
 import { WeekPlanner } from './WeekPlanner';
@@ -118,6 +118,11 @@ function computeConsumedMacros(
 
 export function DashboardPage() {
   const { user, signOut } = useAuth();
+  const activeUserId = useRef(user?.id);
+  useEffect(() => {
+    activeUserId.current = user?.id;
+    return () => { activeUserId.current = undefined; };
+  }, [user?.id]);
   const {
     profile,
     loading: profileLoading,
@@ -515,8 +520,14 @@ export function DashboardPage() {
           ? baseline.meals.find(original => original.slot === meal.slot) ?? meal
           : meal),
       }, baseline);
-      const saved = await schedule.save([{ date: selectedDate, plan }], true);
-      if (!saved[selectedDate]) throw Error('ذخیرهٔ تغییر وعده تأیید نشد. دوباره تلاش کن.');
+      try {
+        const saved = await schedule.save([{ date: selectedDate, plan }], true);
+        if (!saved[selectedDate]) throw Error('ذخیرهٔ تغییر وعده تأیید نشد. دوباره تلاش کن.');
+      } catch (error) {
+        if (user?.id === activeUserId.current) track('meal_change_save_failed');
+        throw error;
+      }
+      if (user?.id === activeUserId.current) track('meal_changed');
       if (editContextRef.current === editContext) {
         if (viewingToday) setPlanVersion(0);
         setScheduleSyncError(false);
@@ -536,8 +547,10 @@ export function DashboardPage() {
         index, preferences, viewingToday ? todayIntake : { skippedSlots: [], extraMeals: [] },
       ));
     } catch (error) {
-      if (editContextRef.current === editContext)
+      if (editContextRef.current === editContext) {
+        if (error instanceof MealChangeUnavailableError) track('meal_change_unavailable');
         setViewError(error instanceof Error ? error.message : 'تغییر وعده انجام نشد.');
+      }
     }
   };
   const saveScannedFood=async(result:FoodScanResult,slot:Meal['slot'],independent:boolean)=>{
@@ -690,8 +703,10 @@ export function DashboardPage() {
     } else performToggleConsumed(index);
   };
 
+  const reportedEmptySwap = useRef(false);
   const handleSwapComponent = (mealIdx: number, componentIdx: number) => {
     if (!viewingToday || mealChangeInFlight.current || activePlan?.meals[mealIdx]?.consumed) return;
+    reportedEmptySwap.current = false;
     setSwapMealIndex(mealIdx);
     setSwapComponentIndex(componentIdx);
   };
@@ -746,6 +761,14 @@ export function DashboardPage() {
     swapMealIndex,
     swapComponentIndex,
   ]);
+  useEffect(() => {
+    if (swapCurrentComponent && catalog && intakeReady && profile?.dietary_preferences_json &&
+      swapCandidates.length === 0 && !reportedEmptySwap.current) {
+      reportedEmptySwap.current = true;
+      track('meal_change_unavailable');
+    }
+  }, [swapCurrentComponent, catalog, intakeReady, profile, swapCandidates.length]);
+
 
   const consumed = activePlan ? computeConsumedMacros({...activePlan,meals:[...activePlan.meals,...extraFoods.map(f=>({...f.meal_snapshot,consumed:true}))]}) : null;
   const planned = activePlan

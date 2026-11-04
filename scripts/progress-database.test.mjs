@@ -30,6 +30,12 @@ for (const [migration, foodId, templateId] of [
   const sql = await read('migrations/' + migration);
   await db.exec(sql);
   await db.exec(sql);
+  if (foodId === 'chicken_curry_brown_rice_cooked') {
+    const allergySql = await read('migrations/20261104182705_044_member_celery_allergy.sql');
+    await db.exec(allergySql);
+    await db.exec(allergySql);
+    await assert.rejects(() => db.query("update food_items set allergy_flags=array['unexpected'] where id=$1", [foodId]), /food_items_allergy_flags_check/);
+  }
   const foodRows = (await db.query('select * from food_items where id = $1', [foodId])).rows;
   const templateRows = (await db.query('select * from meal_templates where id = $1', [templateId])).rows;
   const slotRows = (await db.query('select * from meal_template_slots where template_id = $1', [templateId])).rows;

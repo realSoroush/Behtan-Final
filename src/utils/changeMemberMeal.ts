@@ -27,6 +27,8 @@ export function memberMealAlternatives(plan: DailyMealPlan, index: number, prefe
   return [...unique.values()];
 }
 
+export class MealChangeUnavailableError extends Error {}
+
 /** Rotate through approved menus until one can fit the day. */
 export function changeMemberMeal(
   plan: DailyMealPlan, index: number, preferences: DietaryPreferencesJson, intake: MemberDayIntake,
@@ -48,5 +50,5 @@ export function changeMemberMeal(
       swapBaselineMeals: baseline.map(m => m.slot === original.slot ? replacement : m),
     };
   }
-  throw Error('با ثبت‌ها و محدودیت‌های فعلی، منوی دیگری که با هدف روز سازگار باشد پیدا نشد.');
+  throw new MealChangeUnavailableError('با ثبت‌ها و محدودیت‌های فعلی، منوی دیگری که با هدف روز سازگار باشد پیدا نشد.');
 }

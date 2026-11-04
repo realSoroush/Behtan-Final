@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {installTestNutritionCatalog} from './setup-test-nutrition-catalog.mjs';
 import {generateDailyMealPlan,getProfessionalMealOptions,getSwapOptionsForMeal,isPracticalMeal,rebalanceMemberDay} from '../src/utils/mealPlanEngine.ts';
 import {calculateMacros} from '../src/utils/nutritionHelpers.ts';
+import { memberMealAlternatives } from '../src/utils/changeMemberMeal.ts';
 const catalog=installTestNutritionCatalog();
 assert(!catalog.foods.some(f=>f.id==='medjool_date'));
 assert(catalog.foods.find(f=>f.id==='dates_small').gramsPerUnit<10);
@@ -51,6 +52,14 @@ assert(curry);
 assert(curry.components[0].grams >= 285 && curry.components[0].grams <= 475);
 assert.equal(curry.totalKcal, Math.round(curry.components[0].units * 220.32));
 assert(rebalanceMemberDay(pilot, lunchIndex, curry, omnivore, { skippedSlots: [], extraMeals: [] }));
-for (const prefs of [{ ...omnivore, allergies: ['dairy'] }, { ...omnivore, vegetarianStatus: 'lacto_ovo' }]) {
+for (const prefs of [{ ...omnivore, allergies: ['dairy'] }, { ...omnivore, allergies: ['celery'] }, { ...omnivore, vegetarianStatus: 'lacto_ovo' }]) {
   assert(!getProfessionalMealOptions(lunch, prefs, false).some(m => m.templateId === curryId));
+}
+
+const celeryFree = { ...omnivore, allergies: ['celery'] };
+const planWithCurry = { ...pilot, meals: pilot.meals.map((meal, index) => index === lunchIndex ? curry : meal) };
+assert(!memberMealAlternatives(planWithCurry, lunchIndex, celeryFree).some(m => m.templateId === curryId));
+for (let seed = 0; seed < 8; seed++) {
+  const plan = generateDailyMealPlan(pilot.targets, 85, celeryFree, false, `celery-free-${seed}`);
+  assert(plan.meals.every(meal => meal.components.every(c => !c.foodItem.allergyFlags.includes('celery'))));
 }

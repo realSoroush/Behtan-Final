@@ -910,7 +910,8 @@
       "carbsPerUnit": 26.4,
       "fatPerUnit": 6.47,
       "allergyFlags": [
-        "dairy"
+        "dairy",
+        "celery"
       ],
       "excludedForVegetarian": [
         "vegan",
