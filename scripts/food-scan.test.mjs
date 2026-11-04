@@ -17,7 +17,9 @@ const custom=scannedMeal(changed,'lunch','ناهار');assert.equal(custom.templ
 const targets=calculateMacros(2100,85,'weight_loss',178);const prefs={vegetarianStatus:'none',allergies:[]};const plan=generateDailyMealPlan(targets,85,prefs,false,'2026-10-22-v0',{proteinBudgetPreference:'balanced'});
 const applied=applyDailyMealSnapshots(plan,{lunch:custom});assert.equal(applied.meals.find(m=>m.slot==='lunch').totalKcal,195);assert.equal(applied.meals.filter(m=>m.consumed).length,1);
 assert.deepEqual(prescriptionForSchedule(applied,plan).meals.find(m=>m.slot==='lunch'),plan.meals.find(m=>m.slot==='lunch'));
-const next=changeMemberMeal(withSwapBaseline(applied,plan),0,85,prefs,'balanced','test-single');for(let i=1;i<applied.meals.length;i++)assert.deepEqual(next.meals[i],applied.meals[i]);assert.deepEqual(withSwapBaseline(next,plan).swapBaselineMeals[0],next.meals[0]);assert.throws(()=>changeMemberMeal(applied,applied.meals.findIndex(m=>m.slot==='lunch'),85,prefs,'balanced','locked'));
+const intake={skippedSlots:[],extraMeals:[]};
+assert.throws(()=>changeMemberMeal(withSwapBaseline(applied,plan),0,prefs,intake),/با هدف روز سازگار/);
+assert.throws(()=>changeMemberMeal(applied,applied.meals.findIndex(m=>m.slot==='lunch'),prefs,intake),/ثبت‌شده/);
 const db=new PGlite();try{
  await db.exec(`create schema auth;create role anon;create role authenticated;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql as $$select nullif(current_setting('request.uid',true),'')::uuid$$;create function public.billing_has_access() returns boolean language sql as $$select current_setting('request.access',true)='yes'$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;`);
  await db.exec(await readFile(new URL('../supabase/migrations/20261022_033_food_scan_quota.sql',import.meta.url),'utf8'));
@@ -28,4 +30,4 @@ const db=new PGlite();try{
  await db.exec('reset role;update public.member_food_scan_usage set last_request_at=now()-interval \'1 minute\';set role authenticated');assert.equal((await db.query('select public.reserve_food_scan() as ok')).rows[0].ok,false);
  await db.query("select set_config('request.access','no',false)");await assert.rejects(db.query('select public.reserve_food_scan()'),/ACCESS_DENIED/);await db.exec('reset role;set role anon');await assert.rejects(db.query('select public.reserve_food_scan()'),/permission denied/);
 }finally{await db.close();}
-console.log('✓ Food scan: Persian weights, 125→150g scaling, bounded AI output, custom snapshot reload, one-slot menu changes, protected atomic quotas and denied unauthorized access');
+console.log('✓ Food scan: Persian weights, 125→150g scaling, bounded AI output, custom snapshot reload, safe rejection when a custom meal leaves an infeasible remainder, protected atomic quotas and denied unauthorized access');
