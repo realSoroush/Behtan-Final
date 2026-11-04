@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { addPlanDays, isPresentablePlan } from "@/utils/mealPresentation";
-import type { DailyMealPlan } from "@/types";
+import type { DailyMealPlan, DietaryPreferencesJson } from "@/types";
 type Row = { plan_date: string; plan: unknown; context_key: string; updated_at: string };
 const emptySchedule = { plans: {}, versions: {} };
 
@@ -22,6 +22,7 @@ export function useMemberMealSchedule(
   userId: string | undefined,
   today: string,
   context: string | null,
+  dietaryPreferences: DietaryPreferencesJson | null,
 ) {
   const key = `${userId}:${today}:${context}`;
   const keyRef = useRef(key);
@@ -32,6 +33,7 @@ export function useMemberMealSchedule(
     versions: Record<string, string>;
     error: string | null;
     conflict?: boolean;
+    profileChanged?: boolean;
   }>({ key: "", ...emptySchedule, error: null });
   const conflictKey = useRef<string | null>(null);
   const [retry, setRetry] = useState(0);
@@ -77,7 +79,7 @@ export function useMemberMealSchedule(
     };
   }, [userId, today, context, key, retry]);
   const save = useCallback(
-    async (days: { date: string; plan: DailyMealPlan }[], replace = false) => {
+    async (days: { date: string; plan: DailyMealPlan }[], replace = false, mealEdit = false) => {
       if (!context || !userId || key !== state.key || state.error)
         throw Error("ابتدا برنامهٔ ذخیره‌شده را دوباره دریافت کن.");
       const versionedDays = days.map(day => ({
@@ -93,20 +95,28 @@ export function useMemberMealSchedule(
         const timeout = setTimeout(() => controller.abort(), 15000);
         try {
           const { data, error } = await supabase
-            .rpc("save_member_meal_schedule_v2", {
+            .rpc("save_member_meal_schedule_v3", {
               p_today: today,
               p_context: context,
               p_days: versionedDays,
               p_replace: replace,
+              p_expected_diet: dietaryPreferences,
+              p_meal_edit: mealEdit,
             })
             .abortSignal(controller.signal)
             .retry(false);
-          if (error?.message === "MEAL_SCHEDULE_CONFLICT") {
+          if (error?.message === "MEAL_SCHEDULE_CONFLICT" || error?.message === "MEAL_PROFILE_CHANGED") {
+            const message = error.message === "MEAL_PROFILE_CHANGED"
+              ? "ترجیحات غذایی در دستگاه دیگری تغییر کرده‌اند. نسخهٔ تازه را باز کن."
+              : conflictMessage;
             if (keyRef.current === key) {
               conflictKey.current = key;
-              setState(current => ({ ...current, error: conflictMessage, conflict: true }));
+              setState(current => ({
+                ...current, error: message, conflict: true,
+                profileChanged: error.message === "MEAL_PROFILE_CHANGED",
+              }));
             }
-            throw Error(conflictMessage);
+            throw Error(message);
           }
           if (error) throw Error("برنامه ذخیره نشد. دوباره تلاش کن.");
           const updated = scheduleFrom(data, context);
@@ -121,7 +131,7 @@ export function useMemberMealSchedule(
       queue.current = pending;
       return pending;
     },
-    [context, userId, key, state.key, state.error, state.versions, today],
+    [context, userId, key, state.key, state.error, state.versions, today, dietaryPreferences],
   );
   return {
     plans: state.key === key ? state.plans : {},
@@ -129,6 +139,7 @@ export function useMemberMealSchedule(
     error: state.key === key ? state.error : null,
     saving,
     save,
+    profileChanged: state.key === key && Boolean(state.profileChanged),
     conflict: state.key === key && Boolean(state.conflict),
     retry: () => {
       if (conflictKey.current === key) window.location.reload();

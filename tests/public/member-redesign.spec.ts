@@ -79,7 +79,7 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/rest/v1/**", async (r) => {
     const url = r.request().url(),
       body = r.request().postDataJSON();
-    if (url.includes("/rpc/save_member_meal_schedule_v2")) {
+    if (url.includes("/rpc/save_member_meal_schedule_v3")) {
       for (const day of body.p_days) {
         const existing = schedule[day.date];
         if (!body.p_replace && existing?.context_key === body.p_context) continue;
@@ -313,8 +313,9 @@ test('rotation keeps the old meal on save failure and survives reload after ackn
   let attempts = 0;
   let finish!: () => void;
   const release = new Promise<void>(resolve => { finish = resolve; });
-  await page.route('**/rpc/save_member_meal_schedule_v2', async route => {
-    if (!route.request().postDataJSON().p_replace) return route.fallback();
+  await page.route('**/rpc/save_member_meal_schedule_v3', async route => {
+    if (!route.request().postDataJSON().p_meal_edit) return route.fallback();
+    expect(route.request().postDataJSON().p_expected_diet).toEqual(profile.dietary_preferences_json);
     attempts++;
     if (attempts === 1) {
       await release;
@@ -333,7 +334,7 @@ test('rotation keeps the old meal on save failure and survives reload after ackn
   await change.click();
   await expect.poll(foods).not.toBe(original);
   const saved = await foods();
-  await expect.poll(() => events).toEqual(['meal_change_save_failed', 'meal_changed'].map(event => ({
+  await expect.poll(() => events).toEqual(['meal_change_save_failed'].map(event => ({
     event, step: null, source: 'app', keys: ['p_event', 'p_id', 'p_session', 'p_source', 'p_step'],
   })));
   await page.reload();
@@ -385,7 +386,7 @@ test('skipping requires confirmation and the skipped meal can be restored', asyn
 test('stale schedule writes keep the displayed meal and ask to reload', async ({ page }) => {
   const card = page.locator('#today-panel .member-meal-card');
   const before = await card.locator('h3').textContent();
-  await page.route('**/rpc/save_member_meal_schedule_v2', route => {
+  await page.route('**/rpc/save_member_meal_schedule_v3', route => {
     if (!route.request().postDataJSON().p_replace) return route.fallback();
     return route.fulfill({ status: 400, json: { message: 'MEAL_SCHEDULE_CONFLICT', code: 'P0001' } });
   });
@@ -444,6 +445,38 @@ test('weekly review persists to the account and can retry a failed save', async 
   await expect(review).toContainText('پیشنهاد مرور شد.');
   expect(attempts).toBe(3);
   expect(await page.evaluate(key => localStorage.getItem(key), storageKey)).toBeNull();
+});
+
+test('returning to progress reads updated evidence without reloading the app', async ({ page }) => {
+  let enoughEntries = false;
+  await page.route('**/rest/v1/user_progress_entries?*', route => route.fulfill({
+    json: enoughEntries ? ['2026-10-23', '2026-10-25', '2026-10-27', '2026-10-30', '2026-11-01', '2026-11-03']
+      .map(entry_date => ({ entry_date, weight_kg: 85, adherence: 'mostly', hunger: 'often', difficulty: null })) : [],
+  }));
+  await page.route('**/rest/v1/member_weekly_review_acknowledgements?*', route => route.fulfill({ json: [] }));
+  await page.getByRole('link', { name: 'روند من', exact: true }).click();
+  const review = page.getByRole('region', { name: 'بازبینی هفتگی هدف' });
+  await expect(review).toContainText('حداقل سه ثبت وزن');
+  await page.getByRole('link', { name: 'برنامهٔ امروز', exact: true }).click();
+  enoughEntries = true;
+  await page.getByRole('link', { name: 'روند من', exact: true }).click();
+  await expect(review).toContainText('گرسنگی مکرر ثبت شده');
+});
+
+test('focusing the app refreshes a remotely updated diet before the next save', async ({ page }) => {
+  let diet = profile.dietary_preferences_json;
+  await page.unroute('**/src/hooks/useUserProfile.ts*');
+  await page.route('**/rest/v1/user_profiles?*', route =>
+    route.fulfill({ json: [{ ...profile, dietary_preferences_json: diet }] }));
+  await page.reload();
+  await expect(page.locator('#today-panel .member-meal-card')).toBeVisible();
+  diet = { ...diet, allergies: ['celery'] };
+  const freshSave = page.waitForRequest(request => request.url().includes('/rpc/save_member_meal_schedule_v3')
+    && request.postDataJSON().p_expected_diet?.allergies.includes('celery'));
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await freshSave;
+  await page.getByRole('link', { name: 'حساب من', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'حساسیت‌های غذایی' })).toContainText('کرفس');
 });
 
 test('account saves celery allergy while preserving existing food preferences', async ({ page }) => {

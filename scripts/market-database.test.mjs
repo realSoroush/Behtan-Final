@@ -14,7 +14,9 @@ export async function testMarketDatabase({ db }) {
     "20261024_037_pro_self_service.sql",
     "20261024_038_food_preparation_labels.sql",
     "20261024_039_compute_limits.sql",
+    "20261104134358_042_version_member_meal_schedule.sql",
     "20261104182716_045_member_review_and_meal_events.sql",
+    "20261104205157_046_member_safety_sync.sql",
   ])
     await db.exec(
       await readFile(
@@ -211,10 +213,39 @@ export async function testMarketDatabase({ db }) {
       ]),
     /INVALID_EVENT/,
   );
-  const mealChangeEvents = ["meal_changed", "meal_change_unavailable", "meal_change_save_failed"];
+  const mealChangeEvents = ["meal_change_unavailable", "meal_change_save_failed"];
+  for (const event of ["meal_changed", "meal_changed_verified"]) {
+    await assert.rejects(
+      () => db.query("select record_product_event($1,$2,$3,null,'app')", [randomUUID(), randomUUID(), event]),
+      /INVALID_EVENT/,
+    );
+  }
   for (const event of mealChangeEvents) {
     await db.query("select record_product_event($1,$2,$3,null,'app')", [randomUUID(), randomUUID(), event]);
   }
+  await db.exec("reset role");
+  const initialDiet = { vegetarianStatus: "none", allergies: [] };
+  const updatedDiet = { ...initialDiet, allergies: ["celery"] };
+  const diet = value => db.query("update user_profiles set dietary_preferences_json=$1 where id=$2", [value, other]);
+  await diet(initialDiet);
+  await as(other);
+  const date = (await db.query("select current_date::text as d")).rows[0].d;
+  const plan = { isWorkoutDay: false, targets: {}, meals: [{ slot: "lunch", templateId: "first" }] };
+  const edited = { ...plan, meals: [{ slot: "lunch", templateId: "second" }] };
+  const save = async (currentDiet, next, version, replace = false, edit = false) =>
+    (await db.query("select save_member_meal_schedule_v3($1,'test',$2,$3,$4,$5) as days",
+      [date, JSON.stringify([{ date, plan: next, expected_updated_at: version }]), currentDiet, replace, edit])).rows[0].days[0];
+  const baseline = await save(initialDiet, plan, null);
+  await db.exec("reset role");
+  await diet(updatedDiet);
+  await as(other);
+  await assert.rejects(() => save(initialDiet, edited, baseline.updated_at, true, true), /MEAL_PROFILE_CHANGED/);
+  await assert.rejects(() => db.query("select save_member_meal_schedule_v2($1,'test','[]',true)", [date]), /permission denied/);
+  const changed = await save(updatedDiet, edited, baseline.updated_at, true, true);
+  assert.equal(changed.plan.meals[0].templateId, "second");
+  await assert.rejects(() => save(updatedDiet, plan, baseline.updated_at, true, true), /MEAL_SCHEDULE_CONFLICT/);
+  await save(updatedDiet, edited, changed.updated_at, true, true);
+  await as(user);
   const reviewKey = "c0ffee00";
   const readReviews = () => db.query("select review_key from member_weekly_review_acknowledgements");
   const acknowledge = (id, key = reviewKey) => db.query(
@@ -286,7 +317,7 @@ export async function testMarketDatabase({ db }) {
   const pulse = (await db.query("select admin_business_pulse(30) as p")).rows[0]
     .p;
   assert(pulse.events.some((e) => e.event === "app_open"));
-  for (const event of mealChangeEvents) assert.equal(pulse.events.find(e => e.event === event)?.events, 1);
+  for (const event of [...mealChangeEvents, "meal_changed_verified"]) assert.equal(pulse.events.find(e => e.event === event)?.events, 1);
   await db.exec("reset role");
   for (let i = 0; i < 5; i++)
     assert.equal(
@@ -306,6 +337,13 @@ export async function testMarketDatabase({ db }) {
     false,
   );
   const {intake}=await import('./pro-real-plan.test.mjs');
+  const { display_name, phone, ...answers } = intake;
+  const celeryIntake = { ...answers, allergies: ["celery"] };
+  const validation = (await db.query(
+    "select pro_private.valid_intake($1) as sandbox, pro_private.valid_real_intake($2) as real, pro_private.valid_intake($3) as out_of_bounds",
+    [celeryIntake, { ...celeryIntake, display_name, phone }, { ...celeryIntake, height_cm: 99 }],
+  )).rows[0];
+  assert.deepEqual(validation, { sandbox: true, real: true, out_of_bounds: false });
   await as(user);const trialCases=[];
   for(let i=0;i<3;i++)trialCases.push((await db.query('select pro_save_real_case($1,null,0,$2,$3) as c',[org,JSON.stringify({...intake,display_name:'پرونده '+i}),randomUUID()])).rows[0].c);
   await assert.rejects(()=>db.query('select pro_save_real_case($1,null,0,$2,$3)',[org,JSON.stringify({...intake,display_name:'پرونده چهارم'}),randomUUID()]),/PRO_CASE_LIMIT/);

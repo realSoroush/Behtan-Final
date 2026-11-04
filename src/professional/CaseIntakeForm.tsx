@@ -20,6 +20,7 @@ const allergies = [
   ["tree_nut", "مغزهای درختی"],
   ["soy", "سویا"],
   ["seafood", "غذای دریایی"],
+  ["celery", "کرفس"],
 ] as const;
 export function CaseIntakeForm({
   value: a,

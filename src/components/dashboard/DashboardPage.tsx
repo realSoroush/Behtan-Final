@@ -127,7 +127,8 @@ export function DashboardPage() {
     profile,
     loading: profileLoading,
     error: profileError,
-  } = useUserProfile(user?.id);
+    refetch: refetchProfile,
+  } = useUserProfile(user?.id, true);
   const {
     catalog,
     loading: catalogLoading,
@@ -242,8 +243,11 @@ export function DashboardPage() {
         : null,
     [profile, catalog, proteinPolicy],
   );
-  const schedule = useMemberMealSchedule(user?.id, todayKey, scheduleContext);
+  const schedule = useMemberMealSchedule(user?.id, todayKey, scheduleContext, profile?.dietary_preferences_json ?? null);
   const scheduledToday = schedule.plans[todayKey];
+  useEffect(() => {
+    if (schedule.profileChanged) void refetchProfile();
+  }, [schedule.profileChanged, refetchProfile]);
   const editContext = `${user?.id}:${todayKey}:${scheduleContext}`;
   const editContextRef = useRef(editContext);
   editContextRef.current = editContext;
@@ -400,6 +404,7 @@ export function DashboardPage() {
   }>(() => {
     if (
       schedule.loading ||
+      schedule.profileChanged ||
       workoutChoice?.key !== generationKey ||
       !catalog ||
       !targets ||
@@ -463,6 +468,7 @@ export function DashboardPage() {
     generationKey,
     workoutChoice?.key,
     schedule.loading,
+    schedule.profileChanged,
     scheduledToday,
   ]);
 
@@ -476,7 +482,7 @@ export function DashboardPage() {
 
   const selectedDate=viewDate&&viewDate>=todayKey&&viewDate<=addPlanDays(todayKey,2)?viewDate:todayKey;
   const viewingToday=selectedDate===todayKey;
-  const viewedPlan=viewingToday?activePlan:schedule.plans[selectedDate]??null;
+  const viewedPlan=schedule.profileChanged?null:viewingToday?activePlan:schedule.plans[selectedDate]??null;
   const selectDay=async(date:string)=>{
     setViewDate(date);setViewError('');setDayOpen(false);
     if(date===todayKey||schedule.plans[date])return;
@@ -521,13 +527,12 @@ export function DashboardPage() {
           : meal),
       }, baseline);
       try {
-        const saved = await schedule.save([{ date: selectedDate, plan }], true);
+        const saved = await schedule.save([{ date: selectedDate, plan }], true, true);
         if (!saved[selectedDate]) throw Error('ذخیرهٔ تغییر وعده تأیید نشد. دوباره تلاش کن.');
       } catch (error) {
         if (user?.id === activeUserId.current) track('meal_change_save_failed');
         throw error;
       }
-      if (user?.id === activeUserId.current) track('meal_changed');
       if (editContextRef.current === editContext) {
         if (viewingToday) setPlanVersion(0);
         setScheduleSyncError(false);
@@ -878,6 +883,9 @@ export function DashboardPage() {
           <p className="font-semibold text-neutral-700 dark:text-neutral-300">
             {profileError}
           </p>
+          <button type="button" className="member-secondary" onClick={() => void refetchProfile()}>
+            تلاش دوباره
+          </button>
         </div>
       </div>
     );
@@ -1044,6 +1052,7 @@ export function DashboardPage() {
             key={`${user.id}:${todayKey}`}
             userId={user.id}
             today={todayKey}
+            active={section === 'progress'}
             profile={profile!}
             policy={proteinPolicy!}
           />
