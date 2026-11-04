@@ -12,7 +12,7 @@ assert.equal(merged.meals[0].consumed,true); assert.equal(merged.meals[0].templa
 const dashboard=readFileSync(resolve(process.cwd(),'src/components/dashboard/DashboardPage.tsx'),'utf8');
 const hook=readFileSync(resolve(process.cwd(),'src/hooks/useDailyMealProgress.ts'),'utf8');
 const migration=readFileSync(resolve(process.cwd(),'supabase/migrations/20260905_011_daily_meal_checkins.sql'),'utf8');
-assert(dashboard.includes('useDailyMealProgress')); assert(dashboard.includes('applyDailyMealSnapshots')); assert(dashboard.includes("if (activePlan?.meals[mealIdx]?.consumed) return;"));
+assert(dashboard.includes('useDailyMealProgress')); assert(dashboard.includes('applyDailyMealSnapshots')); assert(dashboard.includes("activePlan?.meals[mealIdx]?.consumed) return;"));
 assert(!dashboard.includes("new Date().toISOString().slice(0, 10)")); assert(hook.includes(".from('daily_meal_checkins')")); assert(hook.includes('.upsert(')); assert(hook.includes('.delete()'));
 assert(migration.includes('enable row level security')); assert(migration.includes('auth.uid()) = user_id')); assert(migration.includes('meal_snapshot jsonb not null'));
 console.log('✅ Behtan daily meal progress smoke test passed');

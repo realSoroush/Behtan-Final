@@ -1,6 +1,6 @@
 import type { Meal, MealComponent, MealSlot, ProteinBudgetPreference } from '../types/index.ts';
 
-export const MEAL_POLICY_VERSION = 'mobile-meals-v2';
+export const MEAL_POLICY_VERSION = 'mobile-meals-v3';
 // Product allocation, not a clinical prescription. Each macro uses the same
 // split so the energy assigned to a slot is consistent with its macro budget.
 export const MEAL_SHARES: Record<MealSlot, number> = {

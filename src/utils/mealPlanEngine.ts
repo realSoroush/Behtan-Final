@@ -257,8 +257,14 @@ function range(min: number, max: number, step: number): number[] {
   return out;
 }
 
-export function isPracticalMeal(slot: MealSlot, components: MealComponent[]): boolean {
+export function isPracticalMeal(slot: MealSlot, components: MealComponent[], complete = true): boolean {
   if (slot === 'breakfast') {
+    // Product serving guardrails for bread-based breakfasts. Evaluate the
+    // share only after all ingredients are present in the solver's beam.
+    const bread = components.filter(c => c.foodItem.swapGroup === 'bread');
+    if (bread.reduce((sum, c) => sum + c.grams, 0) > 120) return false;
+    const kcal = components.reduce((sum, c) => sum + c.kcal, 0);
+    if (complete && components.length > 1 && bread.reduce((sum, c) => sum + c.kcal, 0) > kcal * .70) return false;
     for (const id of ['egg_whole','egg_white']) {
       if (components.filter(c=>c.foodItem.id===id).reduce((n,c)=>n+c.units,0)>3.001) return false;
     }
@@ -268,6 +274,17 @@ export function isPracticalMeal(slot: MealSlot, components: MealComponent[]): bo
     if (components.some(c=>c.foodItem.qualityTags.includes('protein_supplement') && c.units>1)) return false;
   }
   return true;
+}
+
+function fitsMealProtein(slot: MealSlot, protein: number, target: number): boolean {
+  return !['breakfast', 'lunch', 'dinner'].includes(slot) || protein >= target * .5;
+}
+
+function fixedPortion(template: MealTemplate, index: number, foodId: string): number | undefined {
+  const ingredient = template.slots[index];
+  return ingredient && !ingredient.dynamicUnits && ingredient.primaryFoodItemId === foodId
+    ? ingredient.fixedUnits ?? 1
+    : undefined;
 }
 
 function portionRuleFor(food: FoodItem): PortionRule {
@@ -381,7 +398,16 @@ function scoreTotals(actual: MacroVector, target: MacroVector): number {
 
 function resolveTemplate(template: MealTemplate, slotTargets: MacroVector): ResolvedTemplate {
   const foods = template.slots.map((slotFill) => foodById(slotFill.primaryFoodItemId));
-  const candidateSets = foods.map((food) => portionCandidates(food, slotTargets, template.slot));
+  const candidateSets = foods.map((food, index) => {
+    const fixed = fixedPortion(template, index, food.id);
+    if (fixed === undefined) return portionCandidates(food, slotTargets, template.slot);
+    const rule = portionRuleFor(food);
+    if (!Number.isFinite(fixed) || fixed <= 0 || fixed > rule.hardMaxUnits) return [];
+    return [fixed];
+  });
+  if (candidateSets.some(candidates => !candidates.length)) {
+    throw new Error(`[mealPlanEngine] Could not resolve template ${template.id}`);
+  }
 
   type Bounds = { min: MacroVector; max: MacroVector };
   const remainingBounds: Bounds[] = Array.from({ length: foods.length + 1 }, () => ({
@@ -467,7 +493,9 @@ function resolveTemplate(template: MealTemplate, slotTargets: MacroVector): Reso
         // Remaining components only add calories and mass; branches already far
         // above either hard boundary cannot recover.
         if (totals.kcal > slotTargets.kcal * 1.35 && index < foods.length - 1) continue;
-        if (grams > hardMealMass || !isPracticalMeal(template.slot, [...state.components, component])) continue;
+        const complete = index === foods.length - 1;
+        if (grams > hardMealMass || !isPracticalMeal(template.slot, [...state.components, component], complete)) continue;
+        if (complete && !fitsMealProtein(template.slot, totals.protein, slotTargets.protein)) continue;
 
         expanded.push({
           components: [...state.components, component],
@@ -738,7 +766,9 @@ function addVector(a: MacroVector, b: MacroVector): MacroVector {
 function refineDailyPortions(
   chosen: ResolvedOption[],
   targets: MacroTargets,
-  feasibilityFirst = false
+  feasibilityFirst = false,
+  preservePortions = false,
+  allocationTargets = targets,
 ): ResolvedOption[] {
   const dailyTarget: MacroVector = {
     kcal: targets.targetCalories,
@@ -768,7 +798,7 @@ function refineDailyPortions(
     components: MealComponent[],
     slot: MealSlot
   ) => {
-    if (!isPracticalMeal(slot, components)) return Number.POSITIVE_INFINITY;
+    if (!isPracticalMeal(slot, components) || !fitsMealProtein(slot, candidateMeal.protein, slotTarget.protein)) return Number.POSITIVE_INFINITY;
     const kcalRatio = candidateMeal.kcal / Math.max(1, slotTarget.kcal);
     if (kcalRatio < 0.55 || kcalRatio > 1.35) return Number.POSITIVE_INFINITY;
     if (mealMassGrams(components) > mealMassLimitGrams(slot, slotTarget.kcal)) {
@@ -787,18 +817,15 @@ function refineDailyPortions(
   for (let pass = 0; pass < 4; pass++) {
     let changed = false;
 
-    for (const option of refined) {
+    for (const [optionIndex, option] of refined.entries()) {
       if (option.locked) continue;
-      const share = SLOT_DISTRIBUTION[option.slot];
-      const slotTarget: MacroVector = {
-        kcal: dailyTarget.kcal * share.kcal,
-        protein: dailyTarget.protein * share.protein,
-        carbs: dailyTarget.carbs * share.carbs,
-        fat: dailyTarget.fat * share.fat,
-      };
+      const slotTarget = getSlotTargets(option.slot, allocationTargets);
 
       for (let index = 0; index < option.resolved.components.length; index++) {
         const current = option.resolved.components[index];
+        if (fixedPortion(option.template, index, current.foodItem.id) !== undefined) continue;
+        const original = chosen[optionIndex].resolved.components[index];
+        const step = portionRuleFor(current.foodItem).step;
         const withoutCurrentMeal = subtractComponent(option.resolved.totals, current);
         const withoutCurrentDay = subtractComponent(dailyTotals, current);
 
@@ -813,14 +840,20 @@ function refineDailyPortions(
           option.slot
         );
 
-        for (const units of portionCandidates(current.foodItem, slotTarget, option.slot)) {
+        if (preservePortions) bestScore += .04 * Math.abs(current.units - original.units) / step;
+        const rule = portionRuleFor(current.foodItem);
+        const candidates = feasibilityFirst
+          ? range(rule.minUnits, rule.hardMaxUnits, rule.step)
+          : portionCandidates(current.foodItem, slotTarget, option.slot);
+        for (const units of candidates) {
+          if (preservePortions && Math.abs(units - original.units) > Math.max(step, original.units * .25) + 1e-9) continue;
           const candidateComponent = componentFromUnits(current.foodItem, units);
           const candidateMeal = addTotals(withoutCurrentMeal, candidateComponent);
           const candidateDay = addTotals(withoutCurrentDay, candidateComponent);
           const candidateComponents = option.resolved.components.map((component, candidateIndex) =>
             candidateIndex === index ? candidateComponent : component
           );
-          const candidateScore = combinedScore(
+          const candidateScore = (preservePortions ? .04 * Math.abs(units - original.units) / step : 0) + combinedScore(
             candidateDay,
             candidateMeal,
             slotTarget,
@@ -849,6 +882,7 @@ function refineDailyPortions(
   }
 
   for (const option of refined) {
+    if (option.locked) continue;
     option.resolved.totals = {
       kcal: Math.round(option.resolved.totals.kcal),
       protein: round1(option.resolved.totals.protein),
@@ -1362,6 +1396,16 @@ function buildRestoreOption(
   };
 }
 
+function eligibleSwapFoods(reference: FoodItem, currentId: string, slot: MealSlot, preferences: DietaryPreferencesJson): FoodItem[] {
+  return getSubstitutesFor(reference.id)
+    .filter((food) => food.id !== currentId)
+    .filter((food) => food.role === reference.role)
+    .filter((food) => isFoodAllowed(food, preferences))
+    .filter((food) => isSwapAllowedForMeal(food, slot))
+    .filter((food) => !(slot === 'breakfast' && reference.swapGroup === 'bread' && food.swapGroup !== 'bread'))
+    .filter((food) => !(slot === 'afternoon_snack' && reference.swapGroup === 'fresh_fruit' && food.swapGroup !== 'fresh_fruit'));
+}
+
 /**
  * Returns pre-calculated swap options for one component. A swap is applied only
  * when the replacement is appropriate for the current meal context AND can
@@ -1382,12 +1426,7 @@ export function getSwapOptionsForMeal(
   // Candidate identity is anchored to the ORIGINAL generated component, not to
   // whatever food happens to be selected after one or more swaps. This keeps
   // the list stable and prevents macro drift across A -> B -> C transitions.
-  const candidateFoods = getSubstitutesFor(reference.foodItem.id)
-    .filter((food) => food.id !== current.foodItem.id)
-    .filter((food) => food.role === reference.foodItem.role)
-    .filter((food) => isFoodAllowed(food, preferences))
-    .filter((food) => isSwapAllowedForMeal(food, meal.slot))
-    .filter((food) => !(meal.slot === 'afternoon_snack' && reference.foodItem.swapGroup === 'fresh_fruit' && food.swapGroup !== 'fresh_fruit'));
+  const candidateFoods = eligibleSwapFoods(reference.foodItem, current.foodItem.id, meal.slot, preferences);
 
   const options = candidateFoods.map((food) =>
     buildSwapOption(meal, componentIndex, food, reference)
@@ -1413,6 +1452,116 @@ export function getSwapOptionsForMeal(
       Number(b.isEquivalent) - Number(a.isEquivalent) ||
       a.score - b.score
     );
+}
+
+export type MemberDayIntake = {
+  skippedSlots: readonly string[];
+  extraMeals: readonly Meal[];
+};
+
+function mealOption(meal: Meal, locked: boolean): ResolvedOption {
+  const template = requireNutritionCatalog().mealTemplates.find(t => t.id === meal.templateId)
+    ?? { id: meal.templateId, slot: meal.slot, displayName: meal.templateName, slots: [], isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [] };
+  return {
+    slot: meal.slot, template, locked: locked ? meal : undefined,
+    resolved: {
+      components: meal.components,
+      totals: { kcal: meal.totalKcal, protein: meal.totalProtein, carbs: meal.totalCarbs, fat: meal.totalFat },
+      score: 0, kcalDeviation: 0,
+    },
+  };
+}
+
+function memberAllocationTargets(plan: DailyMealPlan, replacement: Meal): MacroTargets {
+  const post = replacement.slot === 'post_workout' ? replacement : plan.meals.find(m => m.slot === 'post_workout');
+  if (!post) return plan.targets;
+  return {
+    ...plan.targets,
+    targetCalories: plan.targets.targetCalories - post.totalKcal,
+    proteinGrams: plan.targets.proteinGrams - post.totalProtein,
+    carbGrams: plan.targets.carbGrams - post.totalCarbs,
+    fatGrams: plan.targets.fatGrams - post.totalFat,
+  };
+}
+
+/** The selected serving and intake facts are locked. Only other planned portions may move. */
+export function rebalanceMemberDay(
+  plan: DailyMealPlan, index: number, replacement: Meal, preferences: DietaryPreferencesJson, intake: MemberDayIntake,
+): DailyMealPlan | null {
+  const current = plan.meals[index];
+  if (!current || current.slot !== replacement.slot || current.consumed || intake.skippedSlots.includes(current.slot)) return null;
+
+  const allocation = memberAllocationTargets(plan, replacement);
+  if (replacement.slot !== 'post_workout') {
+    const slotTarget = getSlotTargets(replacement.slot, allocation);
+    if (replacement.totalKcal > slotTarget.kcal * 1.35 ||
+      !fitsMealProtein(replacement.slot, replacement.totalProtein, slotTarget.protein) ||
+      mealMassGrams(replacement.components) > mealMassLimitGrams(replacement.slot, slotTarget.kcal)) return null;
+  }
+
+  const catalog = requireNutritionCatalog();
+  const meals = plan.meals.map((meal, i) => i === index ? replacement : meal);
+  const included = meals.filter(m => m.consumed || !intake.skippedSlots.includes(m.slot));
+  for (const meal of included) {
+    if (meal.consumed) continue;
+    if (!isPracticalMeal(meal.slot, meal.components) || !meal.components.every(component => {
+      const food = catalog.foods.find(item => item.id === component.foodItem.id);
+      return food && isFoodAllowed(food, preferences) && Number.isFinite(component.units) &&
+        component.units > 0 && component.units <= portionRuleFor(food).hardMaxUnits;
+    })) return null;
+  }
+  const options = [
+    ...included.map(meal => mealOption(meal, meal === replacement || meal.consumed || meal.slot === 'post_workout')),
+    ...intake.extraMeals.map(meal => mealOption(meal, true)),
+  ];
+  if (isDailyPlanFeasible(options, plan.targets)) return { ...plan, meals, remainingTargetsUnmet: false };
+  const refined = refineDailyPortions(options, plan.targets, true, true, allocation);
+  if (!isDailyPlanFeasible(refined, plan.targets)) return null;
+
+  const adjusted = new Map(included.map((meal, i) => {
+    const option = refined[i];
+    if (option.locked || meal.components.every((component, j) => component.units === option.resolved.components[j].units)) {
+      return [meal.slot, meal] as const;
+    }
+    const { components, totalKcal, totalProtein, totalCarbs, totalFat, totalFiber } = buildMeal(option);
+    return [meal.slot, { ...meal, components, totalKcal, totalProtein, totalCarbs, totalFat, totalFiber }] as const;
+  }));
+  return { ...plan, meals: meals.map(meal => adjusted.get(meal.slot) ?? meal), remainingTargetsUnmet: false };
+}
+
+export type MemberSwapOption = Pick<FoodSwapOption, 'foodItem' | 'replacementComponent'> & {
+  plan: DailyMealPlan;
+};
+
+export function getMemberSwapOptions(
+  plan: DailyMealPlan, mealIndex: number, componentIndex: number, preferences: DietaryPreferencesJson,
+  intake: MemberDayIntake, referenceComponent?: MealComponent,
+): MemberSwapOption[] {
+  const meal = plan.meals[mealIndex];
+  const current = meal?.components[componentIndex];
+  if (!current || meal.consumed || meal.slot === 'post_workout' || intake.skippedSlots.includes(meal.slot)) return [];
+  const reference = referenceComponent ?? current;
+  const liveReference = requireNutritionCatalog().foods.find(food => food.id === reference.foodItem.id);
+  if (!liveReference) return [];
+  const candidates = eligibleSwapFoods(liveReference, current.foodItem.id, meal.slot, preferences);
+  const restore = current.foodItem.id !== liveReference.id && isFoodAllowed(liveReference, preferences) &&
+    isSwapAllowedForMeal(liveReference, meal.slot);
+  return [...(restore ? [liveReference] : []), ...candidates].flatMap(food => {
+    const portions = food.id === liveReference.id
+      ? [reference]
+      : allRealisticPortionCandidates(food).map(units => componentFromUnits(food, units))
+        .sort((a, b) =>
+          Number(isMacroEquivalentSwap(reference, b)) - Number(isMacroEquivalentSwap(reference, a)) ||
+          swapEquivalenceScore(reference, a) - swapEquivalenceScore(reference, b) ||
+          portionRealismPenalty(food, a.units) - portionRealismPenalty(food, b.units)
+        );
+    for (const replacementComponent of portions) {
+      const replacement = mealWithReplacement(meal, componentIndex, replacementComponent);
+      const updated = rebalanceMemberDay(plan, mealIndex, replacement, preferences, intake);
+      if (updated) return [{ foodItem: food, replacementComponent, plan: updated }];
+    }
+    return [];
+  });
 }
 
 /** Backwards-compatible safe wrapper used by older call sites/tests. */
@@ -1442,5 +1591,16 @@ export function getSlotTargets(slot: MealSlot, targets: MacroTargets): MacroVect
 export function getProfessionalMealOptions(base: Meal, preferences: DietaryPreferencesJson, workout: boolean): Meal[] {
   const templates = requireNutritionCatalog().mealTemplates.filter(t => t.slot === base.slot && isTemplateEligible(t, preferences, workout));
   const target = {kcal:base.totalKcal, protein:base.totalProtein, carbs:base.totalCarbs, fat:base.totalFat};
+  if (base.slot === 'post_workout') {
+    return templates.flatMap(template => {
+      try {
+        const resolved = resolveTemplate(template, target);
+        return [buildMeal({ slot: base.slot, template, resolved })];
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('Could not resolve template')) return [];
+        throw error;
+      }
+    });
+  }
   return getResolvedOptions(base.slot, templates, target).map(buildMeal);
 }

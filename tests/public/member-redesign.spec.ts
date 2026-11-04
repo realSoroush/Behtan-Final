@@ -46,6 +46,7 @@ const profile = {
   body_fat_source: null,
 };
 test.beforeEach(async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-11-04T12:00:00Z"));
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.route("**/src/hooks/useAuth.ts*", (r) =>
     r.fulfill({
@@ -216,11 +217,11 @@ test('a collapsed recorded meal can be restored from the today sheet',async({pag
 });
 
 test("swapping previews a selection before applying it to the plate",async({page})=>{
- await page.getByRole('button',{name:/بزرگ‌نمایی بشقاب/}).click();
- await page.getByRole('button',{name:/جایگزینی این ماده/}).click();
+ await page.getByRole('button',{name:'تغییر وعده',exact:true}).click();
+ await page.getByRole('button',{name:'جایگزینی نان سنگک',exact:true}).click();
  const swap=page.getByRole('dialog',{name:'جایگزینی غذا'});
  const alternative=swap.locator('.swap-option-v2:not(:disabled)[aria-pressed=false]').first();
- if(await alternative.count()===0){await expect(swap.getByRole('button',{name:'تأیید جایگزینی'})).toBeDisabled();return;}
+ await expect(alternative).toBeVisible();
  const selectedId=await alternative.getAttribute('data-food-id');
  const previous=await page.locator('#today-panel .food-piece').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('data-food-id')));
  await alternative.click();
@@ -228,6 +229,8 @@ test("swapping previews a selection before applying it to the plate",async({page
  expect(await page.locator('#today-panel .food-piece').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('data-food-id')))).toEqual(previous);
  await swap.getByRole('button',{name:'تأیید جایگزینی'}).click();
  await expect(swap).toHaveCount(0);
+ await expect(page.locator('#today-panel .food-piece[data-food-id="'+selectedId+'"]')).toHaveCount(1);
+ await page.reload();
  await expect(page.locator('#today-panel .food-piece[data-food-id="'+selectedId+'"]')).toHaveCount(1);
 });
 
@@ -273,9 +276,40 @@ test('meal rotation keeps working across consecutive clicks without hiding the c
   await expect(card).toBeVisible();
   await expect(page.getByText('با محدودیت‌های فعلی، منوی متفاوت مناسبی برای این وعده پیدا نشد.',{exact:true})).toHaveCount(0);
   previous=await foods();seen.add(previous);
-  if(i===5){await page.reload();await expect(card).toBeVisible();previous=await foods();}
+  if(i===5){await page.reload();await expect(card).toBeVisible();await expect.poll(foods).toBe(previous);}
  }
  expect(seen.size).toBeGreaterThan(1);
  await expect(card.locator('.meal-visual-surface')).toHaveCount(1);
  await expect(card.locator('.meal-visual-surface .meal-change-row')).toBeVisible();
+});
+
+test('rotation keeps the old meal on save failure and survives reload after acknowledgment', async ({ page }) => {
+  const card = page.locator('#today-panel .member-meal-card');
+  const change = card.getByRole('button', { name: 'تغییر وعده', exact: true });
+  const foods = () => card.locator('.food-piece').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-food-id')).join('|'));
+  const original = await foods();
+  let attempts = 0;
+  let finish!: () => void;
+  const release = new Promise<void>(resolve => { finish = resolve; });
+  await page.route('**/rpc/save_member_meal_schedule', async route => {
+    if (!route.request().postDataJSON().p_replace) return route.fallback();
+    attempts++;
+    if (attempts === 1) {
+      await release;
+      return route.fulfill({ status: 500, json: { message: 'Synthetic save failure' } });
+    }
+    return route.fallback();
+  });
+  await change.click();
+  await expect.poll(() => attempts).toBe(1);
+  await expect(change).toBeDisabled();
+  expect(await foods()).toBe(original);
+  finish();
+  await expect(page.getByText('برنامه ذخیره نشد. دوباره تلاش کن.', { exact: true })).toBeVisible();
+  expect(await foods()).toBe(original);
+  await change.click();
+  await expect.poll(foods).not.toBe(original);
+  const saved = await foods();
+  await page.reload();
+  await expect.poll(foods).toBe(saved);
 });

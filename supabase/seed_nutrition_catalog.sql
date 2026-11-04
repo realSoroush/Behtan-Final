@@ -206,7 +206,7 @@ insert into public.meal_templates (
   ('bk_adasi_sangak', 'breakfast', 'عدسی با نان سنگک و خیار و گوجه', false, false, null, false, '{}'::text[], '{}'::text[], true, 3),
   ('bk_vegan_lentil_pea', 'breakfast', 'عدسی با نوشیدنی پروتئین گیاهی و خیار و گوجه', false, false, null, true, array['vegan']::text[], '{}'::text[], true, 4),
   ('bk_restricted_eggs_potato', 'breakfast', 'تخم‌مرغ با سیب‌زمینی آب‌پز و خیار و گوجه', false, false, null, true, '{}'::text[], '{}'::text[], true, 5),
-  ('bk_restricted_lentil_potato', 'breakfast', 'عدسی با سیب‌زمینی آب‌پز و خیار و گوجه', false, false, null, true, '{}'::text[], '{}'::text[], true, 6),
+  ('bk_restricted_lentil_potato', 'breakfast', 'عدسی با سیب‌زمینی آب‌پز و خیار و گوجه', false, false, null, false, '{}'::text[], '{}'::text[], true, 6),
   ('ms_whey_milk', 'morning_snack', 'پروتئین وی با شیر کم‌چرب', true, false, null, false, '{}'::text[], '{}'::text[], true, 7),
   ('ms_lentil_apple', 'morning_snack', 'عدسی و سیب', false, false, null, false, '{}'::text[], '{}'::text[], true, 8),
   ('ms_pea_apple', 'morning_snack', 'پروتئین نخود و سیب', false, false, null, false, '{}'::text[], '{}'::text[], true, 9),
