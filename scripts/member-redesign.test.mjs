@@ -127,6 +127,9 @@ try {
       "utf8",
     ),
   );
+  await db.exec(await readFile(new URL(
+    "../supabase/migrations/20261104134358_042_version_member_meal_schedule.sql", import.meta.url,
+  ), "utf8"));
   const today = (
     await db.query("select to_char(current_date,'YYYY-MM-DD') as date")
   ).rows[0].date;
@@ -138,11 +141,11 @@ try {
     [user1],
   );
   await db.exec("set role authenticated");
-  const reserve = async (date, key, p, replace = false) =>
+  const reserve = async (date, key, p, replace = false, expected = null) =>
     (
       await db.query(
-        "select public.save_member_meal_schedule($1,$2,$3::jsonb,$4) as days",
-        [today, key, JSON.stringify([{ date, plan: p }]), replace],
+        "select public.save_member_meal_schedule_v2($1,$2,$3::jsonb,$4) as days",
+        [today, key, JSON.stringify([{ date, plan: p, expected_updated_at: expected }]), replace],
       )
     ).rows[0].days;
   let saved = await reserve(today, "context-a", dayPlan);
@@ -154,16 +157,14 @@ try {
     dayPlan.isWorkoutDay,
     "Concurrent prepare preserves same-context reservation",
   );
-  assert.equal(
-    (await reserve(today, "context-a", swapped, true))[0].plan.isWorkoutDay,
-    true,
-    "Explicit workout/swap replaces saved plan",
-  );
-  assert.equal(
-    (await reserve(today, "context-b", dayPlan))[0].plan.isWorkoutDay,
-    dayPlan.isWorkoutDay,
-    "New profile/catalog context replaces old plan",
-  );
+  const replaced = (await reserve(today, "context-a", swapped, true, saved[0].updated_at))[0];
+  assert.equal(replaced.plan.isWorkoutDay, true, "Explicit edit can replace its own version");
+  await assert.rejects(reserve(today, "context-a", dayPlan, true, saved[0].updated_at), /MEAL_SCHEDULE_CONFLICT/);
+  await assert.rejects(reserve(today, "context-b", dayPlan, false, saved[0].updated_at), /MEAL_SCHEDULE_CONFLICT/);
+  await assert.rejects(db.query("select public.save_member_meal_schedule($1,$2,$3::jsonb,true)",
+    [today, "context-a", JSON.stringify([{ date: today, plan: dayPlan }])]), /MEAL_SCHEDULE_CONFLICT/);
+  assert.equal((await reserve(today, "context-a", dayPlan))[0].plan.isWorkoutDay, true);
+  assert.equal((await reserve(today, "context-b", dayPlan, false, replaced.updated_at))[0].plan.isWorkoutDay, false);
   await assert.rejects(
     db.query("update public.member_meal_schedule set context_key='bad'"),
     /permission denied/,

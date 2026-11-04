@@ -44,3 +44,13 @@ for (const prefs of [
 ]) {
   assert(!getProfessionalMealOptions(lunch, prefs, false).some(m => m.templateId === pastaId));
 }
+
+const curryId = 'ln_chicken_curry_brown_rice';
+const curry = getProfessionalMealOptions(lunch, omnivore, false).find(m => m.templateId === curryId);
+assert(curry);
+assert(curry.components[0].grams >= 285 && curry.components[0].grams <= 475);
+assert.equal(curry.totalKcal, Math.round(curry.components[0].units * 220.32));
+assert(rebalanceMemberDay(pilot, lunchIndex, curry, omnivore, { skippedSlots: [], extraMeals: [] }));
+for (const prefs of [{ ...omnivore, allergies: ['dairy'] }, { ...omnivore, vegetarianStatus: 'lacto_ovo' }]) {
+  assert(!getProfessionalMealOptions(lunch, prefs, false).some(m => m.templateId === curryId));
+}

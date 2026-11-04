@@ -2647,3 +2647,47 @@
 .account-native :is(button,a,summary){-webkit-tap-highlight-color:transparent;touch-action:manipulation}.account-services :is(a,button){transition:opacity .15s,transform .15s}.account-services :is(a,button):active{opacity:.75;transform:scale(.99)}.account-native :is(button,a,summary):focus-visible{outline:2px solid var(--member-strong);outline-offset:4px}
 @media(max-width:380px){.account-native .account-hero{padding:18px}.account-native h1{font-size:20px}.account-facts{gap:5px}.account-native .account-facts dd{font-size:12px}.account-services{padding:0 13px}}
 @media(prefers-reduced-motion:reduce){.account-services :is(a,button){transition:none;transform:none!important}}
+
+.member-app .meal-skip-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+}
+.member-recipe {
+  margin: 12px 20px;
+  padding: 0 12px;
+  border: 1px solid var(--member-line);
+  border-radius: 14px;
+  color: var(--member-ink);
+}
+.member-recipe summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.member-recipe :is(p, ul, a) {
+  font-size: 12px;
+  line-height: 1.9;
+}
+.member-recipe ul {
+  list-style: none;
+  padding: 0;
+}
+.member-recipe li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--member-line);
+}
+.member-recipe a {
+  display: inline-block;
+  padding-block: 8px;
+  color: var(--member-strong);
+  text-decoration: underline;
+}

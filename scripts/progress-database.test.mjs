@@ -21,25 +21,28 @@ for(const t of TEST_NUTRITION_CATALOG.mealTemplates.filter(t=>t.id.startsWith('b
  const slots=(await db.query('select primary_food_item_id from meal_template_slots where template_id=$1 order by position',[t.id])).rows;
  assert.deepEqual(slots.map(s=>s.primary_food_item_id),t.slots.map(s=>s.primaryFoodItemId));
 }
-// Verify the deployed rows hydrate to exactly the engine's expected recipe.
-const pastaMigration = await read('migrations/20261104094805_041_verified_beef_pasta_menu.sql');
+// Verify that replaying both catalog migrations hydrates the sourced recipes exactly once.
 await db.exec(await read('migrations/20261024_038_food_preparation_labels.sql'));
-await db.exec(pastaMigration);
-await db.exec(pastaMigration);
-const pastaId = 'whole_wheat_beef_pasta_cooked';
-const pastaTemplateId = 'ln_whole_wheat_beef_pasta';
-const foodRows = (await db.query('select * from food_items where id = $1', [pastaId])).rows;
-const templateRows = (await db.query('select * from meal_templates where id = $1', [pastaTemplateId])).rows;
-const slotRows = (await db.query('select * from meal_template_slots where template_id = $1', [pastaTemplateId])).rows;
-const pastaCatalog = buildNutritionCatalog({ foodRows, templateRows, slotRows, substituteRows: [] });
-assert.equal(foodRows.length, 1);
-assert.equal(templateRows.length, 1);
-assert.equal(slotRows.length, 1);
-assert.deepEqual(pastaCatalog.foods[0], TEST_NUTRITION_CATALOG.foods.find(f => f.id === pastaId));
-assert.deepEqual(pastaCatalog.portionRules[pastaId], TEST_NUTRITION_CATALOG.portionRules[pastaId]);
-assert.deepEqual(JSON.parse(JSON.stringify(pastaCatalog.mealTemplates[0])),
-  TEST_NUTRITION_CATALOG.mealTemplates.find(t => t.id === pastaTemplateId));
-assert.match(foodRows[0].source_url, /^https:\/\/theicn\.org\/cnrb\//);
+for (const [migration, foodId, templateId] of [
+  ['20261104094805_041_verified_beef_pasta_menu.sql', 'whole_wheat_beef_pasta_cooked', 'ln_whole_wheat_beef_pasta'],
+  ['20261104134709_043_verified_chicken_curry_rice.sql', 'chicken_curry_brown_rice_cooked', 'ln_chicken_curry_brown_rice'],
+]) {
+  const sql = await read('migrations/' + migration);
+  await db.exec(sql);
+  await db.exec(sql);
+  const foodRows = (await db.query('select * from food_items where id = $1', [foodId])).rows;
+  const templateRows = (await db.query('select * from meal_templates where id = $1', [templateId])).rows;
+  const slotRows = (await db.query('select * from meal_template_slots where template_id = $1', [templateId])).rows;
+  const catalog = buildNutritionCatalog({ foodRows, templateRows, slotRows, substituteRows: [] });
+  assert.equal(foodRows.length, 1);
+  assert.equal(templateRows.length, 1);
+  assert.equal(slotRows.length, 1);
+  assert.deepEqual(catalog.foods[0], TEST_NUTRITION_CATALOG.foods.find(f => f.id === foodId));
+  assert.deepEqual(catalog.portionRules[foodId], TEST_NUTRITION_CATALOG.portionRules[foodId]);
+  assert.deepEqual(JSON.parse(JSON.stringify(catalog.mealTemplates[0])),
+    TEST_NUTRITION_CATALOG.mealTemplates.find(t => t.id === templateId));
+  assert.match(foodRows[0].source_url, /^https:\/\/theicn\.org\/cnrb\//);
+}
 
 const user=randomUUID(),other=randomUUID(),admin=randomUUID();
 await db.query('insert into auth.users(id,phone,phone_confirmed_at) values($1,\'989111111111\',now()),($2,\'989122222222\',now()),($3,\'989133333333\',now())',[user,other,admin]);

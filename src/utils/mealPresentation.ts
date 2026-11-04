@@ -35,6 +35,7 @@ const VISUALS: Record<string, FoodVisual> = {
   lean_beef: "beef",
   ground_beef_lean: "beef",
   whole_wheat_beef_pasta_cooked: "pasta",
+  chicken_curry_brown_rice_cooked: "rice",
   whey_protein: "powder",
   pea_protein: "powder",
   soy_chunks: "beans",
