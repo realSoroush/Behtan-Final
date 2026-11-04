@@ -11,6 +11,7 @@ export type FoodVisual =
   | "beef"
   | "beans"
   | "rice"
+  | "pasta"
   | "bread"
   | "potato"
   | "salad"
@@ -33,6 +34,7 @@ const VISUALS: Record<string, FoodVisual> = {
   grilled_fish: "fish",
   lean_beef: "beef",
   ground_beef_lean: "beef",
+  whole_wheat_beef_pasta_cooked: "pasta",
   whey_protein: "powder",
   pea_protein: "powder",
   soy_chunks: "beans",

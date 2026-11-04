@@ -72,6 +72,17 @@ export function FoodArt({ kind }: { kind: FoodVisual }) {
           <ellipse cx="-5" cy="-5" rx="6" ry="4" fill="#ffdc7b" />
         </g>
       );
+    case "pasta":
+      return (
+        <g>
+          <ellipse rx="35" ry="29" fill="#edc980" />
+          <path d="M-26-10Q-7-25 8-12T26-10M-28 2Q-12-12 3 1T28 1M-25 15Q-12 3 1 14T23 14"
+            fill="none" stroke="#ca8b45" strokeWidth="4" strokeLinecap="round" />
+          <path d="M-17-11Q-7-26 8-19Q24-18 16-5Q8 7-9 4Q-22 1-17-11" fill="#ad5f3e" />
+          <circle cx="-8" cy="-10" r="3.5" fill="#753f30" />
+          <circle cx="8" cy="-12" r="4" fill="#753f30" />
+        </g>
+      );
     case "rice":
     case "oats":
       return (

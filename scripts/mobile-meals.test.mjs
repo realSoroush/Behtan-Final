@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {installTestNutritionCatalog} from './setup-test-nutrition-catalog.mjs';
-import {generateDailyMealPlan,getSwapOptionsForMeal,isPracticalMeal} from '../src/utils/mealPlanEngine.ts';
+import {generateDailyMealPlan,getProfessionalMealOptions,getSwapOptionsForMeal,isPracticalMeal,rebalanceMemberDay} from '../src/utils/mealPlanEngine.ts';
 import {calculateMacros} from '../src/utils/nutritionHelpers.ts';
 const catalog=installTestNutritionCatalog();
 assert(!catalog.foods.some(f=>f.id==='medjool_date'));
@@ -22,3 +22,25 @@ for(const prefs of [{vegetarianStatus:'vegan',allergies:[]},{vegetarianStatus:'n
  for(const m of plan.meals)for(const c of m.components){assert(!c.foodItem.allergyFlags.some(a=>prefs.allergies.includes(a)));assert(!c.foodItem.excludedForVegetarian.includes(prefs.vegetarianStatus));}
 }
 console.log(`✅ ${total} rest/workout/budget plans; breakfast+swap caps, fixed small recovery meals, unchanged targets, consumed preservation, diet/allergy alternatives`);
+
+
+// A composite recipe scales as a whole and goes through the normal menu gates.
+const omnivore = { vegetarianStatus: 'none', allergies: [] };
+const pastaId = 'ln_whole_wheat_beef_pasta';
+const pilot = generateDailyMealPlan(calculateMacros(2050, 85, 'weight_loss', 178), 85, omnivore, false, 'verified-pasta');
+const lunchIndex = pilot.meals.findIndex(m => m.slot === 'lunch');
+const lunch = pilot.meals[lunchIndex];
+const pasta = getProfessionalMealOptions(lunch, omnivore, false).find(m => m.templateId === pastaId);
+assert(pasta);
+assert.equal(pasta.components.length, 1);
+assert.equal(pasta.components[0].grams, pasta.components[0].units * 200);
+assert.equal(pasta.totalKcal, Math.round(pasta.components[0].units * 270));
+assert(pasta.components[0].grams >= 200 && pasta.components[0].grams <= 400);
+assert.deepEqual(getSwapOptionsForMeal(pasta, 0, omnivore), []);
+assert(rebalanceMemberDay(pilot, lunchIndex, pasta, omnivore, { skippedSlots: [], extraMeals: [] }));
+for (const prefs of [
+  { ...omnivore, allergies: ['gluten'] },
+  ...['vegan', 'lacto_ovo', 'pescatarian', 'raw'].map(vegetarianStatus => ({ ...omnivore, vegetarianStatus })),
+]) {
+  assert(!getProfessionalMealOptions(lunch, prefs, false).some(m => m.templateId === pastaId));
+}
