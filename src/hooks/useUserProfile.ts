@@ -20,7 +20,7 @@ interface UseUserProfileReturn {
   refetch: () => Promise<void>;
 }
 
-export function useUserProfile(userId: string | undefined): UseUserProfileReturn {
+export function useUserProfile(userId: string | undefined, refreshOnReturn = false): UseUserProfileReturn {
   const requestSequence = useRef(0);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [fetching, setFetching] = useState(false);
@@ -59,6 +59,23 @@ export function useUserProfile(userId: string | undefined): UseUserProfileReturn
     void fetch();
     const refresh=()=>void fetch();window.addEventListener('member-profile-changed',refresh);return()=>{requestSequence.current++;window.removeEventListener('member-profile-changed',refresh);};
   }, [fetch]);
+
+  useEffect(() => {
+    if (!refreshOnReturn || !userId) return;
+    let pending = false;
+    const refresh = async () => {
+      if (document.visibilityState !== 'visible' || pending) return;
+      pending = true;
+      try { await fetch(); }
+      finally { pending = false; }
+    };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [fetch, refreshOnReturn, userId]);
 
   const upsertProfile = useCallback(async (partial: Partial<UserProfile>) => {
     if (!userId) {

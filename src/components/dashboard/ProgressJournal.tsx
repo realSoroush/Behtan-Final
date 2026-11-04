@@ -20,9 +20,9 @@ const recommendationText = {
   continue: 'روند وزن و تجربهٔ اجرای برنامه با ادامهٔ هدف فعلی سازگارند.',
 } as const;
 
-export function ProgressJournal({userId,today,profile,policy}:{userId:string;today:string;profile?:UserProfile;policy?:ProteinEnginePolicy}) {
+export function ProgressJournal({userId,today,active,profile,policy}:{userId:string;today:string;active:boolean;profile?:UserProfile;policy?:ProteinEnginePolicy}) {
   const [changePopup,setChangePopup]=useState<{before:number;after:number}|null>(null);
-  const journal=useProgressJournal(userId,today);
+  const journal=useProgressJournal(userId,today,active);
   const [editing,setEditing]=useState(false);
   const [weight,setWeight]=useState('');
   const [adherence,setAdherence]=useState<ProgressEntry['adherence']>(null);
