@@ -14,6 +14,7 @@ export async function testMarketDatabase({ db }) {
     "20261024_037_pro_self_service.sql",
     "20261024_038_food_preparation_labels.sql",
     "20261024_039_compute_limits.sql",
+    "20261104182716_045_member_review_and_meal_events.sql",
   ])
     await db.exec(
       await readFile(
@@ -210,6 +211,29 @@ export async function testMarketDatabase({ db }) {
       ]),
     /INVALID_EVENT/,
   );
+  const mealChangeEvents = ["meal_changed", "meal_change_unavailable", "meal_change_save_failed"];
+  for (const event of mealChangeEvents) {
+    await db.query("select record_product_event($1,$2,$3,null,'app')", [randomUUID(), randomUUID(), event]);
+  }
+  const reviewKey = "c0ffee00";
+  const readReviews = () => db.query("select review_key from member_weekly_review_acknowledgements");
+  const acknowledge = (id, key = reviewKey) => db.query(
+    "insert into member_weekly_review_acknowledgements values($1,$2) on conflict do nothing",
+    [id, key],
+  );
+  await acknowledge(user);
+  await acknowledge(user);
+  assert.deepEqual((await readReviews()).rows, [{ review_key: reviewKey }]);
+  await assert.rejects(() => acknowledge(other), /row-level/);
+  await assert.rejects(() => acknowledge(user, "invalid"), /check constraint/);
+  await assert.rejects(() => db.exec("update member_weekly_review_acknowledgements set review_key='ba5eba11'"), /permission denied/);
+  await as(other);
+  assert.deepEqual((await readReviews()).rows, []);
+  await assert.rejects(() => acknowledge(user), /row-level/);
+  await db.exec("reset role; set role anon");
+  await assert.rejects(readReviews, /permission denied/);
+  await assert.rejects(() => acknowledge(user), /permission denied/);
+  await as(user);
   await db.query("select record_product_event($1,$2,'app_open',null,'app')", [
     randomUUID(),
     randomUUID(),
@@ -262,6 +286,7 @@ export async function testMarketDatabase({ db }) {
   const pulse = (await db.query("select admin_business_pulse(30) as p")).rows[0]
     .p;
   assert(pulse.events.some((e) => e.event === "app_open"));
+  for (const event of mealChangeEvents) assert.equal(pulse.events.find(e => e.event === event)?.events, 1);
   await db.exec("reset role");
   for (let i = 0; i < 5; i++)
     assert.equal(

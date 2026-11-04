@@ -19,6 +19,7 @@ export const ALLERGIES: { value: Allergy; icon: string; label: string }[] = [
   { value: 'tree_nut', icon: '🌰', label: 'گردو، بادام و پسته' },
   { value: 'soy', icon: '🌱', label: 'سویا' },
   { value: 'seafood', icon: '🦐', label: 'غذاهای دریایی' },
+  { value: 'celery', icon: '🥬', label: 'کرفس' },
 ];
 
 export const PROTEIN_BUDGET_OPTIONS: {

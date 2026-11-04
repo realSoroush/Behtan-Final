@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Activity, ChevronDown, ReceiptText, UserRound, ScanLine, Send, ChevronLeft, Sparkles } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import type { UserProfile } from "@/types";
+import { MemberAllergies } from "./MemberAllergies";
 
 const n = (value: number | null | undefined) =>
   value == null ? "—" : value.toLocaleString("fa-IR");
@@ -128,6 +129,9 @@ export function MemberProfile({
       </nav>
       {scan && <BodyReview profile={profile} onClose={()=>setScan(false)}/>}
       <ProfileCompletion profile={profile}/>
+      {profile.dietary_preferences_json && (
+        <MemberAllergies userId={profile.id} preferences={profile.dietary_preferences_json} />
+      )}
       <section aria-labelledby="membership-title" className="account-membership">
         <div className="flex items-center gap-2 mb-3">
           <ReceiptText

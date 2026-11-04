@@ -12,6 +12,8 @@ export type ProductEvent =
   | "meal_undone"
   | "meal_skipped"
   | "meal_changed"
+  | "meal_change_unavailable"
+  | "meal_change_save_failed"
   | "food_manual"
   | "food_scan"
   | "progress_saved"

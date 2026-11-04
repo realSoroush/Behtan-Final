@@ -302,6 +302,14 @@ test('rotation keeps the old meal on save failure and survives reload after ackn
   const change = card.getByRole('button', { name: 'تغییر وعده', exact: true });
   const foods = () => card.locator('.food-piece').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-food-id')).join('|'));
   const original = await foods();
+  const events: unknown[] = [];
+  await page.route('**/rpc/record_product_event', route => {
+    const body = route.request().postDataJSON();
+    if (body.p_event.startsWith('meal_chang')) {
+      events.push({ event: body.p_event, step: body.p_step, source: body.p_source, keys: Object.keys(body).sort() });
+    }
+    return route.fulfill({ json: null });
+  });
   let attempts = 0;
   let finish!: () => void;
   const release = new Promise<void>(resolve => { finish = resolve; });
@@ -318,16 +326,41 @@ test('rotation keeps the old meal on save failure and survives reload after ackn
   await expect.poll(() => attempts).toBe(1);
   await expect(change).toBeDisabled();
   expect(await foods()).toBe(original);
+  expect(events).toEqual([]);
   finish();
   await expect(page.getByText('برنامه ذخیره نشد. دوباره تلاش کن.', { exact: true })).toBeVisible();
   expect(await foods()).toBe(original);
   await change.click();
   await expect.poll(foods).not.toBe(original);
   const saved = await foods();
+  await expect.poll(() => events).toEqual(['meal_change_save_failed', 'meal_changed'].map(event => ({
+    event, step: null, source: 'app', keys: ['p_event', 'p_id', 'p_session', 'p_source', 'p_step'],
+  })));
   await page.reload();
   await expect.poll(foods).toBe(saved);
 });
 
+
+test('an empty ingredient replacement records one unavailable result without saving', async ({ page }) => {
+  await page.unroute('**/src/hooks/useNutritionCatalog.ts*');
+  await page.route('**/src/hooks/useNutritionCatalog.ts*', route => route.fulfill({
+    contentType: 'text/javascript',
+    body: `import {configureNutritionCatalog} from '/src/utils/mealPlanEngine.ts';const catalog=${JSON.stringify({ ...catalog, substitutes: [] })};configureNutritionCatalog(catalog);export function useNutritionCatalog(){return {catalog,loading:false,error:null}}`,
+  }));
+  const events: string[] = [];
+  await page.route('**/rpc/record_product_event', route => {
+    const event = route.request().postDataJSON().p_event;
+    if (event.startsWith('meal_chang')) events.push(event);
+    return route.fulfill({ json: null });
+  });
+  await page.reload();
+  await page.getByRole('button', { name: /نمایش وعده‌های امروز/ }).click();
+  const first = page.getByRole('dialog', { name: 'وعده‌های امروز', exact: true }).locator('.member-meal-card').first();
+  await first.getByRole('button', { name: /جزئیات/ }).click();
+  await first.getByRole('button', { name: /جایگزینی/ }).first().click();
+  await expect(page.getByRole('dialog', { name: 'جایگزینی غذا' }).locator('.swap-option-v2')).toHaveCount(0);
+  await expect.poll(() => events).toEqual(['meal_change_unavailable']);
+});
 
 test('skipping requires confirmation and the skipped meal can be restored', async ({ page }) => {
   const card = page.locator('#today-panel .member-meal-card');
@@ -361,7 +394,7 @@ test('stale schedule writes keep the displayed meal and ask to reload', async ({
   await expect(card.locator('h3')).toHaveText(before!);
 });
 
-test('weekly review shows a proposal only with enough weight and feedback', async ({ page }) => {
+test('weekly review persists to the account and can retry a failed save', async ({ page }) => {
   await page.route('**/rest/v1/user_progress_entries?*', route => route.fulfill({
     json: ['2026-10-23', '2026-10-25', '2026-10-27', '2026-10-30', '2026-11-01', '2026-11-03']
       .map((entry_date, index) => ({
@@ -371,10 +404,73 @@ test('weekly review shows a proposal only with enough weight and feedback', asyn
         difficulty: null,
       })),
   }));
+  let reviewKey: string | null = null;
+  let attempts = 0;
+  await page.route('**/rest/v1/member_weekly_review_acknowledgements?*', route => {
+    if (route.request().method() === 'POST') {
+      if (++attempts === 1) return route.fulfill({ status: 400, json: { message: 'Synthetic save failure' } });
+      const body = route.request().postDataJSON();
+      expect(body).toEqual({ user_id: profile.id, review_key: expect.stringMatching(/^[0-9a-f]{8}$/) });
+      expect(route.request().headers().prefer).toContain('resolution=ignore-duplicates');
+      reviewKey = body.review_key;
+      return route.fulfill({ status: 201, body: '' });
+    }
+    const params = new URL(route.request().url()).searchParams;
+    expect(params.get('user_id')).toBe(`eq.${profile.id}`);
+    return route.fulfill({ json: reviewKey && params.get('review_key') === `eq.${reviewKey}` ? [{ review_key: reviewKey }] : [] });
+  });
   await page.getByRole('link', { name: 'روند من', exact: true }).click();
   const review = page.getByRole('region', { name: 'بازبینی هفتگی هدف' });
   await expect(review).toContainText('گرسنگی مکرر ثبت شده');
   await review.getByRole('button', { name: 'مرور پیشنهاد' }).click();
-  await page.getByRole('dialog', { name: 'تأیید مرور هفتگی' }).getByRole('button', { name: 'مرور شد' }).click();
+  const dialog = page.getByRole('dialog', { name: 'تأیید مرور هفتگی' });
+  await dialog.getByRole('button', { name: 'مرور شد' }).click();
+  await expect(dialog.getByRole('alert')).toContainText('تأیید مرور ذخیره نشد');
+  await expect(review).not.toContainText('پیشنهاد مرور شد.');
+  await dialog.getByRole('button', { name: 'مرور شد' }).click();
   await expect(review).toContainText('پیشنهاد مرور شد.');
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.getByRole('link', { name: 'روند من', exact: true }).click();
+  await expect(review).toContainText('پیشنهاد مرور شد.');
+  expect(attempts).toBe(2);
+
+  // An acknowledgement from the previous browser-only release is uploaded once.
+  const storageKey = `behtan:weekly-review:${profile.id}`;
+  await page.evaluate(({ key, value }) => localStorage.setItem(key, value!), { key: storageKey, value: reviewKey });
+  reviewKey = null;
+  await page.reload();
+  await page.getByRole('link', { name: 'روند من', exact: true }).click();
+  await expect(review).toContainText('پیشنهاد مرور شد.');
+  expect(attempts).toBe(3);
+  expect(await page.evaluate(key => localStorage.getItem(key), storageKey)).toBeNull();
+});
+
+test('account saves celery allergy while preserving existing food preferences', async ({ page }) => {
+  const existing = { vegetarianStatus: 'pescatarian', allergies: ['dairy'] };
+  let preferences = existing;
+  await page.unroute('**/src/hooks/useUserProfile.ts*');
+  await page.route('**/rest/v1/user_profiles?*', route => {
+    if (route.request().method() === 'PATCH') {
+      const params = new URL(route.request().url()).searchParams;
+      expect(params.get('id')).toBe(`eq.${profile.id}`);
+      expect(params.get('dietary_preferences_json')).toBe(`eq.${JSON.stringify(existing)}`);
+      preferences = route.request().postDataJSON().dietary_preferences_json;
+      expect(preferences).toEqual({ ...existing, allergies: ['dairy', 'celery'] });
+      return route.fulfill({ json: [{ id: profile.id }] });
+    }
+    return route.fulfill({ json: [{ ...profile, dietary_preferences_json: preferences }] });
+  });
+  await page.reload();
+  await page.getByRole('link', { name: 'حساب من', exact: true }).click();
+  const allergies = page.getByRole('region', { name: 'حساسیت‌های غذایی' });
+  await allergies.getByRole('button', { name: 'ویرایش حساسیت‌ها' }).click();
+  const dialog = page.getByRole('dialog', { name: 'ویرایش حساسیت‌های غذایی' });
+  await expect(dialog.getByRole('checkbox', { name: 'لبنیات' })).toBeChecked();
+  await dialog.getByRole('checkbox', { name: 'کرفس' }).check();
+  await dialog.getByRole('button', { name: 'ذخیرهٔ حساسیت‌ها' }).click();
+  await expect(allergies).toContainText('لبنیات، کرفس');
+  await page.reload();
+  await page.getByRole('link', { name: 'حساب من', exact: true }).click();
+  await expect(allergies).toContainText('لبنیات، کرفس');
 });
