@@ -866,6 +866,36 @@
         "whole_food"
       ],
       "fruitVegGramsPerUnit": 8.3
+    },
+    {
+      "id": "whole_wheat_beef_pasta_cooked",
+      "name": "ماکارونی سبوس‌دار با گوشت چرخ‌کرده",
+      "role": "protein",
+      "emoji": "🍝",
+      "unitLabel": "گرم",
+      "preparationState": "cooked",
+      "gramsPerUnit": 200,
+      "kcalPerUnit": 270,
+      "proteinPerUnit": 21,
+      "carbsPerUnit": 26,
+      "fatPerUnit": 9,
+      "allergyFlags": [
+        "gluten"
+      ],
+      "excludedForVegetarian": [
+        "vegan",
+        "lacto_ovo",
+        "pescatarian",
+        "raw"
+      ],
+      "swapAllowedMeals": [
+        "lunch"
+      ],
+      "swapGroup": "whole_wheat_beef_pasta",
+      "swapPriority": 100,
+      "fiberPerUnit": 5,
+      "qualityTags": [],
+      "fruitVegGramsPerUnit": 0
     }
   ],
   "FOOD_SUBSTITUTES": [
@@ -2476,6 +2506,21 @@
       "isWorkoutDayOnly": true,
       "isRestDayOnly": false,
       "goalTags": []
+    },
+    {
+      "id": "ln_whole_wheat_beef_pasta",
+      "slot": "lunch",
+      "displayName": "ماکارونی سبوس‌دار با گوشت چرخ‌کرده",
+      "slots": [
+        {
+          "role": "protein",
+          "primaryFoodItemId": "whole_wheat_beef_pasta_cooked",
+          "dynamicUnits": true
+        }
+      ],
+      "isWorkoutDayOnly": false,
+      "isRestDayOnly": false,
+      "goalTags": []
     }
   ],
   "PORTION_RULES": {
@@ -2695,6 +2740,13 @@
       "softMaxUnits": 3,
       "hardMaxUnits": 4,
       "step": 1
+    },
+    "whole_wheat_beef_pasta_cooked": {
+      "minUnits": 1,
+      "typicalUnits": 1.5,
+      "softMaxUnits": 1.75,
+      "hardMaxUnits": 2,
+      "step": 0.25
     }
   }
 }
