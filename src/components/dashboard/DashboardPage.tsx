@@ -148,7 +148,7 @@ export function DashboardPage() {
     () => window.location.hash === '#progress',
   );
   const [dayOpen, setDayOpen] = useState(false);
-  const [pendingMeal,setPendingMeal]=useState<PendingMealConfirmation|null>(null);
+  const [pendingMeal,setPendingMeal]=useState<(PendingMealConfirmation & { action: 'record' | 'skip' })|null>(null);
   const [scanOpen,setScanOpen]=useState(false);
   const [viewDate,setViewDate]=useState<string|null>(null);
   const [dayLoading,setDayLoading]=useState<string|null>(null);
@@ -199,7 +199,7 @@ export function DashboardPage() {
   const skipLoadSequence=useRef(0);
   const loadSkipped=useCallback(async()=>{if(!skippedUserId)return;const sequence=++skipLoadSequence.current;const {data,error}=await supabase.from('member_skipped_meals').select('slot').eq('user_id',skippedUserId).eq('plan_date',todayKey);if(sequence!==skipLoadSequence.current)return;if(error){setSkipError(true);setViewError('وضعیت وعده‌های نخورده دریافت نشد؛ صفحه را تازه کن.');return;}setSkipError(false);setSkipped((data??[]).map(x=>x.slot));setSkipReadyKey(`${skippedUserId}:${todayKey}`);},[skippedUserId,todayKey]);
   useEffect(()=>{setSkipped([]);void loadSkipped();return()=>{skipLoadSequence.current++;};},[loadSkipped]);
-  const skipMeal=async(slot:string)=>{if(!user||mealChangeInFlight.current||skipError||skipPending.current.has(slot))return;skipPending.current.add(slot);try{const undo=skipped.includes(slot);const query=undo?supabase.from('member_skipped_meals').delete().eq('user_id',user.id).eq('plan_date',todayKey).eq('slot',slot):supabase.from('member_skipped_meals').upsert({user_id:user.id,plan_date:todayKey,slot},{onConflict:'user_id,plan_date,slot'});const{error}=await query;if(error)throw error;await loadSkipped();await refetchMealProgress();track('meal_skipped');}catch{setViewError('ثبت وضعیت وعده انجام نشد.');}finally{skipPending.current.delete(slot);}};
+  const skipMeal=async(slot:string, undo:boolean)=>{if(!user||mealChangeInFlight.current||skipError||skipReadyKey!==`${user.id}:${todayKey}`||skipPending.current.has(slot))return;skipPending.current.add(slot);try{setViewError('');const query=undo?supabase.from('member_skipped_meals').delete().eq('user_id',user.id).eq('plan_date',todayKey).eq('slot',slot):supabase.from('member_skipped_meals').upsert({user_id:user.id,plan_date:todayKey,slot},{onConflict:'user_id,plan_date,slot'});const{error}=await query;if(error)throw error;await loadSkipped();await refetchMealProgress();track('meal_skipped');}catch{setViewError('ثبت وضعیت وعده انجام نشد.');}finally{skipPending.current.delete(slot);}};
   const [extraFoods,setExtraFoods]=useState<{id:string;meal_snapshot:Meal}[]>([]);
   const extraLoadSequence = useRef(0);
   const [extrasReadyKey, setExtrasReadyKey] = useState<string|null>(null);
@@ -485,9 +485,9 @@ export function DashboardPage() {
     }catch(e){setViewError(e instanceof Error?e.message:'برنامهٔ این روز آماده نشد.');}
     finally{setDayLoading(current=>current===date?null:current);}
   };
-  const intakeReady = !mealProgressLoading && !mealProgressError && !skipError &&
-    skipReadyKey === generationKey && extrasReadyKey === generationKey &&
-    mealProgressSavingSlots.size === 0;
+  const mealStatusReady = !mealProgressLoading && !mealProgressError && !skipError &&
+    skipReadyKey === generationKey && mealProgressSavingSlots.size === 0;
+  const intakeReady = mealStatusReady && extrasReadyKey === generationKey;
   const todayIntake = useMemo(() => ({
     skippedSlots: skipped,
     extraMeals: extraFoods.map(row => row.meal_snapshot),
@@ -667,14 +667,27 @@ export function DashboardPage() {
     const meal=activePlan?.meals[mealIdx];
     if(!meal||mealChangeInFlight.current||mealProgressError||mealProgressSavingSlots.has(meal.slot))return;
     if(meal.consumed){performToggleConsumed(mealIdx);return;}
-    setPendingMeal({meal:JSON.parse(JSON.stringify(meal)),date:todayKey,identity:generationKey});
+    setPendingMeal({meal:JSON.parse(JSON.stringify(meal)),date:todayKey,identity:generationKey,action:'record'});
+  };
+  const requestSkip = (meal: Meal) => {
+    if (!viewingToday || meal.consumed || !mealStatusReady || skipPending.current.has(meal.slot)) return;
+    if (skipped.includes(meal.slot)) {
+      void skipMeal(meal.slot, true);
+      return;
+    }
+    setPendingMeal({ meal, date: todayKey, identity: generationKey, action: 'skip' });
   };
   const confirmPendingMeal=()=>{
     const pending=pendingMeal;if(!pending)return;
     const index=activePlan?.meals.findIndex(m=>m.slot===pending.meal.slot)??-1;
     setPendingMeal(null);
-    if(isCurrentMealConfirmation(pending,activePlan?.meals[index],todayKey,generationKey))performToggleConsumed(index);
-    else setViewError('این وعده تغییر کرده است؛ دوباره آن را بررسی و ثبت کن.');
+    if (!isCurrentMealConfirmation(pending, activePlan?.meals[index], todayKey, generationKey)) {
+      setViewError('این وعده تغییر کرده است؛ دوباره آن را بررسی و ثبت کن.');
+      return;
+    }
+    if (pending.action === 'skip') {
+      if (viewingToday && mealStatusReady && !skipped.includes(pending.meal.slot)) void skipMeal(pending.meal.slot, false);
+    } else performToggleConsumed(index);
   };
 
   const handleSwapComponent = (mealIdx: number, componentIdx: number) => {
@@ -880,7 +893,7 @@ export function DashboardPage() {
                 else setScheduleSyncRetry((n) => n + 1);
               }}
             >
-              تلاش دوباره
+              {schedule.conflict ? 'بازکردن نسخهٔ تازه' : 'تلاش دوباره'}
             </button>
           </div>
         )}
@@ -967,7 +980,7 @@ export function DashboardPage() {
           </div>
         ) : viewedPlan ? (
           <section className="member-next-section"><div className="member-next-heading"><div><span className="member-eyebrow">برنامهٔ شخصی تو</span><h2 id="daily-meals" tabIndex={-1}>{nextIndex<0?'امروزت کامل شد':viewingToday?'وعدهٔ بعدی':'اولین وعدهٔ این روز'}</h2></div><span className="daily-count-pill">{toPersianDigits(viewedPlan.meals.filter(m=>m.consumed).length)} از {toPersianDigits(viewedPlan.meals.length)} ثبت شده</span></div>
-          {nextIndex>=0?<div id={`meal-${viewedPlan.meals[nextIndex].slot}`} tabIndex={-1}><MealCard readOnly={!viewingToday} onChangeMeal={()=>void changeVisibleMeal(nextIndex)} changing={changingMeal} onSkip={()=>void skipMeal(viewedPlan.meals[nextIndex].slot)} key={viewedPlan.meals[nextIndex].slot} meal={viewedPlan.meals[nextIndex]} isConsumedSaving={mealProgressSavingSlots.has(viewedPlan.meals[nextIndex].slot)} consumedToggleDisabled={Boolean(mealProgressError)||skipError} onToggleConsumed={()=>handleToggleConsumed(nextIndex)} onSwapComponent={index=>handleSwapComponent(nextIndex,index)}/></div>:<div className="member-complete"><Check size={24}/><p>برای اصلاح یا مرور ثبت‌ها، برنامهٔ امروز را باز کن.</p></div>}
+          {nextIndex>=0?<div id={`meal-${viewedPlan.meals[nextIndex].slot}`} tabIndex={-1}><MealCard readOnly={!viewingToday} onChangeMeal={()=>void changeVisibleMeal(nextIndex)} changing={changingMeal} onSkip={()=>requestSkip(viewedPlan.meals[nextIndex])} key={viewedPlan.meals[nextIndex].slot} meal={viewedPlan.meals[nextIndex]} isConsumedSaving={mealProgressSavingSlots.has(viewedPlan.meals[nextIndex].slot)} consumedToggleDisabled={Boolean(mealProgressError)||skipError} onToggleConsumed={()=>handleToggleConsumed(nextIndex)} onSwapComponent={index=>handleSwapComponent(nextIndex,index)}/></div>:<div className="member-complete"><Check size={24}/><p>برای اصلاح یا مرور ثبت‌ها، برنامهٔ امروز را باز کن.</p></div>}
           <div className="member-plan-actions"><button type="button" className="member-secondary" aria-expanded={dayOpen} onClick={()=>setDayOpen(true)}><CalendarDays size={19}/><span className="day-entry-copy"><b>{viewingToday?'نمایش وعده‌های امروز':'نمایش همهٔ وعده‌های این روز'}</b><small>مرور غذاها و اصلاح ثبت‌ها</small></span><span>←</span></button></div></section>
         ) : (
           <div className="text-center py-12 text-neutral-400 dark:text-neutral-500">
@@ -979,7 +992,7 @@ export function DashboardPage() {
       {dayOpen&&viewedPlan&&<MemberDialog title={viewingToday?'وعده‌های امروز':'وعده‌های این روز'} onClose={()=>setDayOpen(false)} wide>
         <div className="day-sheet-intro"><div><span>{new Date(selectedDate+'T12:00:00').toLocaleDateString('fa-IR',{weekday:'long',day:'numeric',month:'long'})}</span><strong>{toPersianDigits(viewedPlan.meals.filter(m=>m.consumed).length)} از {toPersianDigits(viewedPlan.meals.length)} وعده ثبت شده</strong></div><span>{toPersianDigits(viewedPlan.targets.targetCalories)}<small> کالری هدف</small></span></div>
         <button type="button" className="member-primary week-entry-button" onClick={()=>{setDayOpen(false);setWeekOpen(true);}}><CalendarDays size={17}/>نمایش وعده‌های هفته<span>←</span></button>
-        <div className="day-meal-list">{viewedPlan.meals.map((meal,index)=><MealCard compact readOnly={!viewingToday} onSkip={()=>void skipMeal(meal.slot)} skipped={isMealSkipped(meal.slot,skipped,todayKey,selectedDate)} key={meal.slot} meal={meal} isConsumedSaving={mealProgressSavingSlots.has(meal.slot)} consumedToggleDisabled={Boolean(mealProgressError)||skipError} onToggleConsumed={()=>handleToggleConsumed(index)} onSwapComponent={componentIndex=>{setDayOpen(false);handleSwapComponent(index,componentIndex);}}/>)}</div>
+        <div className="day-meal-list">{viewedPlan.meals.map((meal,index)=><MealCard compact readOnly={!viewingToday} onSkip={()=>requestSkip(meal)} skipped={isMealSkipped(meal.slot,skipped,todayKey,selectedDate)} key={meal.slot} meal={meal} isConsumedSaving={mealProgressSavingSlots.has(meal.slot)} consumedToggleDisabled={Boolean(mealProgressError)||skipError} onToggleConsumed={()=>handleToggleConsumed(index)} onSwapComponent={componentIndex=>{setDayOpen(false);handleSwapComponent(index,componentIndex);}}/>)}</div>
         {viewingToday&&<details className="day-more-options"><summary>تنوع غذا و کیفیت برنامه</summary><button type="button" className="member-secondary" onClick={()=>{regenerate();setDayOpen(false);}} disabled={Boolean(viewedPlan.meals.every(m=>m.consumed))||mealProgressSavingSlots.size>0||Boolean(mealProgressError)||skipError}><RefreshCw size={15}/>تغییر وعده‌های باقی‌مانده</button>{foodQuality&&<NutritionQualitySummary quality={foodQuality}/>}</details>}
       </MemberDialog>}
       {weekOpen && activePlan && targets && profile && catalog && (
@@ -1057,7 +1070,7 @@ export function DashboardPage() {
         </div>
       </nav>
 
-      {pendingMeal&&<MemberMealConfirmation meal={pendingMeal.meal} onConfirm={confirmPendingMeal} onCancel={()=>setPendingMeal(null)}/> }
+      {pendingMeal&&<MemberMealConfirmation meal={pendingMeal.meal} action={pendingMeal.action} onConfirm={confirmPendingMeal} onCancel={()=>setPendingMeal(null)}/> }
 
       {/* Swap modal */}
       <FoodSwapModal

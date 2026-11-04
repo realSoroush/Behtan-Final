@@ -72,19 +72,33 @@ test.beforeEach(async ({ page }) => {
       body: `import {DEFAULT_PROTEIN_ENGINE_POLICY as policy} from '/src/utils/proteinPolicy.ts';export function useProteinEnginePolicy(){return {policy,loading:false,error:null}}`,
     }),
   );
-  const schedule: Record<string, unknown> = {};
+  const schedule: Record<string, { plan_date: string; plan: unknown; context_key: string; updated_at: string }> = {};
+  const skipped = new Set<string>();
+  let scheduleRevision = 0;
   const checkins: Record<string, unknown> = {};
   await page.route("**/rest/v1/**", async (r) => {
     const url = r.request().url(),
       body = r.request().postDataJSON();
-    if (url.includes("/rpc/save_member_meal_schedule")) {
-      for (const day of body.p_days)
-        if (!schedule[day.date] || body.p_replace)
-          schedule[day.date] = { plan_date: day.date, plan: day.plan };
+    if (url.includes("/rpc/save_member_meal_schedule_v2")) {
+      for (const day of body.p_days) {
+        const existing = schedule[day.date];
+        if (!body.p_replace && existing?.context_key === body.p_context) continue;
+        if ((existing?.updated_at ?? null) !== day.expected_updated_at)
+          return r.fulfill({ status: 400, json: { message: "MEAL_SCHEDULE_CONFLICT", code: "P0001" } });
+        schedule[day.date] = { plan_date: day.date, plan: day.plan, context_key: body.p_context, updated_at: String(++scheduleRevision) };
+      }
       return r.fulfill({ json: Object.values(schedule) });
     }
     if (url.includes("/member_meal_schedule"))
       return r.fulfill({ json: Object.values(schedule) });
+    if (url.includes("/member_skipped_meals")) {
+      if (r.request().method() === "POST") skipped.add(body.slot);
+      if (r.request().method() === "DELETE") {
+        const slot = new URL(url).searchParams.get("slot")?.replace(/^eq\./, "");
+        if (slot) skipped.delete(slot);
+      }
+      return r.fulfill({ json: [...skipped].map(slot => ({ slot })) });
+    }
     if (url.includes("/daily_meal_checkins")) {
       if (r.request().method() === "POST") checkins[body.meal_slot] = body;
       if (r.request().method() === "DELETE") {
@@ -291,7 +305,7 @@ test('rotation keeps the old meal on save failure and survives reload after ackn
   let attempts = 0;
   let finish!: () => void;
   const release = new Promise<void>(resolve => { finish = resolve; });
-  await page.route('**/rpc/save_member_meal_schedule', async route => {
+  await page.route('**/rpc/save_member_meal_schedule_v2', async route => {
     if (!route.request().postDataJSON().p_replace) return route.fallback();
     attempts++;
     if (attempts === 1) {
@@ -312,4 +326,55 @@ test('rotation keeps the old meal on save failure and survives reload after ackn
   const saved = await foods();
   await page.reload();
   await expect.poll(foods).toBe(saved);
+});
+
+
+test('skipping requires confirmation and the skipped meal can be restored', async ({ page }) => {
+  const card = page.locator('#today-panel .member-meal-card');
+  const original = await card.getAttribute('data-meal-slot');
+  const skip = card.getByRole('button', { name: 'این وعده را نخوردم' });
+  const dialog = page.getByRole('dialog', { name: 'تأیید نخوردن وعده' });
+  await skip.click();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'انصراف' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(card).toHaveAttribute('data-meal-slot', original!);
+  await skip.click();
+  await dialog.getByRole('button', { name: 'بله، نخوردم' }).click();
+  await expect(card).not.toHaveAttribute('data-meal-slot', original!);
+  await page.reload();
+  await expect(card).not.toHaveAttribute('data-meal-slot', original!);
+  await page.getByRole('button', { name: /نمایش وعده‌های امروز/ }).click();
+  await page.getByRole('button', { name: 'بازگرداندن به وعده‌های پیش رو' }).click();
+  await expect(card).toHaveAttribute('data-meal-slot', original!);
+});
+
+test('stale schedule writes keep the displayed meal and ask to reload', async ({ page }) => {
+  const card = page.locator('#today-panel .member-meal-card');
+  const before = await card.locator('h3').textContent();
+  await page.route('**/rpc/save_member_meal_schedule_v2', route => {
+    if (!route.request().postDataJSON().p_replace) return route.fallback();
+    return route.fulfill({ status: 400, json: { message: 'MEAL_SCHEDULE_CONFLICT', code: 'P0001' } });
+  });
+  await card.getByRole('button', { name: 'تغییر وعده', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'بازکردن نسخهٔ تازه' })).toBeVisible();
+  await expect(card.locator('h3')).toHaveText(before!);
+});
+
+test('weekly review shows a proposal only with enough weight and feedback', async ({ page }) => {
+  await page.route('**/rest/v1/user_progress_entries?*', route => route.fulfill({
+    json: ['2026-10-23', '2026-10-25', '2026-10-27', '2026-10-30', '2026-11-01', '2026-11-03']
+      .map((entry_date, index) => ({
+        entry_date, weight_kg: index < 3 ? 85 : 84.5,
+        adherence: index === 5 ? 'mostly' : null,
+        hunger: index === 5 ? 'often' : null,
+        difficulty: null,
+      })),
+  }));
+  await page.getByRole('link', { name: 'روند من', exact: true }).click();
+  const review = page.getByRole('region', { name: 'بازبینی هفتگی هدف' });
+  await expect(review).toContainText('گرسنگی مکرر ثبت شده');
+  await review.getByRole('button', { name: 'مرور پیشنهاد' }).click();
+  await page.getByRole('dialog', { name: 'تأیید مرور هفتگی' }).getByRole('button', { name: 'مرور شد' }).click();
+  await expect(review).toContainText('پیشنهاد مرور شد.');
 });

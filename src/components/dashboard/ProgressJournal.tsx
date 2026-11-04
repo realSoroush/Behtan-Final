@@ -5,11 +5,21 @@ import {ProgressCelebration} from '@/member/ProgressCelebration';
 import {track} from '@/member/analytics';
 import {useState} from 'react';
 import type {ProgressEntry} from '@/utils/progressJournal';
-import {parseWeight,reviewDue,weightTrend} from '@/utils/progressJournal';
+import {parseWeight,reviewDue,weightTrend,weeklyGoalReview} from '@/utils/progressJournal';
+import { contentFingerprint } from '@/utils/planProvenance';
+import { evaluateProfileMedicalEligibility } from '@/utils/medicalEligibility';
+import { MemberDialog } from './MemberDialog';
 import {useProgressJournal} from '@/hooks/useProgressJournal';
 
 const number=(n:number)=>n.toLocaleString('fa-IR',{maximumFractionDigits:1});
 const dateLabel=(date:string)=>new Date(date+'T12:00:00').toLocaleDateString('fa-IR',{month:'short',day:'numeric'});
+const recommendationText = {
+  review_hunger: 'گرسنگی مکرر ثبت شده. قبل از تغییر هدف، اندازه و زمان وعده‌ها را با متخصص مرور کن.',
+  review_routine: 'اجرای برنامه سخت بوده. این هفته روی رفع مانع ثبت‌شده و انتخاب وعده‌های قابل‌اجرا تمرکز کن.',
+  review_trend: 'روند این دو هفته با هدف هم‌جهت نیست. یک هفتهٔ دیگر ثبت را ادامه بده و بعد هدف را بازبینی کن.',
+  continue: 'روند وزن و تجربهٔ اجرای برنامه با ادامهٔ هدف فعلی سازگارند.',
+} as const;
+
 export function ProgressJournal({userId,today,profile,policy}:{userId:string;today:string;profile?:UserProfile;policy?:ProteinEnginePolicy}) {
   const [changePopup,setChangePopup]=useState<{before:number;after:number}|null>(null);
   const journal=useProgressJournal(userId,today);
@@ -19,12 +29,26 @@ export function ProgressJournal({userId,today,profile,policy}:{userId:string;tod
   const [hunger,setHunger]=useState<ProgressEntry['hunger']>(null);
   const [difficulty,setDifficulty]=useState<ProgressEntry['difficulty']>(null);
   const [message,setMessage]=useState('');const [error,setError]=useState('');
+  const [reviewOpen, setReviewOpen] = useState<string | null>(null);
+  const reviewStorageKey = `behtan:weekly-review:${userId}`;
+  const [reviewed, setReviewed] = useState<string | null>(() => {
+    try { return localStorage.getItem(reviewStorageKey); } catch { return null; }
+  });
+  const reviewGoal = profile?.goal && evaluateProfileMedicalEligibility(profile).canGenerateAutomaticPlan ? profile.goal : null;
+  const review = reviewGoal ? weeklyGoalReview(journal.entries, today, reviewGoal) : null;
+  const reviewKey = review ? contentFingerprint(review.evidence) : null;
+  const confirmReview = () => {
+    if (!reviewKey || reviewOpen !== reviewKey) return;
+    try { localStorage.setItem(reviewStorageKey, reviewKey); } catch { /* Session-only if storage is unavailable. */ }
+    setReviewed(reviewKey);
+    setReviewOpen(null);
+  };
   const {points,change}=weightTrend(journal.entries);
   const open=()=>{const entry=journal.entries.find(e=>e.entry_date===today);setWeight(entry?.weight_kg?.toString()??'');setAdherence(entry?.adherence??null);setHunger(entry?.hunger??null);setDifficulty(entry?.difficulty??null);setMessage('');setError('');setEditing(true);};
   const save=async(e:React.FormEvent)=>{
     e.preventDefault();setError('');setMessage('');
     try{const weight_kg=parseWeight(weight);if(weight_kg===null&&!adherence&&!hunger&&!difficulty)throw Error('وزن یا حداقل یک پاسخ را وارد کن.');
-      const before=profile&&policy?memberNutrition(profile,policy,false).targets.targetCalories:null;
+      const before=profile&&policy&&evaluateProfileMedicalEligibility(profile).canGenerateAutomaticPlan?memberNutrition(profile,policy,false).targets.targetCalories:null;
       await journal.save({entry_date:today,weight_kg,adherence,hunger,difficulty});track('progress_saved');window.dispatchEvent(new Event('member-profile-changed'));
       if(before!==null&&weight_kg&&profile&&policy){try{setChangePopup({before,after:memberNutrition({...profile,weight:weight_kg},policy,false).targets.targetCalories});}catch{setMessage('وزن ثبت شد. با اطلاعات تازه، ارزیابی ایمنی برنامه باید دوباره بررسی شود.');}}setMessage('اطلاعات امروز ذخیره شد.');setEditing(false);
     }catch(err){setError(err instanceof Error?err.message:'ثبت انجام نشد. دوباره تلاش کن.');}
@@ -41,6 +65,16 @@ export function ProgressJournal({userId,today,profile,policy}:{userId:string;tod
       {points.length?<div><div className="flex justify-between items-baseline"><strong className="text-2xl text-neutral-900 dark:text-neutral-100">{number(points[points.length-1].weight_kg!)} <small className="text-xs font-normal">کیلوگرم</small></strong><span className="text-xs text-neutral-500">آخرین ثبت: {dateLabel(points[points.length-1].entry_date)}</span></div>
         {points.length>1&&<><svg viewBox="0 0 300 76" role="img" aria-label={`روند وزن از ${number(points[0].weight_kg!)} تا ${number(points[points.length-1].weight_kg!)} کیلوگرم`} className="w-full h-20 my-2 text-primary-600 dark:text-primary-400"><path d="M10 64H290" stroke="currentColor" opacity="0.15"/><polyline fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" points={chartPoints.map(p=>`${p.x},${p.y}`).join(' ')}/>{chartPoints.map((p,i)=><circle key={points[i].entry_date} cx={p.x} cy={p.y} r={3} fill="currentColor"/>)}</svg><div dir="ltr" className="mb-3 flex justify-between text-[11px] text-neutral-500 dark:text-neutral-400"><span>{dateLabel(points[0].entry_date)}</span><span>{dateLabel(points[points.length-1].entry_date)}</span></div><p className="text-xs text-neutral-600 dark:text-neutral-400">تغییر از {dateLabel(points[0].entry_date)}: {change!>0?'+':''}{number(change!)} کیلوگرم؛ از {number(points.length)} ثبت. نوسان روزانه طبیعی است؛ به روند نگاه کن.</p></>}
       </div>:<p className="text-sm leading-6 text-neutral-600 dark:text-neutral-400">اولین وزن را ثبت کن تا بتوانی تغییراتت را در طول زمان ببینی.</p>}
+      {reviewGoal && <section aria-label="بازبینی هفتگی هدف" className="rounded-xl border border-neutral-200 dark:border-neutral-700 p-3 space-y-2">
+        <h3 className="text-sm font-bold">بازبینی هفتگی هدف</h3>
+        {review ? <>
+          <p className="text-xs">میانگین هفتهٔ قبل {number(review.previousAverage)} و هفت روز اخیر {number(review.currentAverage)} کیلوگرم</p>
+          <p className="text-sm">{recommendationText[review.recommendation]}</p>
+          {reviewed === reviewKey
+            ? <p role="status" className="text-xs">پیشنهاد مرور شد.</p>
+            : <button type="button" className="member-secondary" onClick={() => setReviewOpen(reviewKey)}>مرور پیشنهاد</button>}
+        </> : <p className="text-xs">برای پیشنهاد هفتگی، در هر یک از دو هفته حداقل سه ثبت وزن و یک پاسخ اخیر دربارهٔ پایبندی و گرسنگی لازم است.</p>}
+      </section>}
       {!editing&&<><button type="button" onClick={open} className="w-full rounded-xl bg-primary-600 text-white min-h-11 px-4 py-3 text-sm font-semibold">{journal.entries.some(e=>e.entry_date===today)?'ویرایش ثبت امروز':reviewDue(journal.entries,today)?'ثبت وزن و بررسی هفته':'ثبت وزن امروز'}</button>{reviewDue(journal.entries,today)&&<p className="text-xs text-neutral-500 leading-5">این هفته اجرای برنامه چطور بود؟ سه سؤال کوتاه؛ پاسخ‌دادن اختیاری است.</p>}</>}
       {editing&&<form onSubmit={save} className="space-y-4">
         <label className="block text-sm text-neutral-700 dark:text-neutral-300">وزن امروز (کیلوگرم، اختیاری)<input aria-label="وزن امروز" inputMode="decimal" value={weight} onChange={e=>setWeight(e.target.value)} placeholder="مثلاً ۸۴٫۵" className={field} disabled={journal.saving}/></label>
@@ -53,6 +87,17 @@ export function ProgressJournal({userId,today,profile,policy}:{userId:string;tod
       </form>}
       {journal.entries.length>0&&<details><summary className="cursor-pointer min-h-11 py-3 text-sm text-neutral-600 dark:text-neutral-400">ثبت‌های قبلی ({number(journal.entries.length)})</summary><ul className="max-h-48 overflow-auto text-sm divide-y divide-neutral-100 dark:divide-neutral-800">{journal.entries.map(e=><li key={e.entry_date} className="flex justify-between gap-3 py-3 text-neutral-600 dark:text-neutral-400"><span>{dateLabel(e.entry_date)}</span><span>{e.weight_kg!==null?`${number(e.weight_kg)} کیلوگرم`:'بدون ثبت وزن'}{e.adherence||e.hunger||e.difficulty?' · بررسی ثبت شده':''}</span></li>)}</ul></details>}
     </>}
+    {reviewOpen && reviewOpen === reviewKey && review && (
+      <MemberDialog title="تأیید مرور هفتگی" variant="confirmation" onClose={() => setReviewOpen(null)}>
+        <div className="meal-confirmation-content">
+          <p>{recommendationText[review.recommendation]}</p>
+          <div className="meal-confirmation-actions">
+            <button type="button" className="member-primary" onClick={confirmReview}>مرور شد</button>
+            <button type="button" className="member-secondary" onClick={() => setReviewOpen(null)}>بعداً</button>
+          </div>
+        </div>
+      </MemberDialog>
+    )}
     {changePopup&&<ProgressCelebration {...changePopup} onClose={()=>setChangePopup(null)}/>}
     <p role="status" className="text-sm text-primary-700 dark:text-primary-300">{message}</p>
   </section>;

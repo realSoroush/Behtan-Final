@@ -40,8 +40,8 @@ assert(
   'Empty Supabase vegetarian_statuses_only array must normalize to unrestricted'
 );
 
-assert(TEST_NUTRITION_CATALOG.foods.length === 32, 'Expected 32 active fixture foods');
-assert(TEST_NUTRITION_CATALOG.mealTemplates.length === 58, 'Expected 58 active fixture templates');
+assert(TEST_NUTRITION_CATALOG.foods.length === 33, 'Expected 33 active fixture foods');
+assert(TEST_NUTRITION_CATALOG.mealTemplates.length === 59, 'Expected 59 active fixture templates');
 assert(Object.keys(TEST_NUTRITION_CATALOG.portionRules).length === TEST_NUTRITION_CATALOG.foods.length, 'Every food must have a portion rule');
 for (const food of TEST_NUTRITION_CATALOG.foods) {
   assert(Number.isFinite(food.fiberPerUnit) && food.fiberPerUnit >= 0, `Fiber missing for ${food.id}`);
@@ -62,6 +62,7 @@ const seedSource = [
   'supabase/seed_nutrition_catalog.sql',
   'supabase/migrations/20260923_020_mobile_meal_catalog.sql',
   'supabase/migrations/20261104094805_041_verified_beef_pasta_menu.sql',
+  'supabase/migrations/20261104134709_043_verified_chicken_curry_rice.sql',
 ].map(path => readFileSync(resolve(projectRoot, path), 'utf8')).join('\n');
 const mealAwareMigrationSource = readFileSync(
   resolve(projectRoot, 'supabase/migrations/20260831_003_meal_aware_food_swaps.sql'),
