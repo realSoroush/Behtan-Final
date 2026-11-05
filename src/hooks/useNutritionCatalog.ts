@@ -1,96 +1,48 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { configureNutritionCatalog } from '@/utils/mealPlanEngine';
-import {
-  buildNutritionCatalog,
-  type FoodItemRow,
-  type FoodSubstituteRow,
-  type MealTemplateRow,
-  type MealTemplateSlotRow,
-} from '@/utils/nutritionCatalog';
-import type { NutritionCatalog } from '@/types';
+import { readNutritionContext, type NutritionContext } from '@/utils/nutritionContext';
 
-interface UseNutritionCatalogReturn {
-  catalog: NutritionCatalog | null;
-  loading: boolean;
-  error: string | null;
-  refetch: () => Promise<void>;
-}
+export function useNutritionCatalog(scope?: string) {
+  const [state, setState] = useState<{ scope?: string; context: NutritionContext | null; loading: boolean; error: string | null }>({
+    context: null, loading: true, error: null,
+  });
+  const request = useRef<AbortController | null>(null);
+  const cache = useRef<{ scope?: string; context: NutritionContext } | null>(null);
 
-export function useNutritionCatalog(): UseNutritionCatalogReturn {
-  const [catalog, setCatalog] = useState<NutritionCatalog | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchCatalog = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    const [foodsResult, substitutesResult, templatesResult, slotsResult] = await Promise.all([
-      supabase
-        .from('food_items')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true }),
-      supabase
-        .from('food_substitutes')
-        .select('*')
-        .eq('is_active', true),
-      supabase
-        .from('meal_templates')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true }),
-      supabase
-        .from('meal_template_slots')
-        .select('*')
-        .order('template_id', { ascending: true })
-        .order('position', { ascending: true }),
-    ]);
-
-    const firstError =
-      foodsResult.error ??
-      substitutesResult.error ??
-      templatesResult.error ??
-      slotsResult.error;
-
-    if (firstError) {
-      console.error('[useNutritionCatalog] Supabase catalog fetch failed:', firstError);
-      setCatalog(null);
-      setError('دریافت دیتابیس غذایی با خطا مواجه شد. دوباره تلاش کنید.');
-      setLoading(false);
-      return;
-    }
-
+  const fetchContext = useCallback(async (foreground = true) => {
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
+    const cached = cache.current?.scope === scope ? cache.current?.context : undefined;
+    if (foreground || !cached) setState({ scope, context: null, loading: true, error: null });
     try {
-      const nextCatalog = buildNutritionCatalog({
-        foodRows: (foodsResult.data ?? []) as FoodItemRow[],
-        substituteRows: (substitutesResult.data ?? []) as FoodSubstituteRow[],
-        templateRows: (templatesResult.data ?? []) as MealTemplateRow[],
-        slotRows: (slotsResult.data ?? []) as MealTemplateSlotRow[],
-      });
-
-      // Configure the deterministic engine before publishing `catalog` to the
-      // React tree. A render that sees catalog != null can therefore safely
-      // generate meals synchronously.
-      configureNutritionCatalog(nextCatalog);
-      setCatalog(nextCatalog);
-    } catch (catalogError) {
-      console.error('[useNutritionCatalog] Catalog validation failed:', catalogError);
-      setCatalog(null);
-      setError(
-        catalogError instanceof Error
-          ? `دیتابیس غذایی نامعتبر است: ${catalogError.message}`
-          : 'ساختار دیتابیس غذایی نامعتبر است.'
-      );
-    } finally {
-      setLoading(false);
+      const context = await readNutritionContext(supabase, AbortSignal.any([controller.signal, AbortSignal.timeout(12000)]), cached);
+      if (controller.signal.aborted) return;
+      cache.current = { scope, context };
+      setState({ scope, context, loading: false, error: null });
+    } catch {
+      if (controller.signal.aborted) return;
+      setState({ scope, context: null, loading: false, error: 'دریافت نسخهٔ معتبر کاتالوگ و سیاست تغذیه انجام نشد. دوباره تلاش کن.' });
     }
-  }, []);
+  }, [scope]);
 
   useEffect(() => {
-    void fetchCatalog();
-  }, [fetchCatalog]);
+    void fetchContext();
+    const refresh = () => { if (document.visibilityState === 'visible') void fetchContext(false); };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      request.current?.abort();
+      cache.current = null;
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [fetchContext]);
 
-  return { catalog, loading, error, refetch: fetchCatalog };
+  const current = state.scope === scope ? state.context : null;
+  return {
+    catalog: current?.catalog ?? null, policy: current?.policy ?? null, revision: current?.revision ?? null,
+    loading: state.scope !== scope || state.loading, error: state.scope === scope ? state.error : null,
+    refetch: fetchContext,
+  };
 }

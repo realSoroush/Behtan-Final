@@ -335,6 +335,7 @@ export interface FoodSwapOption {
 }
 
 export interface DailyMealPlan {
+  nutritionContext?: { revision: string; engineVersion: string };
   date: string;
   isWorkoutDay: boolean;
   targets: MacroTargets;

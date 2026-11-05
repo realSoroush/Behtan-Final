@@ -7,6 +7,7 @@ import type {
 import {
   generateDailyMealPlan,
   getProfessionalMealOptions,
+  type MealPlanEngine,
 } from "../utils/mealPlanEngine.ts";
 import {
   calculateFullNutritionPlanWithTrace,
@@ -24,6 +25,7 @@ export interface MenuDay {
   slots: { slot: MealSlot; label: string; options: Meal[] }[];
 }
 export interface PrintedPlan {
+  catalog_revision?: string;
   version: 1;
   created_at: string;
   date: string;
@@ -88,6 +90,7 @@ export function generatePrintedPlan(
   policy: ProteinEnginePolicy,
   date: string,
   notes = "",
+  engine: Pick<MealPlanEngine, "generateDailyMealPlan" | "getProfessionalMealOptions"> = { generateDailyMealPlan, getProfessionalMealOptions },
 ): PrintedPlan {
   if (!Number.isInteger(count) || count < 1 || count > 4)
     throw new Error("تعداد منو باید بین ۱ تا ۴ باشد.");
@@ -117,7 +120,7 @@ export function generatePrintedPlan(
       isWorkoutDay: workout,
       referenceDate,
     });
-    const base = generateDailyMealPlan(
+    const base = engine.generateDailyMealPlan(
       targets,
       a.weight_kg,
       preferences,
@@ -134,7 +137,7 @@ export function generatePrintedPlan(
     }));
     for (const slot of slots) {
       if (count === 1) continue;
-      for (const candidate of getProfessionalMealOptions(
+      for (const candidate of engine.getProfessionalMealOptions(
         slot.options[0],
         preferences,
         workout,

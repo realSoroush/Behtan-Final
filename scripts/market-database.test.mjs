@@ -18,6 +18,7 @@ export async function testMarketDatabase({ db }) {
     "20261104182716_045_member_review_and_meal_events.sql",
     "20261104205157_046_member_safety_sync.sql",
     "20261105094021_047_egg_sesame_allergen_safety.sql",
+    "20261105171239_048_nutrition_context_snapshot.sql",
   ])
     await db.exec(
       await readFile(
@@ -113,6 +114,40 @@ export async function testMarketDatabase({ db }) {
     ).rows[0].n,
     1,
   );
+  const snapshot = async (known = null) => (await db.query(
+    "select nutrition_context_snapshot($1) as result", [known],
+  )).rows[0].result;
+  await as(user);
+  const paidSnapshot = await snapshot();
+  assert.equal(paidSnapshot.policy_row.id, 'default');
+  assert(paidSnapshot.food_rows.length > 0);
+  assert.deepEqual(await snapshot(paidSnapshot.revision), { schema_version: 1, revision: paidSnapshot.revision });
+  await as(other);
+  await assert.rejects(() => snapshot(paidSnapshot.revision), /NUTRITION_CONTEXT_DENIED/);
+  await db.exec('reset role; set role anon');
+  await assert.rejects(() => snapshot(), /permission denied/);
+  await db.exec('reset role; set role service_role');
+  assert.deepEqual(await snapshot(), paidSnapshot, 'Member and server consume identical reference rows');
+  await db.exec('reset role; begin');
+  try {
+    const t = paidSnapshot.template_rows.find(t => t.id === paidSnapshot.slot_rows[0].template_id);
+    const ingredient = paidSnapshot.slot_rows.find(s => s.template_id === t.id);
+    await db.query(`insert into meal_template_slots(template_id,position,role,primary_food_item_id,dynamic_units)
+      select $1, n, $2, $3, true from generate_series(1000,2000) n`,
+      [t.id, ingredient.role, ingredient.primary_food_item_id]);
+    await db.query("update nutrition_protein_policy set reference_bmi=24 where id='default'");
+    const expanded = await snapshot(paidSnapshot.revision);
+    assert.notEqual(expanded.revision, paidSnapshot.revision);
+    assert.equal(expanded.slot_rows.length, paidSnapshot.slot_rows.length + 1001);
+    assert.equal(Number(expanded.policy_row.reference_bmi), 24);
+    await db.query('update food_items set is_active=false where id=$1', [ingredient.primary_food_item_id]);
+    const retired = await snapshot(expanded.revision);
+    assert.notEqual(retired.revision, expanded.revision);
+    assert(!retired.food_rows.some(f => f.id === ingredient.primary_food_item_id));
+    assert(!retired.slot_rows.some(s => s.primary_food_item_id === ingredient.primary_food_item_id || s.template_id === t.id));
+    assert(!retired.substitute_rows.some(s => [s.food_item_id, s.substitute_food_item_id].includes(ingredient.primary_food_item_id)));
+  } finally { await db.exec('rollback'); }
+  console.log('PASS nutrition context SQL: subscribed/service parity, denied anonymous and unpaid reads, 1,000+ slots, revision changes, retired-food exclusion');
   await db.query(
     "update user_subscriptions set revoked_at=now() where user_id=$1",
     [user],

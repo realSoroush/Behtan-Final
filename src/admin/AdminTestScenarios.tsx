@@ -2,7 +2,6 @@ import { PanelSelect } from '@/components/ui/PanelSelect';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useNutritionCatalog } from '@/hooks/useNutritionCatalog';
-import { useProteinEnginePolicy } from '@/hooks/useProteinEnginePolicy';
 import { JalaliBirthDate } from '@/components/ui/JalaliBirthDate';
 import { OptionCard, CheckboxCard } from '@/components/ui/Card';
 import { MedicalSafetyForm, type MedicalSafetyFormValue } from '@/components/safety/MedicalSafetyForm';
@@ -37,7 +36,6 @@ export function AdminTestScenarios({ adminId }: { adminId: string }) {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const catalog = useNutritionCatalog();
-  const protein = useProteinEnginePolicy();
 
   const load = async () => {
     setLoading(true);
@@ -83,8 +81,8 @@ export function AdminTestScenarios({ adminId }: { adminId: string }) {
   };
   const generate = () => {
     setError(''); setNotice(''); setResult(null);
-    if (!catalog.catalog || !protein.policy) { setError('کاتالوگ یا سیاست پروتئین هنوز آماده نیست.'); return; }
-    try { setResult(calculateTestScenario(scenario, catalog.catalog, protein.policy)); }
+    if (!catalog.catalog || !catalog.policy) { setError('کاتالوگ یا سیاست پروتئین هنوز آماده نیست.'); return; }
+    try { setResult(calculateTestScenario(scenario, catalog.catalog, catalog.policy)); }
     catch (e) { setError(e instanceof Error ? e.message : 'تولید برنامه انجام نشد.'); }
   };
   const data = scenario.data;
@@ -127,7 +125,7 @@ export function AdminTestScenarios({ adminId }: { adminId: string }) {
       </>}
       </div>
       <div className="admin-tools"><button type="button" disabled={step === 0} onClick={() => setStep(step - 1)}>قبلی</button>{step < steps.length - 1 && <button type="button" onClick={() => setStep(step + 1)}>بعدی</button>}<button type="button" disabled={busy} onClick={() => void save()}>{busy ? 'در حال ذخیره…' : currentId ? 'ذخیره تغییرات' : 'ذخیره سناریو'}</button>{currentId && <button type="button" disabled={busy} onClick={() => void remove()}>حذف سناریو</button>}</div>
-      {step === steps.length - 1 && <><button type="button" disabled={catalog.loading || protein.loading || !catalog.catalog || !protein.policy} onClick={generate}>تولید و مشاهدهٔ برنامه</button>{(catalog.loading || protein.loading) && <p>در حال بارگیری داده‌های برنامه…</p>}{(catalog.error || protein.error) && <p role="alert">{catalog.error ?? protein.error} <button type="button" onClick={() => { void catalog.refetch(); void protein.refetch(); }}>تلاش دوباره</button></p>}</>}
+      {step === steps.length - 1 && <><button type="button" disabled={catalog.loading || !catalog.catalog || !catalog.policy} onClick={generate}>تولید و مشاهدهٔ برنامه</button>{(catalog.loading) && <p>در حال بارگیری داده‌های برنامه…</p>}{catalog.error && <p role="alert">{catalog.error} <button type="button" onClick={() => { void catalog.refetch(); }}>تلاش دوباره</button></p>}</>}
       {error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}
     </section>
     {result && <section className="admin-card"><h2>پیش‌نمایش همان برنامهٔ روزانه</h2><p className="admin-note">سناریوی تازه، بدون وعدهٔ مصرف‌شده یا سابقهٔ روزهای قبل. مجموع غذاهای تولیدشده ممکن است اندکی با هدف ماکرو تفاوت داشته باشد.</p>

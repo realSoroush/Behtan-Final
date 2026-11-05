@@ -1,6 +1,6 @@
 import type { PrintedPlan, RealIntake } from '../src/professional/menuPlan.ts';
 import { generatePrintedPlan } from '../src/professional/menuPlan.ts';
-import { configureNutritionCatalog } from '../src/utils/mealPlanEngine.ts';
+import { createMealPlanEngine } from '../src/utils/mealPlanEngine.ts';
 import type { NutritionCatalog, ProteinEnginePolicy } from '../src/types/index.ts';
 import { proNutritionDraftAllowed } from '../src/professional/intake.ts';
 
@@ -15,7 +15,7 @@ export interface PlanDependencies {
   reportFailure?(input:{id:string;actor:string;org:string;operation:'generate'|'save';code:string}):Promise<void>;
   verifyToken(token: string): Promise<string>;
   readCase(token: string, org: string, record: string): Promise<{ revision: number; answers: RealIntake }>;
-  loadNutrition(token: string): Promise<{ catalog: NutritionCatalog; policy: ProteinEnginePolicy }>;
+  loadNutrition(token: string): Promise<{ catalog: NutritionCatalog; policy: ProteinEnginePolicy; revision?: string }>;
   stage(input: { org: string; record: string; revision: number; actor: string; key: string; request: DraftRequest; plan: PrintedPlan }): Promise<ServerDraft>;
   publish(input: { org: string; record: string; revision: number; actor: string; draft: string; key: string }): Promise<string>;
 }
@@ -53,13 +53,12 @@ export async function processPlanRequest(body: unknown, token: string, deps: Pla
   if (!proNutritionDraftAllowed(current.answers, new Date())
       || !proNutritionDraftAllowed(current.answers, new Date(request.date + 'T12:00:00Z')))
     throw new ProServerError('PRO_MEDICAL_STOP', 422);
-  const { catalog, policy } = await deps.loadNutrition(token);
+  const { catalog, policy, revision } = await deps.loadNutrition(token);
   let plan: PrintedPlan;
   try {
-    // No await between configuring and using the legacy synchronous engine: requests
-    // cannot interleave catalogs on this Node event loop.
-    configureNutritionCatalog(catalog);
-    plan = generatePrintedPlan(current.answers, current.revision, request.count, policy, request.date, request.notes);
+    const engine = createMealPlanEngine(catalog, revision);
+    plan = generatePrintedPlan(current.answers, current.revision, request.count, policy, request.date, request.notes, engine);
+    if (revision) plan.catalog_revision = revision;
   } catch {
     throw new ProServerError('PRO_GENERATION_FAILED', 422);
   }
