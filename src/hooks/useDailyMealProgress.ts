@@ -20,7 +20,9 @@ export function useDailyMealProgress(userId: string | undefined, localDateKey: s
     if (sbError) { setError('وضعیت وعده‌های امروز از حساب شما دریافت نشد.'); setSnapshots({}); }
     else {
       const next: DailyMealSnapshots = {};
-      for (const row of data ?? []) { const slot = row.meal_slot as MealSlot; if (isStoredMealSnapshot(row.meal_snapshot, slot)) next[slot] = { ...row.meal_snapshot, consumed: true }; }
+      let invalid = false;
+      for (const row of data ?? []) { const slot = row.meal_slot as MealSlot; if (isStoredMealSnapshot(row.meal_snapshot, slot)) next[slot] = { ...row.meal_snapshot, consumed: true }; else invalid = true; }
+      if (invalid) setError('بخشی از سابقهٔ مصرف نیازمند بررسی است؛ داده حذف نشده است. با پشتیبانی تماس بگیر.');
       setSnapshots(next);
     }
     setLoadedKey(requestKey); setLoading(false);
@@ -29,6 +31,7 @@ export function useDailyMealProgress(userId: string | undefined, localDateKey: s
   useEffect(() => { setSnapshots({}); setLoadedKey(null); void fetchProgress(); }, [fetchProgress]);
 
   const setMealConsumed = useCallback(async (meal: Meal, consumed: boolean) => {
+    if (consumed && !isStoredMealSnapshot(meal, meal.slot)) throw new Error('اطلاعات این وعده معتبر نیست.');
     if (!userId) throw new Error('Cannot persist meal progress without an authenticated user.');
     if (loadedKey !== requestKey) throw new Error('Daily meal progress is not hydrated yet.');
     if (savingSlotsState.includes(meal.slot)) return;

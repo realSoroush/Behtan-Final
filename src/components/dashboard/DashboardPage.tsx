@@ -1,3 +1,4 @@
+import { generateMemberPrescription, currentIntakeLocks } from '@/utils/memberPrescription';
 import {extraFoodOperation,finishExtraFoodOperation} from '@/member/extraFoodOperation';
 import {isMealSkipped} from '@/member/mealStatus';
 import {Dumbbell} from 'lucide-react';
@@ -432,7 +433,7 @@ export function DashboardPage() {
         return { plan: scheduledToday, error: null };
       const dateKey = `${todayKey}-v${planVersion}`;
       return {
-        plan: generateDailyMealPlan(
+        plan: generateMemberPrescription(
           targets,
           profile.weight,
           profile.dietary_preferences_json,
@@ -441,7 +442,7 @@ export function DashboardPage() {
           {
             previousDay: history.meals,
             avoidMeals: generationContext.avoidMeals,
-            lockedMeals: generationContext.lockedMeals,
+            lockedMeals: currentIntakeLocks(generationContext.lockedMeals, consumedMealSnapshots),
             proteinBudgetPreference:
               profile.protein_budget_preference ?? 'performance',
           },
@@ -465,6 +466,7 @@ export function DashboardPage() {
     history.loading,
     history.meals,
     generationContext,
+    consumedMealSnapshots,
     generationKey,
     workoutChoice?.key,
     schedule.loading,
@@ -523,7 +525,7 @@ export function DashboardPage() {
       const plan = withSwapBaseline({
         ...next,
         meals: next.meals.map(meal => meal.consumed
-          ? baseline.meals.find(original => original.slot === meal.slot) ?? meal
+          ? { ...(baseline.meals.find(original => original.slot === meal.slot) ?? meal), consumed: false }
           : meal),
       }, baseline);
       try {

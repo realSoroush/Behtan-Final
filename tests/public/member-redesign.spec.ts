@@ -507,3 +507,43 @@ test('account saves celery allergy while preserving existing food preferences', 
   await page.getByRole('link', { name: 'حساب من', exact: true }).click();
   await expect(allergies).toContainText('لبنیات، کرفس');
 });
+
+test('allergy change keeps consumed history but undo and reopening expose only safe prescriptions', async ({ page }) => {
+  await page.getByRole('button', { name: 'تغییر وعده', exact: true }).click();
+  await expect(page.locator('#today-panel [data-food-id="sangak_bread"]').first()).toBeVisible();
+  let eaten: any;
+  page.on('request', request => {
+    if (request.method() === 'POST' && request.url().includes('/daily_meal_checkins')) eaten = request.postDataJSON().meal_snapshot;
+  });
+  await page.getByRole('button', { name: 'علامت‌گذاری وعده به‌عنوان مصرف‌شده' }).click();
+  await page.getByRole('dialog', { name: 'تأیید ثبت وعده' }).getByRole('button', { name: 'بله، ثبت کن' }).click();
+  await expect(page.locator('.meal-receipt')).toBeVisible();
+  expect(eaten.components.some((c: any) => c.foodItem.allergyFlags.includes('gluten'))).toBe(true);
+  const changed = { ...profile, dietary_preferences_json: { vegetarianStatus: 'none', allergies: ['gluten'] } };
+  await page.route('**/src/hooks/useUserProfile.ts*', route => route.fulfill({ contentType: 'text/javascript',
+    body: `const profile=${JSON.stringify(changed)};export function useUserProfile(){return {profile,loading:false,error:null,refetch:async()=>{}}}` }));
+  const savedPlans: any[] = [];
+  page.on('request', request => {
+    if (request.url().includes('/rpc/save_member_meal_schedule_v3')) savedPlans.push(...request.postDataJSON().p_days.map((d: any) => d.plan));
+  });
+  await page.reload();
+  await expect(page.locator('#today-panel .member-meal-card')).toBeVisible();
+  await page.getByRole('button', { name: /نمایش وعده‌های امروز/ }).click();
+  const day = page.getByRole('dialog', { name: 'وعده‌های امروز', exact: true });
+  const historical = day.locator(`[data-meal-slot="${eaten.slot}"]`);
+  await expect(historical.locator('.day-meal-undo')).toBeVisible();
+  await expect(historical).toContainText(eaten.components[0].foodItem.name);
+  await historical.locator('.day-meal-undo').click();
+  await expect(historical.locator('.day-meal-undo')).toHaveCount(0);
+  const forbidden = raw.FOOD_ITEMS.filter((f: any) => f.allergyFlags.includes('gluten')).map((f: any) => f.id);
+  for (const id of forbidden) await expect(historical.locator(`[data-food-id="${id}"]`)).toHaveCount(0);
+  await day.getByRole('button', { name: 'بستن', exact: true }).click();
+  await expect.poll(() => savedPlans.length).toBeGreaterThan(0);
+  for (const plan of savedPlans) {
+    expect(plan.meals.every((m: any) => !m.consumed && !m.source)).toBe(true);
+    expect(plan.meals.every((m: any) => m.components.every((c: any) => !c.foodItem.allergyFlags.includes('gluten')))).toBe(true);
+  }
+  await page.reload();
+  await expect(page.locator('#today-panel .member-meal-card')).toBeVisible();
+  for (const id of forbidden) await expect(page.locator(`#today-panel [data-food-id="${id}"]`)).toHaveCount(0);
+});

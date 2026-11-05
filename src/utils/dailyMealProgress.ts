@@ -8,8 +8,4 @@ export function applyDailyMealSnapshots(plan: DailyMealPlan | null, snapshots: D
   if (!plan) return null;
   return { ...plan, meals: plan.meals.map((meal) => snapshots[meal.slot] ? { ...snapshots[meal.slot]!, consumed: true } : { ...meal, consumed: false }) };
 }
-export function isStoredMealSnapshot(value: unknown, expectedSlot: MealSlot): value is Meal {
-  if (!value || typeof value !== 'object') return false;
-  const meal = value as Partial<Meal>;
-  return meal.slot === expectedSlot && typeof meal.label === 'string' && typeof meal.templateId === 'string' && typeof meal.templateName === 'string' && Array.isArray(meal.components) && typeof meal.totalKcal === 'number' && typeof meal.totalProtein === 'number' && typeof meal.totalCarbs === 'number' && typeof meal.totalFat === 'number';
-}
+export { isMealSnapshot as isStoredMealSnapshot } from './mealValidation.ts';

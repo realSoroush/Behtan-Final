@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { addPlanDays, isPresentablePlan } from "@/utils/mealPresentation";
+import { addPlanDays } from "@/utils/mealPresentation";
+import { isMealPlan as isPresentablePlan, isPrescriptionPlan } from '@/utils/mealValidation';
 import type { DailyMealPlan, DietaryPreferencesJson } from "@/types";
 type Row = { plan_date: string; plan: unknown; context_key: string; updated_at: string };
 const emptySchedule = { plans: {}, versions: {} };
@@ -8,12 +9,17 @@ const emptySchedule = { plans: {}, versions: {} };
 function scheduleFrom(rows: unknown, context: string) {
   const plans: Record<string, DailyMealPlan> = {};
   const versions: Record<string, string> = {};
+  let invalid = false;
   for (const row of (Array.isArray(rows) ? rows as Row[] : [])) {
     if (!row || typeof row.plan_date !== "string" || typeof row.updated_at !== "string") continue;
     versions[row.plan_date] = row.updated_at;
-    if (row.context_key === context && isPresentablePlan(row.plan)) plans[row.plan_date] = row.plan;
+    if (!isPresentablePlan(row.plan)) invalid = true;
+    else if (row.context_key === context) {
+      if (isPrescriptionPlan(row.plan)) plans[row.plan_date] = row.plan;
+      // Legacy intake-bearing schedules are rebuilt underneath intact checkins.
+    }
   }
-  return { plans, versions };
+  return { plans, versions, invalid };
 }
 
 const conflictMessage = "برنامه در دستگاه یا پنجرهٔ دیگری تغییر کرده است. نسخهٔ تازه را باز کن و دوباره انتخاب کن.";
@@ -53,13 +59,14 @@ export function useMemberMealSchedule(
           .gte("plan_date", today)
           .lte("plan_date", addPlanDays(today, 6))
           .abortSignal(controller.signal);
+        const parsed = error ? emptySchedule : scheduleFrom(data, context);
         if (alive)
           setState({
             key,
-            ...(error ? emptySchedule : scheduleFrom(data, context)),
+            ...parsed,
             error: error
               ? "دریافت برنامهٔ ذخیره‌شده انجام نشد. برنامهٔ فعلی قابل‌استفاده است؛ برای هفته دوباره تلاش کن."
-              : null,
+              : ('invalid' in parsed && parsed.invalid) ? 'برنامهٔ ذخیره‌شده نیازمند بررسی است؛ داده حذف نشده است. با پشتیبانی تماس بگیر.' : null,
           });
       } catch {
         if (alive)
@@ -82,6 +89,7 @@ export function useMemberMealSchedule(
     async (days: { date: string; plan: DailyMealPlan }[], replace = false, mealEdit = false) => {
       if (!context || !userId || key !== state.key || state.error)
         throw Error("ابتدا برنامهٔ ذخیره‌شده را دوباره دریافت کن.");
+      if (!days.every(day => isPrescriptionPlan(day.plan))) throw Error('برنامهٔ پیشنهادی معتبر نیست؛ دوباره دریافت کن.');
       const versionedDays = days.map(day => ({
         ...day,
         expected_updated_at: state.versions[day.date] ?? null,
@@ -120,6 +128,7 @@ export function useMemberMealSchedule(
           }
           if (error) throw Error("برنامه ذخیره نشد. دوباره تلاش کن.");
           const updated = scheduleFrom(data, context);
+          if (updated.invalid) throw Error('پاسخ ذخیرهٔ برنامه معتبر نیست؛ دوباره دریافت کن.');
           if (keyRef.current === key) setState({ key, ...updated, error: null });
           return updated.plans;
         } finally {
