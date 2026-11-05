@@ -90,36 +90,7 @@ export function addPlanDays(key: string, days: number) {
   d.setDate(d.getDate() + days);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
-export function isPresentablePlan(value: unknown): value is DailyMealPlan {
-  if (!value || typeof value !== "object") return false;
-  const p = value as DailyMealPlan;
-  return (
-    typeof p.isWorkoutDay === "boolean" &&
-    Array.isArray(p.meals) &&
-    p.meals.length > 0 &&
-    p.meals.length <= 12 &&
-    p.meals.every(
-      (m) =>
-        m &&
-        typeof m.slot === "string" &&
-        typeof m.label === "string" &&
-        typeof m.totalKcal === "number" &&
-        Number.isFinite(m.totalKcal) &&
-        Array.isArray(m.components) &&
-        m.components.length <= 20 &&
-        m.components.every(
-          (c) =>
-            c &&
-            typeof c.foodItem?.id === "string" &&
-            typeof c.foodItem.name === "string" &&
-            Number.isFinite(c.grams) &&
-            Number.isFinite(c.kcal),
-        ),
-    ) &&
-    p.targets &&
-    Number.isFinite(p.targets.targetCalories)
-  );
-}
+export { isMealPlan as isPresentablePlan } from './mealValidation.ts';
 
 export type MemberScheduledPlan = DailyMealPlan & {
   swapBaselineMeals?: Meal[];
@@ -225,11 +196,11 @@ export function prescriptionForSchedule(
   return {
     ...result,
     meals: result.meals.map((meal) =>
-      Boolean(meal.source)
+      Boolean(meal.source) || meal.consumed
         ? (result.swapBaselineMeals?.find(
             (original) =>
-              original.slot === meal.slot && !original.source,
-          ) ?? meal)
+              original.slot === meal.slot && !original.source && !original.consumed,
+          ) ?? (() => { throw Error('پیشنهاد مستقل این وعده آماده نیست؛ برنامه را دوباره دریافت کن.'); })())
         : meal,
     ),
   };

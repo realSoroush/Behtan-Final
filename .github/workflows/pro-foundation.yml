@@ -24,6 +24,7 @@ jobs:
           node-version: "24"
           cache: npm
       - run: npm ci
+      - run: npm run test:engine:safety
       - run: npm run test:landing
       - run: node --experimental-strip-types scripts/member-redesign.test.mjs
       - run: node --experimental-strip-types scripts/member-dialog-scroll.test.mjs

@@ -11,6 +11,7 @@ import type {
   PortionRule,
   VegetarianStatus,
 } from '@/types';
+import { finiteNonnegative } from './mealValidation.ts';
 
 export interface FoodItemRow {
   preparation_state?: 'ready'|'cooked'|'dry'|'raw';
@@ -190,7 +191,7 @@ export function assertValidNutritionCatalog(catalog: NutritionCatalog): void {
     }
     foodIds.add(food.id);
 
-    if (food.gramsPerUnit <= 0 || food.kcalPerUnit < 0 || food.proteinPerUnit < 0 || food.carbsPerUnit < 0 || food.fatPerUnit < 0 || food.fiberPerUnit < 0 || food.fruitVegGramsPerUnit < 0) {
+    if (![food.gramsPerUnit, food.kcalPerUnit, food.proteinPerUnit, food.carbsPerUnit, food.fatPerUnit, food.fiberPerUnit, food.fruitVegGramsPerUnit].every(finiteNonnegative) || food.gramsPerUnit <= 0 || food.kcalPerUnit < 0 || food.proteinPerUnit < 0 || food.carbsPerUnit < 0 || food.fatPerUnit < 0 || food.fiberPerUnit < 0 || food.fruitVegGramsPerUnit < 0) {
       throw new Error(`[nutritionCatalog] Invalid macros/units for food: ${food.id}`);
     }
     if (food.fruitVegGramsPerUnit > food.gramsPerUnit + 1e-9) {
@@ -211,6 +212,7 @@ export function assertValidNutritionCatalog(catalog: NutritionCatalog): void {
       throw new Error(`[nutritionCatalog] Missing portion rule for food: ${food.id}`);
     }
     if (
+      !Object.values(rule).every(finiteNonnegative) ||
       rule.minUnits <= 0 ||
       rule.step <= 0 ||
       rule.minUnits > rule.typicalUnits ||
@@ -245,6 +247,7 @@ export function assertValidNutritionCatalog(catalog: NutritionCatalog): void {
       throw new Error(`[nutritionCatalog] Template has no slots: ${template.id}`);
     }
     for (const slot of template.slots) {
+      if (!slot.dynamicUnits && (typeof slot.fixedUnits !== 'number' || !Number.isFinite(slot.fixedUnits) || slot.fixedUnits <= 0)) throw new Error(`[nutritionCatalog] Invalid fixed units: ${template.id}`);
       if (!foodIds.has(slot.primaryFoodItemId)) {
         throw new Error(
           `[nutritionCatalog] Template ${template.id} references missing food ${slot.primaryFoodItemId}.`
