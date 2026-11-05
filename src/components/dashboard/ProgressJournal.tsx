@@ -14,6 +14,7 @@ import {useProgressJournal} from '@/hooks/useProgressJournal';
 const number=(n:number)=>n.toLocaleString('fa-IR',{maximumFractionDigits:1});
 const dateLabel=(date:string)=>new Date(date+'T12:00:00').toLocaleDateString('fa-IR',{month:'short',day:'numeric'});
 const recommendationText = {
+  review_measurements: 'پیش از نتیجه‌گیری دربارهٔ روند، تاریخ، واحد و شرایط اندازه‌گیری وزن را بررسی کن. جهت تغییر وزن به‌تنهایی کافی نیست؛ تغییر محسوس یا ناخواسته را با متخصص مرور کن.',
   review_hunger: 'گرسنگی مکرر ثبت شده. قبل از تغییر هدف، اندازه و زمان وعده‌ها را با متخصص مرور کن.',
   review_routine: 'اجرای برنامه سخت بوده. این هفته روی رفع مانع ثبت‌شده و انتخاب وعده‌های قابل‌اجرا تمرکز کن.',
   review_trend: 'روند این دو هفته با هدف هم‌جهت نیست. یک هفتهٔ دیگر ثبت را ادامه بده و بعد هدف را بازبینی کن.',

@@ -13,7 +13,7 @@ export function parseWeight(value:string):number|null {
   const n=Number(normalized);if(n<25||n>350)throw Error('وزن باید بین ۲۵ تا ۳۵۰ کیلوگرم باشد.');return n;
 }
 export function weightTrend(entries:ProgressEntry[]) {
-  const points=entries.filter(e=>typeof e.weight_kg==='number'&&Number.isFinite(e.weight_kg)).sort((a,b)=>a.entry_date.localeCompare(b.entry_date));
+  const points=entries.filter(e=>validDay(e.entry_date)&&validWeight(e.weight_kg)).sort((a,b)=>a.entry_date.localeCompare(b.entry_date));
   return {points,change:points.length>1?Math.round((points[points.length-1].weight_kg!-points[0].weight_kg!)*10)/10:null};
 }
 export function reviewDue(entries:ProgressEntry[],today:string):boolean {
@@ -22,11 +22,21 @@ export function reviewDue(entries:ProgressEntry[],today:string):boolean {
 }
 
 const DAY_MS = 86_400_000;
+export const WEEKLY_REVIEW_VERSION = 'descriptive-review-v2';
+const validDay = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+  Number.isFinite(Date.parse(value + 'T12:00:00Z')) && new Date(value + 'T12:00:00Z').toISOString().slice(0, 10) === value;
+const validWeight = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 25 && value <= 350;
+
 
 /** Two consecutive seven-day windows, each with at least three distinct readings. */
 export function weeklyGoalReview(entries: ProgressEntry[], today: string, goal: 'weight_loss'|'weight_gain'|'maintenance') {
+  if (!validDay(today)) return null;
   const anchor = Date.parse(today + 'T12:00:00Z');
-  const days = [...new Map(entries.map(entry => [entry.entry_date, entry])).values()];
+  const relevant = entries.filter(entry => validDay(entry.entry_date) && entry.entry_date <= today &&
+    anchor - Date.parse(entry.entry_date + 'T12:00:00Z') < 14 * DAY_MS);
+  const duplicates = relevant.some((entry, i) => relevant.findIndex(other => other.entry_date === entry.entry_date) !== i);
+  const invalid = relevant.some(entry => entry.weight_kg !== null && !validWeight(entry.weight_kg));
+  const days = [...new Map(relevant.map(entry => [entry.entry_date, entry])).values()];
   const recent = days.filter(entry => {
     const age = (anchor - Date.parse(entry.entry_date + 'T12:00:00Z')) / DAY_MS;
     return age >= 0 && age < 14;
@@ -45,10 +55,14 @@ export function weeklyGoalReview(entries: ProgressEntry[], today: string, goal: 
   const stable = Math.abs(delta) < 0.25;
   const onTrack = goal === 'maintenance' ? stable
     : !stable && (goal === 'weight_loss' ? delta < 0 : delta > 0);
-  const recommendation: 'review_hunger' | 'review_routine' | 'continue' | 'review_trend' = feedback.hunger === 'often' ? 'review_hunger'
+  // No clinically reviewed rate/uncertainty policy exists yet. Direction alone
+  // must never certify an acceptable rate, including small changes. Keep this
+  // descriptive until E07/E14 policy review, rather than inventing a cutoff.
+  const recommendation: 'review_measurements' | 'review_hunger' | 'review_routine' | 'continue' | 'review_trend' = duplicates || invalid ? 'review_measurements'
+    : feedback.hunger === 'often' ? 'review_hunger'
     : feedback.adherence !== 'mostly' || feedback.hunger === 'sometimes' || (feedback.difficulty && feedback.difficulty !== 'none') ? 'review_routine'
-      : onTrack ? 'continue' : 'review_trend';
+      : onTrack ? (goal === 'maintenance' ? 'continue' : 'review_measurements') : 'review_trend';
 
   return { currentAverage, previousAverage, recommendation,
-    evidence: [goal, feedback, currentWeights, previousWeights] };
+    evidence: [WEEKLY_REVIEW_VERSION, goal, feedback, currentWeights, previousWeights, { duplicates, invalid }] };
 }
