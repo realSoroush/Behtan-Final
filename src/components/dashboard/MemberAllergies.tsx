@@ -1,3 +1,4 @@
+import { NEW_ALLERGEN_NOTICE } from '@/utils/allergens';
 import { useState } from 'react';
 import { ALLERGIES } from '@/components/onboarding/Step7Dietary';
 import { supabase } from '@/lib/supabaseClient';
@@ -54,6 +55,7 @@ export function MemberAllergies({ userId, preferences }: { userId: string; prefe
         <MemberDialog title="ویرایش حساسیت‌های غذایی" onClose={() => setDraft(null)} dismissible={!saving}>
           <div className="meal-confirmation-content space-y-3">
             <p>به‌تن حساسیت‌های ثبت‌شده را در ساخت برنامه و پیشنهادهای جایگزین در نظر می‌گیرد.</p>
+            {(draft.allergies.includes('egg') || draft.allergies.includes('sesame')) && <p role="status" className="text-sm">{NEW_ALLERGEN_NOTICE}</p>}
             <fieldset disabled={saving} className="grid gap-2">
               <legend className="sr-only">حساسیت‌های غذایی</legend>
               {ALLERGIES.map(({ value, label }) => (

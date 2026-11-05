@@ -1,3 +1,4 @@
+import { NEW_ALLERGEN_NOTICE } from '@/utils/allergens';
 import {isoToJalali} from '@/utils/jalaliDate';
 import { PanelSelect } from "@/components/ui/PanelSelect";
 import { ArrowLeft, ArrowRight } from "lucide-react";
@@ -21,6 +22,8 @@ const allergies = [
   ["soy", "سویا"],
   ["seafood", "غذای دریایی"],
   ["celery", "کرفس"],
+  ["egg", "تخم‌مرغ"],
+  ["sesame", "کنجد"],
 ] as const;
 export function CaseIntakeForm({
   value: a,
@@ -249,6 +252,7 @@ export function CaseIntakeForm({
               </label>
             </div>
             <h4>حساسیت غذایی</h4>
+            {(a.allergies.includes('egg') || a.allergies.includes('sesame')) && <p role="status">{NEW_ALLERGEN_NOTICE}</p>}
             <div className="pro-check-grid">
               {allergies.map(([id, label]) => (
                 <label key={id}>

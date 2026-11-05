@@ -11,7 +11,9 @@
       "proteinPerUnit": 3.6,
       "carbsPerUnit": 0.2,
       "fatPerUnit": 0.1,
-      "allergyFlags": [],
+      "allergyFlags": [
+        "egg"
+      ],
       "excludedForVegetarian": [
         "vegan"
       ],
@@ -36,7 +38,9 @@
       "proteinPerUnit": 6.3,
       "carbsPerUnit": 0.6,
       "fatPerUnit": 5.3,
-      "allergyFlags": [],
+      "allergyFlags": [
+        "egg"
+      ],
       "excludedForVegetarian": [
         "vegan"
       ],

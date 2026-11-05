@@ -1,3 +1,4 @@
+import { ALLERGENS, ASSESSMENT_STATUSES } from './allergens.ts';
 import type {
   Allergy,
   FoodItem,
@@ -29,6 +30,8 @@ export interface FoodItemRow {
   quality_tags: FoodQualityTag[] | null;
   fruit_veg_grams_per_unit: number | string;
   allergy_flags: Allergy[] | null;
+  allergen_assessment?: FoodItem['allergenAssessment'];
+  allergen_assessment_source?: string | null;
   excluded_for_vegetarian: VegetarianStatus[] | null;
   swap_allowed_meals: MealSlot[] | null;
   swap_group: string | null;
@@ -104,6 +107,8 @@ export function buildNutritionCatalog(input: {
       qualityTags: row.quality_tags ?? [],
       fruitVegGramsPerUnit: toNumber(row.fruit_veg_grams_per_unit, `${row.id}.fruit_veg_grams_per_unit`),
       allergyFlags: row.allergy_flags ?? [],
+      ...(row.allergen_assessment && Object.keys(row.allergen_assessment).length ? { allergenAssessment: row.allergen_assessment } : {}),
+      ...(row.allergen_assessment_source ? { allergenAssessmentSource: row.allergen_assessment_source } : {}),
       excludedForVegetarian: row.excluded_for_vegetarian ?? [],
       swapAllowedMeals: row.swap_allowed_meals ?? [],
       swapGroup: (row.swap_group ?? '').trim() || row.role,
@@ -207,6 +212,13 @@ export function assertValidNutritionCatalog(catalog: NutritionCatalog): void {
       throw new Error(`[nutritionCatalog] Invalid swap priority for food: ${food.id}`);
     }
 
+    if (!Array.isArray(food.allergyFlags) || food.allergyFlags.some(a => !ALLERGENS.includes(a))) throw new Error('[nutritionCatalog] Unknown allergen.');
+    if (food.allergenAssessment !== undefined) {
+      const assessment = food.allergenAssessment;
+      if (!assessment || typeof assessment !== 'object' || Array.isArray(assessment) || Object.entries(assessment).some(([key, status]) =>
+        !ALLERGENS.includes(key as Allergy) || !ASSESSMENT_STATUSES.includes(status!))) throw new Error('[nutritionCatalog] Invalid allergen assessment.');
+      if (Object.values(assessment).includes('assessed_absent') && !food.allergenAssessmentSource?.trim()) throw new Error('[nutritionCatalog] Missing allergen assessment source.');
+    }
     const rule = catalog.portionRules[food.id];
     if (!rule) {
       throw new Error(`[nutritionCatalog] Missing portion rule for food: ${food.id}`);
