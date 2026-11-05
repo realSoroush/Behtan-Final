@@ -395,6 +395,17 @@ test('stale schedule writes keep the displayed meal and ask to reload', async ({
   await expect(card.locator('h3')).toHaveText(before!);
 });
 
+test('abrupt weight change requests measurement review rather than continuation', async ({ page }) => {
+  await page.route('**/rest/v1/user_progress_entries?*', route => route.fulfill({
+    json: ['2026-10-23', '2026-10-25', '2026-10-27', '2026-10-30', '2026-11-01', '2026-11-03']
+      .map((entry_date, index) => ({entry_date, weight_kg: index < 3 ? 100 : 90, adherence:'mostly', hunger:'comfortable', difficulty:'none'})),
+  }));
+  await page.getByRole('link', { name: 'روند من', exact: true }).click();
+  const review = page.getByRole('region', { name: 'بازبینی هفتگی هدف' });
+  await expect(review).toContainText('پیش از نتیجه‌گیری دربارهٔ روند');
+  await expect(review).not.toContainText('روند وزن و تجربهٔ اجرای برنامه با ادامهٔ هدف فعلی سازگارند');
+});
+
 test('weekly review persists to the account and can retry a failed save', async ({ page }) => {
   await page.route('**/rest/v1/user_progress_entries?*', route => route.fulfill({
     json: ['2026-10-23', '2026-10-25', '2026-10-27', '2026-10-30', '2026-11-01', '2026-11-03']
