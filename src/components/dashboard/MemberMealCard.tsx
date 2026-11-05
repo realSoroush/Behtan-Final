@@ -17,10 +17,11 @@ interface Props {
   onSwapComponent: (index: number) => void;
   onChangeMeal?:()=>void;
   changing?:boolean;
+  changeDisabled?: boolean;
   onSkip?:()=>void;
   skipped?:boolean;
 }
-export function MemberMealCard({ meal, compact = false, readOnly = false, isConsumedSaving = false, consumedToggleDisabled = false, onToggleConsumed, onSwapComponent, onChangeMeal, changing=false,onSkip,skipped=false }: Props) {
+export function MemberMealCard({ meal, compact = false, readOnly = false, isConsumedSaving = false, consumedToggleDisabled = false, onToggleConsumed, onSwapComponent, onChangeMeal, changing=false,changeDisabled=false,onSkip,skipped=false }: Props) {
   const [expanded, setExpanded] = useState(!compact);
   const reduced = useReducedMotion();
   const disabled = readOnly || isConsumedSaving || consumedToggleDisabled;
@@ -36,8 +37,8 @@ export function MemberMealCard({ meal, compact = false, readOnly = false, isCons
       <button type="button" className="day-meal-expand" aria-label={`جزئیات ${meal.label}`} aria-expanded={expanded} onClick={() => setExpanded(!expanded)}><ChevronDown size={19} /></button>
     </div> : <>
       <div className="meal-visual-surface">
-      {onChangeMeal&&<div className="meal-change-row"><button type="button" disabled={changing||meal.consumed} onClick={onChangeMeal}>{changing?<Loader2 size={15} className="animate-spin"/>:<RefreshCw size={15}/>}تغییر وعده</button></div>}
-      <div className="meal-v3-hero"><div className="meal-v3-copy"><span className="meal-slot-label"><Utensils size={14} />{meal.label}</span><h3>{title}</h3>{companions && <p>همراه با {companions}</p>}<span className="meal-energy-v3"><b>{n(meal.totalKcal)}</b> کالری</span></div><PlateButton meal={meal} onSwapComponent={readOnly || meal.consumed || disabled ? undefined : onSwapComponent} /></div>
+      {onChangeMeal&&<div className="meal-change-row"><button type="button" disabled={changing||meal.consumed||changeDisabled} onClick={onChangeMeal}>{changing?<Loader2 size={15} className="animate-spin"/>:<RefreshCw size={15}/>}تغییر وعده</button></div>}
+      <div className="meal-v3-hero"><div className="meal-v3-copy"><span className="meal-slot-label"><Utensils size={14} />{meal.label}</span><h3>{title}</h3>{companions && <p>همراه با {companions}</p>}<span className="meal-energy-v3"><b>{n(meal.totalKcal)}</b> کالری</span></div><PlateButton meal={meal} onSwapComponent={readOnly || meal.consumed || disabled || changeDisabled ? undefined : onSwapComponent} /></div>
       </div>
       <div className="meal-macro-chips">{[['پروتئین', meal.totalProtein], ['کربوهیدرات', meal.totalCarbs], ['چربی', meal.totalFat]].map(([label, value]) => <span key={label}><b>{n(Number(value))}</b> گرم {label}</span>)}</div>
       <div className="meal-card-actions">{toggle}<button type="button" className="meal-detail-button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? 'بستن مواد' : 'تغییر مواد'}<ChevronDown size={16} /></button></div>
@@ -47,7 +48,7 @@ export function MemberMealCard({ meal, compact = false, readOnly = false, isCons
     <AnimatePresence initial={false}>{expanded && <motion.div className="meal-ingredients" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={reduced?{duration:0}:{height:{type:'spring',duration:.36,bounce:.06},opacity:{duration:.16}}}>
       {compact && <div className="day-expanded-plate"><FoodPlate meal={meal}/></div>}
       <div className="meal-ingredient-list">{meal.components.map((c, i) => <div className="meal-ingredient-row" key={`${i}-${c.foodItem.id}`}>
-        <svg viewBox="-45 -45 90 90" aria-hidden="true"><FoodArt kind={foodVisual(c.foodItem)} /></svg><div><strong>{c.foodItem.name}</strong><span>{componentAmount(c)}<small> · {n(c.kcal)} کالری</small></span></div>{!readOnly && <button type="button" aria-label={`جایگزینی ${c.foodItem.name}`} onClick={() => onSwapComponent(i)} disabled={meal.consumed || disabled}><RefreshCw size={16} /><span>تغییر</span></button>}
+        <svg viewBox="-45 -45 90 90" aria-hidden="true"><FoodArt kind={foodVisual(c.foodItem)} /></svg><div><strong>{c.foodItem.name}</strong><span>{componentAmount(c)}<small> · {n(c.kcal)} کالری</small></span></div>{!readOnly && <button type="button" aria-label={`جایگزینی ${c.foodItem.name}`} onClick={() => onSwapComponent(i)} disabled={meal.consumed || disabled || changeDisabled}><RefreshCw size={16} /><span>تغییر</span></button>}
       </div>)}</div>
       {meal.components.map(component => {
         const recipe = memberRecipes.get(component.foodItem.id);

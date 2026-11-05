@@ -28,6 +28,15 @@ export async function testMemberMealCommit(db, user, unpaid) {
 
   try {
     const original = await read();
+    assert.equal(original.catalog_revision, revision);
+    for (const [action, limit] of [['meal_schedule', 12], ['preflight', 5], ['training', 5]]) {
+      // Avoid depending on wall-clock rollover across several RPCs.
+      await db.query("delete from member_compute_usage where user_id=$1 and action=$2", [user, action]);
+      const accepted = (await db.query(
+        'select member_reserve_compute($1,$2) as allowed from generate_series(1,$3)', [user, action, limit + 1],
+      )).rows.map(row => row.allowed);
+      assert.deepEqual(accepted, [...Array(limit).fill(true), false]);
+    }
     const request = { key: randomUUID(), profile: original.profile, intakeRevision: original.intake_revision };
     await db.query(`insert into daily_meal_checkins(user_id,plan_date,meal_slot,template_id,meal_snapshot)
       values($1,$2,'breakfast','test','{"slot":"breakfast"}')`, [user, day]);
@@ -39,10 +48,13 @@ export async function testMemberMealCommit(db, user, unpaid) {
     assert(!skipped.checkins.breakfast);
     assert.deepEqual(skipped.skipped, ['breakfast']);
     assert.notEqual(skipped.intake_revision, eaten.intake_revision);
+    const extraId = randomUUID();
     await db.query(`insert into member_extra_foods(id,user_id,plan_date,meal_slot,meal_snapshot)
-      values($1,$2,$3,'lunch','{"slot":"lunch"}')`, [randomUUID(), user, day]);
+      values($1,$2,$3,'lunch','{"slot":"lunch"}')`, [extraId, user, day]);
     const latest = await read();
     assert.notEqual(latest.intake_revision, skipped.intake_revision);
+    assert.deepEqual(latest.extra_food_ids, [extraId]);
+    assert.deepEqual(latest.extras, [{ slot: "lunch" }]);
     await denied(() => commit({ ...request, intakeRevision: latest.intake_revision, catalogRevision: '0' }), /STALE_CONTEXT/);
     const fresh = { ...request, intakeRevision: latest.intake_revision };
     const saved = await commit(fresh);
