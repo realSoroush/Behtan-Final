@@ -3,10 +3,9 @@ import { useState, useRef, useEffect } from "react";
 import type {
   DailyMealPlan,
   MacroTargets,
-  NutritionCatalog,
   UserProfile,
 } from "@/types";
-import { generateDailyMealPlan } from "@/utils/mealPlanEngine";
+import type { MealPlanEngine } from "@/utils/mealPlanEngine";
 import { historyOfMeals } from "@/utils/mealExperience";
 import { addPlanDays, componentAmount, sumPlanIngredients } from "@/utils/mealPresentation";
 import { MemberDialog } from "./MemberDialog";
@@ -26,7 +25,7 @@ export function WeekPlanner({
   plan,
   targetsForDay,
   profile,
-  catalog,
+  engine,
   schedule,
   onClose,
 }: {
@@ -35,7 +34,7 @@ export function WeekPlanner({
   targets: MacroTargets;
   targetsForDay:(workout:boolean)=>MacroTargets;
   profile: UserProfile;
-  catalog: NutritionCatalog;
+  engine: MealPlanEngine;
   schedule: Schedule;
   onClose: () => void;
 }) {
@@ -52,7 +51,7 @@ export function WeekPlanner({
     setError("");
     setBuilding(true);
     try {
-      if (!catalog || !profile.weight || !profile.dietary_preferences_json)
+      if (!profile.weight || !profile.dietary_preferences_json)
         throw Error("اطلاعات برنامه کامل نیست.");
       let previous = plan;
       const missing = [];
@@ -65,7 +64,7 @@ export function WeekPlanner({
           previous = schedule.plans[date];
           continue;
         }
-        const next = generateDailyMealPlan(
+        const next = engine.generateDailyMealPlan(
           targetsForDay(workoutForDate(date,profile.workout_weekdays,profile.workout_days??0)),
           profile.weight,
           profile.dietary_preferences_json,
@@ -98,7 +97,7 @@ export function WeekPlanner({
       return;
     setError("");
     try {
-      const next = generateDailyMealPlan(
+      const next = engine.generateDailyMealPlan(
         targetsForDay(!current.isWorkoutDay),
         profile.weight,
         profile.dietary_preferences_json,

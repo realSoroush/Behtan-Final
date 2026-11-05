@@ -63,15 +63,10 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/src/hooks/useNutritionCatalog.ts*", (r) =>
     r.fulfill({
       contentType: "text/javascript",
-      body: `import {configureNutritionCatalog} from '/src/utils/mealPlanEngine.ts';const catalog=${JSON.stringify(catalog)};configureNutritionCatalog(catalog);export function useNutritionCatalog(){return {catalog,loading:false,error:null}}`,
+      body: `import {DEFAULT_PROTEIN_ENGINE_POLICY as policy} from '/src/utils/proteinPolicy.ts';const catalog=${JSON.stringify(catalog)};export function useNutritionCatalog(){return {catalog,policy,revision:'1',loading:false,error:null}}`,
     }),
   );
-  await page.route("**/src/hooks/useProteinEnginePolicy.ts*", (r) =>
-    r.fulfill({
-      contentType: "text/javascript",
-      body: `import {DEFAULT_PROTEIN_ENGINE_POLICY as policy} from '/src/utils/proteinPolicy.ts';export function useProteinEnginePolicy(){return {policy,loading:false,error:null}}`,
-    }),
-  );
+
   const schedule: Record<string, { plan_date: string; plan: unknown; context_key: string; updated_at: string }> = {};
   const skipped = new Set<string>();
   let scheduleRevision = 0;
@@ -87,7 +82,7 @@ test.beforeEach(async ({ page }) => {
           return r.fulfill({ status: 400, json: { message: "MEAL_SCHEDULE_CONFLICT", code: "P0001" } });
         schedule[day.date] = { plan_date: day.date, plan: day.plan, context_key: body.p_context, updated_at: String(++scheduleRevision) };
       }
-      return r.fulfill({ json: Object.values(schedule) });
+      return r.fulfill({ json: Object.values(schedule).map(row => row.context_key === body.p_context ? row : { ...row, plan: null }) });
     }
     if (url.includes("/member_meal_schedule"))
       return r.fulfill({ json: Object.values(schedule) });
@@ -346,7 +341,7 @@ test('an empty ingredient replacement records one unavailable result without sav
   await page.unroute('**/src/hooks/useNutritionCatalog.ts*');
   await page.route('**/src/hooks/useNutritionCatalog.ts*', route => route.fulfill({
     contentType: 'text/javascript',
-    body: `import {configureNutritionCatalog} from '/src/utils/mealPlanEngine.ts';const catalog=${JSON.stringify({ ...catalog, substitutes: [] })};configureNutritionCatalog(catalog);export function useNutritionCatalog(){return {catalog,loading:false,error:null}}`,
+    body: `import {DEFAULT_PROTEIN_ENGINE_POLICY as policy} from '/src/utils/proteinPolicy.ts';const catalog=${JSON.stringify({ ...catalog, substitutes: [] })};export function useNutritionCatalog(){return {catalog,policy,revision:'2',loading:false,error:null}}`,
   }));
   const events: string[] = [];
   await page.route('**/rpc/record_product_event', route => {

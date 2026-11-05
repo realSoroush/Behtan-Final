@@ -95,9 +95,10 @@ try{
  if(name==='pro_stage_server_plan'){stageCalls++;return json({draft_id:randomUUID(),plan:JSON.parse(init.body).p_plan});}
  referenceReads++;assert.equal(headers.get('apikey'),'server-fixture','Pro reference reads must not use B2C user credentials');
  if(!credential)return json({code:'42501',message:'permission denied'},403);
- if(name==='nutrition_protein_policy')return missingPolicy?json({code:'PGRST116',message:'0 rows'},406):json(policy);
- const data={food_items:foods,food_substitutes:f.FOOD_SUBSTITUTES.flatMap(g=>g.substituteIds.map(id=>({food_item_id:g.foodItemId,substitute_food_item_id:id,is_active:true}))),meal_templates:templates,meal_template_slots:slots}[name];
- assert(data,'unexpected endpoint '+name);return json(data);
+ assert.equal(name,'nutrition_context_snapshot');
+ return json({schema_version:1,revision:'12',food_rows:foods,
+   substitute_rows:f.FOOD_SUBSTITUTES.flatMap(g=>g.substituteIds.map(id=>({food_item_id:g.foodItemId,substitute_food_item_id:id,is_active:true}))),
+   template_rows:templates,slot_rows:slots,policy_row:missingPolicy?null:policy});
  };
  const body={action:'generate',org,record,revision:1,key:randomUUID(),date:'2026-10-26',count:1,notes:''};
  const result=await processPlanRequest(body,'fixture-user',supabasePlanDependencies());assert(result.plan.days.length);assert.equal(stageCalls,1);

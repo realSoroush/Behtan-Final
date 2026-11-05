@@ -36,14 +36,19 @@ import {
   evaluateFoodQualityFromComponents,
   foodQualityPenalty,
 } from './nutritionQuality.ts';
-import { MEAL_SHARES, mealExperiencePenalty, type MealExperienceContext } from './mealExperience.ts';
+import { MEAL_POLICY_VERSION, MEAL_SHARES, mealExperiencePenalty, type MealExperienceContext } from './mealExperience.ts';
 // ============================================================================
 // RUNTIME NUTRITION CATALOG
 // ============================================================================
 // Production data is loaded from Supabase before meal generation. Keeping the
 // engine dependent on an injected catalog prevents a hidden second source of
 // truth in the app bundle while preserving deterministic, pure calculations.
-let ACTIVE_CATALOG: NutritionCatalog | null = null;
+type EngineCatalog = {
+  catalog: NutritionCatalog;
+  foodsById: ReadonlyMap<string, FoodItem>;
+  templatesById: ReadonlyMap<string, MealTemplate>;
+  neighbors: ReadonlyMap<string, readonly string[]>;
+};
 
 export class NutritionCatalogNotLoadedError extends Error {
   constructor() {
@@ -52,21 +57,8 @@ export class NutritionCatalogNotLoadedError extends Error {
   }
 }
 
-export function configureNutritionCatalog(catalog: NutritionCatalog): void {
-  ACTIVE_CATALOG = catalog;
-}
-
-export function clearNutritionCatalog(): void {
-  ACTIVE_CATALOG = null;
-}
-
-function requireNutritionCatalog(): NutritionCatalog {
-  if (!ACTIVE_CATALOG) throw new NutritionCatalogNotLoadedError();
-  return ACTIVE_CATALOG;
-}
-
-const foodById = (id: string): FoodItem => {
-  const f = requireNutritionCatalog().foods.find((x) => x.id === id);
+const foodById = (engine: EngineCatalog, id: string): FoodItem => {
+  const f = engine.foodsById.get(id);
   if (!f) throw new Error(`[mealPlanEngine] Unknown food item id: ${id}`);
   return f;
 };
@@ -81,27 +73,18 @@ const foodById = (id: string): FoodItem => {
  * component, and also include same-role foods in the same explicit swap group.
  * Meal-context, allergy and macro-equivalence gates are applied later.
  */
-export function getSubstitutesFor(foodItemId: string): FoodItem[] {
-  const catalog = requireNutritionCatalog();
-  const source = foodById(foodItemId);
+function getSubstitutesForWithCatalog(engine: EngineCatalog, foodItemId: string): FoodItem[] {
+  const catalog = engine.catalog;
+  const source = foodById(engine, foodItemId);
   const visited = new Set<string>([foodItemId]);
   const queue = [foodItemId];
 
   while (queue.length > 0) {
     const currentId = queue.shift()!;
-    for (const group of catalog.substitutes) {
-      if (group.foodItemId === currentId) {
-        for (const substituteId of group.substituteIds) {
-          if (!visited.has(substituteId)) {
-            visited.add(substituteId);
-            queue.push(substituteId);
-          }
-        }
-      }
-      if (group.substituteIds.includes(currentId) && !visited.has(group.foodItemId)) {
-        visited.add(group.foodItemId);
-        queue.push(group.foodItemId);
-      }
+    for (const neighbor of engine.neighbors.get(currentId) ?? []) {
+      if (visited.has(neighbor)) continue;
+      visited.add(neighbor);
+      queue.push(neighbor);
     }
   }
 
@@ -120,7 +103,7 @@ export function getSubstitutesFor(foodItemId: string): FoodItem[] {
   }
 
   visited.delete(foodItemId);
-  return [...visited].map(foodById);
+  return [...visited].map(id => foodById(engine, id));
 }
 
 // ============================================================================
@@ -164,7 +147,7 @@ function isFoodAllowed(food: FoodItem, preferences: DietaryPreferencesJson): boo
 }
 
 function isTemplateEligible(
-  template: MealTemplate,
+  engine: EngineCatalog, template: MealTemplate,
   preferences: DietaryPreferencesJson,
   isWorkoutDay: boolean
 ): boolean {
@@ -179,7 +162,7 @@ function isTemplateEligible(
     template.vegetarianStatusesOnly?.length &&
     !template.vegetarianStatusesOnly.includes(preferences.vegetarianStatus)
   ) return false;
-  return template.slots.every((slotFill) => isFoodAllowed(foodById(slotFill.primaryFoodItemId), preferences));
+  return template.slots.every((slotFill) => isFoodAllowed(foodById(engine, slotFill.primaryFoodItemId), preferences));
 }
 
 export class MealPlanGenerationError extends Error {
@@ -287,30 +270,30 @@ function fixedPortion(template: MealTemplate, index: number, foodId: string): nu
     : undefined;
 }
 
-function portionRuleFor(food: FoodItem): PortionRule {
-  const rule = requireNutritionCatalog().portionRules[food.id];
+function portionRuleFor(engine: EngineCatalog, food: FoodItem): PortionRule {
+  const rule = engine.catalog.portionRules[food.id];
   if (!rule) {
     throw new Error(`[mealPlanEngine] Missing portion rule for food: ${food.id}`);
   }
   return rule;
 }
 
-function desiredUnitsForTarget(food: FoodItem, target: MacroVector): number {
+function desiredUnitsForTarget(engine: EngineCatalog, food: FoodItem, target: MacroVector): number {
   if (food.role === 'starch' && food.carbsPerUnit > 0) return target.carbs / food.carbsPerUnit;
   if (food.role === 'fat' && food.fatPerUnit > 0) return target.fat / food.fatPerUnit;
   if (food.role === 'protein' && food.proteinPerUnit > 0) return target.protein / food.proteinPerUnit;
   if (food.role === 'dairy' && food.proteinPerUnit > 0) return target.protein / food.proteinPerUnit;
   if (food.role === 'fruit' && food.carbsPerUnit > 0) return target.carbs / food.carbsPerUnit;
-  return portionRuleFor(food).typicalUnits;
+  return portionRuleFor(engine, food).typicalUnits;
 }
 
-function portionCandidates(food: FoodItem, target?: MacroVector, slot?: MealSlot): number[] {
-  const base = portionRuleFor(food);
+function portionCandidates(engine: EngineCatalog, food: FoodItem, target?: MacroVector, slot?: MealSlot): number[] {
+  const base = portionRuleFor(engine, food);
   const cap = slot === 'breakfast' && ['egg_white','egg_whole'].includes(food.id) ? 3 : base.hardMaxUnits;
   const rule = {...base, hardMaxUnits: Math.min(base.hardMaxUnits,cap), softMaxUnits: Math.min(base.softMaxUnits,cap)};
   if (!target) return range(rule.minUnits, rule.softMaxUnits, rule.step);
 
-  const desiredUnits = desiredUnitsForTarget(food, target);
+  const desiredUnits = desiredUnitsForTarget(engine, food, target);
   // Search slightly past the desired amount when necessary, but never relax
   // the hard ceiling. High-energy users are handled by distributing food
   // across the day, not by turning one serving into an extreme portion.
@@ -325,8 +308,8 @@ function portionCandidates(food: FoodItem, target?: MacroVector, slot?: MealSlot
   return range(rule.minUnits, snappedMax, rule.step);
 }
 
-function portionRealismPenalty(food: FoodItem, units: number): number {
-  const rule = portionRuleFor(food);
+function portionRealismPenalty(engine: EngineCatalog, food: FoodItem, units: number): number {
+  const rule = portionRuleFor(engine, food);
   if (units > rule.hardMaxUnits + 1e-9) return Number.POSITIVE_INFINITY;
 
   const typicalDistance = Math.abs(units - rule.typicalUnits) / Math.max(rule.typicalUnits, rule.step);
@@ -359,9 +342,9 @@ function mealMassGrams(components: MealComponent[]): number {
   return components.reduce((sum, component) => sum + component.grams, 0);
 }
 
-function mealRealismPenalty(components: MealComponent[]): number {
+function mealRealismPenalty(engine: EngineCatalog, components: MealComponent[]): number {
   return components.reduce(
-    (sum, component) => sum + portionRealismPenalty(component.foodItem, component.units),
+    (sum, component) => sum + portionRealismPenalty(engine, component.foodItem, component.units),
     0
   );
 }
@@ -396,12 +379,12 @@ function scoreTotals(actual: MacroVector, target: MacroVector): number {
   );
 }
 
-function resolveTemplate(template: MealTemplate, slotTargets: MacroVector): ResolvedTemplate {
-  const foods = template.slots.map((slotFill) => foodById(slotFill.primaryFoodItemId));
+function resolveTemplate(engine: EngineCatalog, template: MealTemplate, slotTargets: MacroVector): ResolvedTemplate {
+  const foods = template.slots.map((slotFill) => foodById(engine, slotFill.primaryFoodItemId));
   const candidateSets = foods.map((food, index) => {
     const fixed = fixedPortion(template, index, food.id);
-    if (fixed === undefined) return portionCandidates(food, slotTargets, template.slot);
-    const rule = portionRuleFor(food);
+    if (fixed === undefined) return portionCandidates(engine, food, slotTargets, template.slot);
+    const rule = portionRuleFor(engine, food);
     if (!Number.isFinite(fixed) || fixed <= 0 || fixed > rule.hardMaxUnits) return [];
     return [fixed];
   });
@@ -501,7 +484,7 @@ function resolveTemplate(template: MealTemplate, slotTargets: MacroVector): Reso
           components: [...state.components, component],
           totals,
           grams,
-          realismPenalty: state.realismPenalty + portionRealismPenalty(food, units),
+          realismPenalty: state.realismPenalty + portionRealismPenalty(engine, food, units),
         });
       }
     }
@@ -562,14 +545,14 @@ type ResolvedOption = {
 };
 
 function getResolvedOptions(
-  slot: MealSlot,
+  engine: EngineCatalog, slot: MealSlot,
   candidates: MealTemplate[],
   slotTargets: MacroVector
 ): ResolvedOption[] {
   const ranked = candidates
     .flatMap((template) => {
       try {
-        const resolved=resolveTemplate(template,slotTargets);
+        const resolved=resolveTemplate(engine, template,slotTargets);
         return resolved.totals.kcal<=slotTargets.kcal*1.35 ? [{slot,template,resolved}] : [];
       } catch (error) {
         if(error instanceof Error && error.message.includes('Could not resolve template')) return [];
@@ -764,7 +747,7 @@ function addVector(a: MacroVector, b: MacroVector): MacroVector {
  * day's calorie + macro fit.
  */
 function refineDailyPortions(
-  chosen: ResolvedOption[],
+  engine: EngineCatalog, chosen: ResolvedOption[],
   targets: MacroTargets,
   feasibilityFirst = false,
   preservePortions = false,
@@ -808,7 +791,7 @@ function refineDailyPortions(
       scoreDailyTotals(candidateDaily, dailyTarget) +
       (feasibilityFirst ? 1000 * feasibilityViolation(candidateDaily, dailyTarget) : 0) +
       0.035 * scoreTotals(candidateMeal, slotTarget) +
-      0.05 * mealRealismPenalty(components)
+      0.05 * mealRealismPenalty(engine, components)
     );
   };
 
@@ -825,7 +808,7 @@ function refineDailyPortions(
         const current = option.resolved.components[index];
         if (fixedPortion(option.template, index, current.foodItem.id) !== undefined) continue;
         const original = chosen[optionIndex].resolved.components[index];
-        const step = portionRuleFor(current.foodItem).step;
+        const step = portionRuleFor(engine, current.foodItem).step;
         const withoutCurrentMeal = subtractComponent(option.resolved.totals, current);
         const withoutCurrentDay = subtractComponent(dailyTotals, current);
 
@@ -841,10 +824,10 @@ function refineDailyPortions(
         );
 
         if (preservePortions) bestScore += .04 * Math.abs(current.units - original.units) / step;
-        const rule = portionRuleFor(current.foodItem);
+        const rule = portionRuleFor(engine, current.foodItem);
         const candidates = feasibilityFirst
           ? range(rule.minUnits, rule.hardMaxUnits, rule.step)
-          : portionCandidates(current.foodItem, slotTarget, option.slot);
+          : portionCandidates(engine, current.foodItem, slotTarget, option.slot);
         for (const units of candidates) {
           if (preservePortions && Math.abs(units - original.units) > Math.max(step, original.units * .25) + 1e-9) continue;
           const candidateComponent = componentFromUnits(current.foodItem, units);
@@ -901,11 +884,11 @@ function totalResolvedOptions(options: ResolvedOption[]): MacroVector {
   );
 }
 
-function scoreResolvedDay(options: ResolvedOption[], dailyTarget: MacroVector): number {
+function scoreResolvedDay(engine: EngineCatalog, options: ResolvedOption[], dailyTarget: MacroVector): number {
   const nutritionScore = scoreDailyTotals(totalResolvedOptions(options), dailyTarget);
   const realismScore = options.reduce(
     // Recorded meals are facts, including custom foods outside the catalog.
-    (sum, option) => sum + (option.locked ? 0 : mealRealismPenalty(option.resolved.components)),
+    (sum, option) => sum + (option.locked ? 0 : mealRealismPenalty(engine, option.resolved.components)),
     0
   );
   return nutritionScore + 0.05 * realismScore;
@@ -919,7 +902,7 @@ function scoreResolvedDay(options: ResolvedOption[], dailyTarget: MacroVector): 
  * macro score improves.
  */
 function refineDailyTemplates(
-  initial: ResolvedOption[],
+  engine: EngineCatalog, initial: ResolvedOption[],
   optionsBySlot: ResolvedOption[][],
   targets: MacroTargets,
   feasibilityFirst = false
@@ -930,9 +913,9 @@ function refineDailyTemplates(
     carbs: targets.carbGrams,
     fat: targets.fatGrams,
   };
-  const objective = (day: ResolvedOption[]) => scoreResolvedDay(day, dailyTarget) +
+  const objective = (day: ResolvedOption[]) => scoreResolvedDay(engine, day, dailyTarget) +
     (feasibilityFirst ? 1000 * feasibilityViolation(totalResolvedOptions(day), dailyTarget) : 0);
-  let best = refineDailyPortions(initial, targets, feasibilityFirst);
+  let best = refineDailyPortions(engine, initial, targets, feasibilityFirst);
   let bestScore = objective(best);
 
   for (let pass = 0; pass < 2; pass++) {
@@ -947,7 +930,7 @@ function refineDailyTemplates(
         const candidateBase = best.map((option, index) =>
           index === slotIndex ? replacement : option
         );
-        const candidate = refineDailyPortions(candidateBase, targets, feasibilityFirst);
+        const candidate = refineDailyPortions(engine, candidateBase, targets, feasibilityFirst);
         const candidateScore = objective(candidate);
 
         if (candidateScore + 1e-9 < slotBestScore) {
@@ -1028,7 +1011,7 @@ function isDailyPlanFeasible(options: ResolvedOption[], targets: MacroTargets): 
  * still pass and the nutrition score does not materially deteriorate.
  */
 function repairDailyQuality(
-  initial: ResolvedOption[],
+  engine: EngineCatalog, initial: ResolvedOption[],
   optionsBySlot: ResolvedOption[][],
   targets: MacroTargets
 ): ResolvedOption[] {
@@ -1057,7 +1040,7 @@ function repairDailyQuality(
         const candidateBase = best.map((option, index) =>
           index === slotIndex ? replacement : option
         );
-        const candidate = refineDailyPortions(candidateBase, targets);
+        const candidate = refineDailyPortions(engine, candidateBase, targets);
         if (!isDailyPlanFeasible(candidate, targets)) continue;
 
         const candidateQuality = qualityPenaltyForResolvedDay(candidate, targets);
@@ -1101,7 +1084,7 @@ function assertDailyPlanFeasible(options: ResolvedOption[], targets: MacroTarget
 }
 
 function repairMealExperience(
-  initial: ResolvedOption[], optionsBySlot: ResolvedOption[][],
+  engine: EngineCatalog, initial: ResolvedOption[], optionsBySlot: ResolvedOption[][],
   targets: MacroTargets, context: MealExperienceContext, seed: number
 ): ResolvedOption[] {
   const asMeals = (options: ResolvedOption[]) => options.map(o => ({slot: o.slot, components: o.resolved.components}));
@@ -1120,7 +1103,7 @@ function repairMealExperience(
       for (const choice of choices) {
         if (choice.template.id === best[index].template.id) continue;
         const candidateBase = best.map((o,i) => i === index ? choice : o);
-        const candidate = refineDailyPortions(candidateBase, targets);
+        const candidate = refineDailyPortions(engine, candidateBase, targets);
         if (!isDailyPlanFeasible(candidate, targets)) continue;
         const deviation = dailyDeviationSummary(candidate, targets);
         if (deviation.protein > Math.max(.04, initialDeviation.protein + .02) ||
@@ -1141,8 +1124,8 @@ function repairMealExperience(
 // 8 - MAIN ENTRY POINT
 // ============================================================================
 
-export function generateDailyMealPlan(
-  targets: MacroTargets,
+function generateDailyMealPlanWithCatalog(
+  engine: EngineCatalog, targets: MacroTargets,
   _weightKg: number,
   preferences: DietaryPreferencesJson,
   isWorkoutDay: boolean,
@@ -1153,9 +1136,9 @@ export function generateDailyMealPlan(
   if (isWorkoutDay || postLocked) {
     const prefs = context.proteinBudgetPreference ?? 'performance';
     const preferred = prefs === 'performance' ? ['pw_whey_water','pw_chicken_potato','pw_plant_bowl','pw_pea_water'] : ['pw_chicken_potato','pw_plant_bowl','pw_pea_water'];
-    const template = preferred.map(id=>requireNutritionCatalog().mealTemplates.find(t=>t.id===id)).find(t=>t && isTemplateEligible(t,preferences,true));
+    const template = preferred.map(id=>engine.templatesById.get(id)).find(t=>t && isTemplateEligible(engine, t,preferences,true));
     if (!postLocked && !template) throw new MealPlanGenerationError('post_workout','گزینهٔ مجاز پس از تمرین در کاتالوگ موجود نیست.');
-    const components = template?.slots.map(s=>componentFromUnits(foodById(s.primaryFoodItemId),s.fixedUnits ?? 1)) ?? [];
+    const components = template?.slots.map(s=>componentFromUnits(foodById(engine, s.primaryFoodItemId),s.fixedUnits ?? 1)) ?? [];
     const totals = components.reduce(addTotals,{kcal:0,protein:0,carbs:0,fat:0});
     const post = postLocked ?? buildMeal({slot:'post_workout',template:template!,resolved:{components,totals,score:0,kcalDeviation:0}});
     const remaining = {...targets,targetCalories:targets.targetCalories-post.totalKcal,proteinGrams:targets.proteinGrams-post.totalProtein,carbGrams:targets.carbGrams-post.totalCarbs,fatGrams:targets.fatGrams-post.totalFat};
@@ -1163,7 +1146,7 @@ export function generateDailyMealPlan(
     remaining.carbCal = remaining.carbGrams * 4;
     remaining.fatCal = remaining.fatGrams * 9;
     if (Object.values(remaining).some(v=>typeof v==='number'&&v<0)) throw new MealPlanGenerationError('post_workout','هدف روزانه برای این ترکیب کافی نیست.');
-    const rest = generateDailyMealPlan(remaining,_weightKg,preferences,false,date,{...context,lockedMeals:context.lockedMeals?.filter(m=>m.slot!=='post_workout')});
+    const rest = generateDailyMealPlanWithCatalog(engine, remaining,_weightKg,preferences,false,date,{...context,lockedMeals:context.lockedMeals?.filter(m=>m.slot!=='post_workout')});
     const meals = [...rest.meals.slice(0,4),post,...rest.meals.slice(4)];
     return {...rest,targets,isWorkoutDay:true,meals};
   }
@@ -1183,8 +1166,8 @@ export function generateDailyMealPlan(
       fat: targets.fatGrams * share.fat,
     };
 
-    const eligible = requireNutritionCatalog().mealTemplates.filter(
-      (template) => template.slot === slot && isTemplateEligible(template, preferences, isWorkoutDay)
+    const eligible = engine.catalog.mealTemplates.filter(
+      (template) => template.slot === slot && isTemplateEligible(engine, template, preferences, isWorkoutDay)
     );
 
     if (eligible.length === 0) {
@@ -1194,19 +1177,19 @@ export function generateDailyMealPlan(
       );
     }
 
-    return getResolvedOptions(slot, eligible, slotTargets);
+    return getResolvedOptions(engine, slot, eligible, slotTargets);
   });
 
   const chosen = chooseDailyCombination(optionsBySlot, targets, seed);
-  let macroRefined = refineDailyTemplates(chosen, optionsBySlot, targets);
+  let macroRefined = refineDailyTemplates(engine, chosen, optionsBySlot, targets);
   if (!isDailyPlanFeasible(macroRefined, targets) && !context.lockedMeals?.length) {
     // Normal optimization can settle just outside an acceptance boundary because
     // realism/local meal scores outweigh a tiny daily shortfall. Retry once,
     // with bounded search that prioritizes satisfying the unchanged constraints.
-    macroRefined = refineDailyTemplates(macroRefined, optionsBySlot, targets, true);
+    macroRefined = refineDailyTemplates(engine, macroRefined, optionsBySlot, targets, true);
   }
-  const qualityRefined = repairDailyQuality(macroRefined, optionsBySlot, targets);
-  const refined = repairMealExperience(qualityRefined, optionsBySlot, targets, context, seed);
+  const qualityRefined = repairDailyQuality(engine, macroRefined, optionsBySlot, targets);
+  const refined = repairMealExperience(engine, qualityRefined, optionsBySlot, targets, context, seed);
   const remainingTargetsUnmet = !isDailyPlanFeasible(refined, targets);
   if (!context.lockedMeals?.length) assertDailyPlanFeasible(refined, targets);
   const meals = refined.map(option => option.locked ? {...option.locked, consumed:true} : buildMeal(option));
@@ -1218,15 +1201,15 @@ export function generateDailyMealPlan(
 // 9 - SWAPS
 // ============================================================================
 
-export function getSwapCandidatesForComponent(
-  component: MealComponent,
+function getSwapCandidatesForComponentWithCatalog(
+  engine: EngineCatalog, component: MealComponent,
   preferences: DietaryPreferencesJson
 ): FoodItem[] {
-  return getSubstitutesFor(component.foodItem.id).filter((food) => isFoodAllowed(food, preferences));
+  return getSubstitutesForWithCatalog(engine, component.foodItem.id).filter((food) => isFoodAllowed(food, preferences));
 }
 
-function allRealisticPortionCandidates(food: FoodItem): number[] {
-  const rule = portionRuleFor(food);
+function allRealisticPortionCandidates(engine: EngineCatalog, food: FoodItem): number[] {
+  const rule = portionRuleFor(engine, food);
   return range(rule.minUnits, rule.hardMaxUnits, rule.step);
 }
 
@@ -1317,14 +1300,14 @@ function mealWithReplacement(meal: Meal, componentIndex: number, replacement: Me
   };
 }
 
-function isSwapAllowedForMeal(food: FoodItem, slot: MealSlot): boolean {
+function isSwapAllowedForMeal(engine: EngineCatalog, food: FoodItem, slot: MealSlot): boolean {
   if (food.swapAllowedMeals.includes(slot)) return true;
 
   // Defensive metadata fallback: if a food is already used by a normal active
   // template in this exact slot, it is contextually valid even if an older DB
   // row forgot to list the slot in swap_allowed_meals. Restricted-diet-only
   // templates do not widen the normal swap UI.
-  return requireNutritionCatalog().mealTemplates.some((template) =>
+  return engine.catalog.mealTemplates.some((template) =>
     template.slot === slot &&
     !template.restrictedDietOnly &&
     template.slots.some((templateSlot) => templateSlot.primaryFoodItemId === food.id)
@@ -1338,21 +1321,21 @@ function swapContextPenalty(original: FoodItem, replacement: FoodItem): number {
 }
 
 function buildSwapOption(
-  meal: Meal,
+  engine: EngineCatalog, meal: Meal,
   componentIndex: number,
   replacement: FoodItem,
   referenceComponent: MealComponent = meal.components[componentIndex]
 ): FoodSwapOption {
   const original = referenceComponent;
-  let bestComponent = componentFromUnits(replacement, portionRuleFor(replacement).minUnits);
+  let bestComponent = componentFromUnits(replacement, portionRuleFor(engine, replacement).minUnits);
   let bestScore = Number.POSITIVE_INFINITY;
 
-  for (const units of allRealisticPortionCandidates(replacement)) {
+  for (const units of allRealisticPortionCandidates(engine, replacement)) {
     const candidate = componentFromUnits(replacement, units);
     if (!isPracticalMeal(meal.slot, mealWithReplacement(meal, componentIndex, candidate).components)) continue;
     const score =
       swapEquivalenceScore(original, candidate) +
-      0.05 * portionRealismPenalty(replacement, units) +
+      0.05 * portionRealismPenalty(engine, replacement, units) +
       swapContextPenalty(original.foodItem, replacement);
     if (score < bestScore) {
       bestScore = score;
@@ -1396,12 +1379,12 @@ function buildRestoreOption(
   };
 }
 
-function eligibleSwapFoods(reference: FoodItem, currentId: string, slot: MealSlot, preferences: DietaryPreferencesJson): FoodItem[] {
-  return getSubstitutesFor(reference.id)
+function eligibleSwapFoods(engine: EngineCatalog, reference: FoodItem, currentId: string, slot: MealSlot, preferences: DietaryPreferencesJson): FoodItem[] {
+  return getSubstitutesForWithCatalog(engine, reference.id)
     .filter((food) => food.id !== currentId)
     .filter((food) => food.role === reference.role)
     .filter((food) => isFoodAllowed(food, preferences))
-    .filter((food) => isSwapAllowedForMeal(food, slot))
+    .filter((food) => isSwapAllowedForMeal(engine, food, slot))
     .filter((food) => !(slot === 'breakfast' && reference.swapGroup === 'bread' && food.swapGroup !== 'bread'))
     .filter((food) => !(slot === 'afternoon_snack' && reference.swapGroup === 'fresh_fruit' && food.swapGroup !== 'fresh_fruit'));
 }
@@ -1413,8 +1396,8 @@ function eligibleSwapFoods(reference: FoodItem, currentId: string, slot: MealSlo
  * tolerances. Other foods in the meal are intentionally NOT changed behind
  * the user's back.
  */
-export function getSwapOptionsForMeal(
-  meal: Meal,
+function getSwapOptionsForMealWithCatalog(
+  engine: EngineCatalog, meal: Meal,
   componentIndex: number,
   preferences: DietaryPreferencesJson,
   referenceComponent?: MealComponent
@@ -1426,10 +1409,10 @@ export function getSwapOptionsForMeal(
   // Candidate identity is anchored to the ORIGINAL generated component, not to
   // whatever food happens to be selected after one or more swaps. This keeps
   // the list stable and prevents macro drift across A -> B -> C transitions.
-  const candidateFoods = eligibleSwapFoods(reference.foodItem, current.foodItem.id, meal.slot, preferences);
+  const candidateFoods = eligibleSwapFoods(engine, reference.foodItem, current.foodItem.id, meal.slot, preferences);
 
   const options = candidateFoods.map((food) =>
-    buildSwapOption(meal, componentIndex, food, reference)
+    buildSwapOption(engine, meal, componentIndex, food, reference)
   );
 
   // After any swap, always expose an exact one-tap restore to the original
@@ -1438,7 +1421,7 @@ export function getSwapOptionsForMeal(
   if (
     current.foodItem.id !== reference.foodItem.id &&
     isFoodAllowed(reference.foodItem, preferences) &&
-    isSwapAllowedForMeal(reference.foodItem, meal.slot)
+    isSwapAllowedForMeal(engine, reference.foodItem, meal.slot)
   ) {
     options.push(buildRestoreOption(meal, componentIndex, reference));
   }
@@ -1459,8 +1442,8 @@ export type MemberDayIntake = {
   extraMeals: readonly Meal[];
 };
 
-function mealOption(meal: Meal, locked: boolean): ResolvedOption {
-  const template = requireNutritionCatalog().mealTemplates.find(t => t.id === meal.templateId)
+function mealOption(engine: EngineCatalog, meal: Meal, locked: boolean): ResolvedOption {
+  const template = engine.templatesById.get(meal.templateId)
     ?? { id: meal.templateId, slot: meal.slot, displayName: meal.templateName, slots: [], isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [] };
   return {
     slot: meal.slot, template, locked: locked ? meal : undefined,
@@ -1485,8 +1468,8 @@ function memberAllocationTargets(plan: DailyMealPlan, replacement: Meal): MacroT
 }
 
 /** The selected serving and intake facts are locked. Only other planned portions may move. */
-export function rebalanceMemberDay(
-  plan: DailyMealPlan, index: number, replacement: Meal, preferences: DietaryPreferencesJson, intake: MemberDayIntake,
+function rebalanceMemberDayWithCatalog(
+  engine: EngineCatalog, plan: DailyMealPlan, index: number, replacement: Meal, preferences: DietaryPreferencesJson, intake: MemberDayIntake,
 ): DailyMealPlan | null {
   const current = plan.meals[index];
   if (!current || current.slot !== replacement.slot || current.consumed || intake.skippedSlots.includes(current.slot)) return null;
@@ -1499,23 +1482,22 @@ export function rebalanceMemberDay(
       mealMassGrams(replacement.components) > mealMassLimitGrams(replacement.slot, slotTarget.kcal)) return null;
   }
 
-  const catalog = requireNutritionCatalog();
   const meals = plan.meals.map((meal, i) => i === index ? replacement : meal);
   const included = meals.filter(m => m.consumed || !intake.skippedSlots.includes(m.slot));
   for (const meal of included) {
     if (meal.consumed) continue;
     if (!isPracticalMeal(meal.slot, meal.components) || !meal.components.every(component => {
-      const food = catalog.foods.find(item => item.id === component.foodItem.id);
+      const food = engine.foodsById.get(component.foodItem.id);
       return food && isFoodAllowed(food, preferences) && Number.isFinite(component.units) &&
-        component.units > 0 && component.units <= portionRuleFor(food).hardMaxUnits;
+        component.units > 0 && component.units <= portionRuleFor(engine, food).hardMaxUnits;
     })) return null;
   }
   const options = [
-    ...included.map(meal => mealOption(meal, meal === replacement || meal.consumed || meal.slot === 'post_workout')),
-    ...intake.extraMeals.map(meal => mealOption(meal, true)),
+    ...included.map(meal => mealOption(engine, meal, meal === replacement || meal.consumed || meal.slot === 'post_workout')),
+    ...intake.extraMeals.map(meal => mealOption(engine, meal, true)),
   ];
   if (isDailyPlanFeasible(options, plan.targets)) return { ...plan, meals, remainingTargetsUnmet: false };
-  const refined = refineDailyPortions(options, plan.targets, true, true, allocation);
+  const refined = refineDailyPortions(engine, options, plan.targets, true, true, allocation);
   if (!isDailyPlanFeasible(refined, plan.targets)) return null;
 
   const adjusted = new Map(included.map((meal, i) => {
@@ -1533,31 +1515,31 @@ export type MemberSwapOption = Pick<FoodSwapOption, 'foodItem' | 'replacementCom
   plan: DailyMealPlan;
 };
 
-export function getMemberSwapOptions(
-  plan: DailyMealPlan, mealIndex: number, componentIndex: number, preferences: DietaryPreferencesJson,
+function getMemberSwapOptionsWithCatalog(
+  engine: EngineCatalog, plan: DailyMealPlan, mealIndex: number, componentIndex: number, preferences: DietaryPreferencesJson,
   intake: MemberDayIntake, referenceComponent?: MealComponent,
 ): MemberSwapOption[] {
   const meal = plan.meals[mealIndex];
   const current = meal?.components[componentIndex];
   if (!current || meal.consumed || meal.slot === 'post_workout' || intake.skippedSlots.includes(meal.slot)) return [];
   const reference = referenceComponent ?? current;
-  const liveReference = requireNutritionCatalog().foods.find(food => food.id === reference.foodItem.id);
+  const liveReference = engine.foodsById.get(reference.foodItem.id);
   if (!liveReference) return [];
-  const candidates = eligibleSwapFoods(liveReference, current.foodItem.id, meal.slot, preferences);
+  const candidates = eligibleSwapFoods(engine, liveReference, current.foodItem.id, meal.slot, preferences);
   const restore = current.foodItem.id !== liveReference.id && isFoodAllowed(liveReference, preferences) &&
-    isSwapAllowedForMeal(liveReference, meal.slot);
+    isSwapAllowedForMeal(engine, liveReference, meal.slot);
   return [...(restore ? [liveReference] : []), ...candidates].flatMap(food => {
     const portions = food.id === liveReference.id
       ? [reference]
-      : allRealisticPortionCandidates(food).map(units => componentFromUnits(food, units))
+      : allRealisticPortionCandidates(engine, food).map(units => componentFromUnits(food, units))
         .sort((a, b) =>
           Number(isMacroEquivalentSwap(reference, b)) - Number(isMacroEquivalentSwap(reference, a)) ||
           swapEquivalenceScore(reference, a) - swapEquivalenceScore(reference, b) ||
-          portionRealismPenalty(food, a.units) - portionRealismPenalty(food, b.units)
+          portionRealismPenalty(engine, food, a.units) - portionRealismPenalty(engine, food, b.units)
         );
     for (const replacementComponent of portions) {
       const replacement = mealWithReplacement(meal, componentIndex, replacementComponent);
-      const updated = rebalanceMemberDay(plan, mealIndex, replacement, preferences, intake);
+      const updated = rebalanceMemberDayWithCatalog(engine, plan, mealIndex, replacement, preferences, intake);
       if (updated) return [{ foodItem: food, replacementComponent, plan: updated }];
     }
     return [];
@@ -1565,14 +1547,14 @@ export function getMemberSwapOptions(
 }
 
 /** Backwards-compatible safe wrapper used by older call sites/tests. */
-export function swapComponentInMeal(
-  meal: Meal,
+function swapComponentInMealWithCatalog(
+  engine: EngineCatalog, meal: Meal,
   componentIndex: number,
   replacement: FoodItem,
   _slotTargets: MacroVector
 ): Meal {
   if (componentIndex < 0 || componentIndex >= meal.components.length) return meal;
-  const option = buildSwapOption(meal, componentIndex, replacement);
+  const option = buildSwapOption(engine, meal, componentIndex, replacement);
   return option.isEquivalent ? option.updatedMeal : meal;
 }
 
@@ -1588,13 +1570,13 @@ export function getSlotTargets(slot: MealSlot, targets: MacroTargets): MacroVect
 
 /** Options for a printed Pro menu, solved with the same catalog, portions and
  * eligibility rules as the daily engine. Existing B2C generation is unchanged. */
-export function getProfessionalMealOptions(base: Meal, preferences: DietaryPreferencesJson, workout: boolean): Meal[] {
-  const templates = requireNutritionCatalog().mealTemplates.filter(t => t.slot === base.slot && isTemplateEligible(t, preferences, workout));
+function getProfessionalMealOptionsWithCatalog(engine: EngineCatalog, base: Meal, preferences: DietaryPreferencesJson, workout: boolean): Meal[] {
+  const templates = engine.catalog.mealTemplates.filter(t => t.slot === base.slot && isTemplateEligible(engine, t, preferences, workout));
   const target = {kcal:base.totalKcal, protein:base.totalProtein, carbs:base.totalCarbs, fat:base.totalFat};
   if (base.slot === 'post_workout') {
     return templates.flatMap(template => {
       try {
-        const resolved = resolveTemplate(template, target);
+        const resolved = resolveTemplate(engine, template, target);
         return [buildMeal({ slot: base.slot, template, resolved })];
       } catch (error) {
         if (error instanceof Error && error.message.includes('Could not resolve template')) return [];
@@ -1602,5 +1584,70 @@ export function getProfessionalMealOptions(base: Meal, preferences: DietaryPrefe
       }
     });
   }
-  return getResolvedOptions(base.slot, templates, target).map(buildMeal);
+  return getResolvedOptions(engine, base.slot, templates, target).map(buildMeal);
 }
+
+// A runtime engine owns an immutable snapshot and private indexes. No caller
+// can change another engine's foods, portion rules or approved substitutions.
+type OmitEngine<T> = T extends (engine: EngineCatalog, ...args: infer P) => infer R ? (...args: P) => R : never;
+
+export function createMealPlanEngine(source: NutritionCatalog, revision?: string | null) {
+  const catalog = structuredClone(source);
+  function freeze(value: object) {
+    for (const child of Object.values(value)) {
+      if (child && typeof child === 'object') freeze(child);
+    }
+    Object.freeze(value);
+  }
+  freeze(catalog);
+  const neighbors = new Map<string, string[]>();
+  const connect = (from: string, to: string) => {
+    const links = neighbors.get(from);
+    if (links) links.push(to);
+    else neighbors.set(from, [to]);
+  };
+  for (const group of catalog.substitutes) {
+    for (const target of group.substituteIds) connect(group.foodItemId, target);
+    for (const target of group.substituteIds) connect(target, group.foodItemId);
+  }
+  const engine: EngineCatalog = {
+    catalog, neighbors,
+    foodsById: new Map(catalog.foods.map(food => [food.id, food])),
+    templatesById: new Map(catalog.mealTemplates.map(template => [template.id, template])),
+  };
+  return {
+    getSubstitutesFor: getSubstitutesForWithCatalog.bind(null, engine),
+    generateDailyMealPlan(...args: Parameters<OmitEngine<typeof generateDailyMealPlanWithCatalog>>): DailyMealPlan {
+      const plan = generateDailyMealPlanWithCatalog(engine, ...args);
+      return revision ? { ...plan, nutritionContext: { revision, engineVersion: MEAL_POLICY_VERSION } } : plan;
+    },
+    getSwapCandidatesForComponent: getSwapCandidatesForComponentWithCatalog.bind(null, engine),
+    getSwapOptionsForMeal: getSwapOptionsForMealWithCatalog.bind(null, engine),
+    rebalanceMemberDay: rebalanceMemberDayWithCatalog.bind(null, engine),
+    getMemberSwapOptions: getMemberSwapOptionsWithCatalog.bind(null, engine),
+    swapComponentInMeal: swapComponentInMealWithCatalog.bind(null, engine),
+    getProfessionalMealOptions: getProfessionalMealOptionsWithCatalog.bind(null, engine),
+  };
+}
+
+export type MealPlanEngine = ReturnType<typeof createMealPlanEngine>;
+
+// Compatibility for the standalone fixture scripts. Application entry points
+// construct and pass their engine explicitly.
+let legacyEngine: MealPlanEngine | null = null;
+export function configureNutritionCatalog(catalog: NutritionCatalog) {
+  legacyEngine = createMealPlanEngine(catalog);
+}
+export function clearNutritionCatalog() { legacyEngine = null; }
+function fixtureEngine() {
+  if (!legacyEngine) throw new NutritionCatalogNotLoadedError();
+  return legacyEngine;
+}
+export const getSubstitutesFor = (...args: Parameters<MealPlanEngine["getSubstitutesFor"]>) => fixtureEngine().getSubstitutesFor(...args);
+export const generateDailyMealPlan = (...args: Parameters<MealPlanEngine["generateDailyMealPlan"]>) => fixtureEngine().generateDailyMealPlan(...args);
+export const getSwapCandidatesForComponent = (...args: Parameters<MealPlanEngine["getSwapCandidatesForComponent"]>) => fixtureEngine().getSwapCandidatesForComponent(...args);
+export const getSwapOptionsForMeal = (...args: Parameters<MealPlanEngine["getSwapOptionsForMeal"]>) => fixtureEngine().getSwapOptionsForMeal(...args);
+export const rebalanceMemberDay = (...args: Parameters<MealPlanEngine["rebalanceMemberDay"]>) => fixtureEngine().rebalanceMemberDay(...args);
+export const getMemberSwapOptions = (...args: Parameters<MealPlanEngine["getMemberSwapOptions"]>) => fixtureEngine().getMemberSwapOptions(...args);
+export const swapComponentInMeal = (...args: Parameters<MealPlanEngine["swapComponentInMeal"]>) => fixtureEngine().swapComponentInMeal(...args);
+export const getProfessionalMealOptions = (...args: Parameters<MealPlanEngine["getProfessionalMealOptions"]>) => fixtureEngine().getProfessionalMealOptions(...args);

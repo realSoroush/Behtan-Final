@@ -1,7 +1,7 @@
 import { createEmptyOnboardingData, type DailyMealPlan, type MacroTargets, type NutritionCatalog, type OnboardingData, type ProteinEnginePolicy } from '@/types';
 import { evaluateOnboardingMedicalEligibility, resolveSafeWeightLossSpeed } from '@/utils/medicalEligibility';
 import { calculateFullNutritionPlanWithTrace, tryCalculateAge, type NutritionCalculationTrace } from '@/utils/nutritionHelpers';
-import { generateDailyMealPlan, configureNutritionCatalog } from '@/utils/mealPlanEngine';
+import { createMealPlanEngine } from '@/utils/mealPlanEngine';
 import { hasDailyMovementAnswers, hasWorkoutAnswers, deriveOnboardingActivity } from '@/utils/onboardingActivity';
 import { getLocalDateKey } from '@/utils/dailyMealProgress';
 
@@ -50,8 +50,7 @@ export function calculateTestScenario(
     isWorkoutDay, trainingType: data.trainingType,
     proteinBudgetPreference: data.proteinBudgetPreference, proteinPolicy,
   });
-  configureNutritionCatalog(catalog);
-  const plan = generateDailyMealPlan(
+  const plan = createMealPlanEngine(catalog).generateDailyMealPlan(
     targets, data.weight,
     { vegetarianStatus: data.vegetarianStatus, allergies: data.allergies },
     isWorkoutDay, `${date}-v0`, { proteinBudgetPreference: data.proteinBudgetPreference },

@@ -54,14 +54,12 @@ import { MemberSwapSheet as FoodSwapModal } from './MemberSwapSheet';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useNutritionCatalog } from '@/hooks/useNutritionCatalog';
-import { useProteinEnginePolicy } from '@/hooks/useProteinEnginePolicy';
 import { useDailyMealProgress } from '@/hooks/useDailyMealProgress';
 import {
   toPersianDigits,
 } from '@/utils/nutritionHelpers';
 import {
-  generateDailyMealPlan,
-  getMemberSwapOptions,
+  createMealPlanEngine,
   type MemberSwapOption,
 } from '@/utils/mealPlanEngine';
 import type {
@@ -132,16 +130,13 @@ export function DashboardPage() {
   } = useUserProfile(user?.id, true);
   const {
     catalog,
+    policy: proteinPolicy,
+    revision: catalogRevision,
     loading: catalogLoading,
     error: catalogError,
     refetch: refetchCatalog,
-  } = useNutritionCatalog();
-  const {
-    policy: proteinPolicy,
-    loading: proteinPolicyLoading,
-    error: proteinPolicyError,
-    refetch: refetchProteinPolicy,
-  } = useProteinEnginePolicy();
+  } = useNutritionCatalog(user?.id);
+  const engine = useMemo(() => catalog ? createMealPlanEngine(catalog, catalogRevision) : null, [catalog, catalogRevision]);
 
   const [section, setSection] = useState<'today' | 'profile' | 'progress' | 'training'>(
     () =>
@@ -407,7 +402,7 @@ export function DashboardPage() {
       schedule.loading ||
       schedule.profileChanged ||
       workoutChoice?.key !== generationKey ||
-      !catalog ||
+      !engine ||
       !targets ||
       history.loading ||
       generationContext?.key !== generationKey ||
@@ -446,6 +441,7 @@ export function DashboardPage() {
             proteinBudgetPreference:
               profile.protein_budget_preference ?? 'performance',
           },
+          engine,
         ),
         error: null,
       };
@@ -457,7 +453,7 @@ export function DashboardPage() {
       return { plan: null, error: message };
     }
   }, [
-    catalog,
+    engine,
     targets,
     profile,
     isWorkoutDay,
@@ -488,12 +484,12 @@ export function DashboardPage() {
   const selectDay=async(date:string)=>{
     setViewDate(date);setViewError('');setDayOpen(false);
     if(date===todayKey||schedule.plans[date])return;
-    if(!profile?.weight||!profile.dietary_preferences_json||!medicalEligibility?.canGenerateAutomaticPlan)return;
+    if(!engine||!profile?.weight||!profile.dietary_preferences_json||!medicalEligibility?.canGenerateAutomaticPlan)return;
     setDayLoading(date);
     try{
       await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
       const futureWorkout=workoutForDate(date,profile.workout_weekdays,profile.workout_days??0);const futureTargets=computeNutrition(futureWorkout)?.targets;if(!futureTargets)throw Error('اطلاعات برنامه کامل نیست.');
-      const future=generateDailyMealPlan(futureTargets,profile.weight,profile.dietary_preferences_json,futureWorkout,date+'-v0',{previousDay:activePlan?historyOfMeals(activePlan.meals):[],proteinBudgetPreference:profile.protein_budget_preference??'performance'});
+      const future=engine.generateDailyMealPlan(futureTargets,profile.weight,profile.dietary_preferences_json,futureWorkout,date+'-v0',{previousDay:activePlan?historyOfMeals(activePlan.meals):[],proteinBudgetPreference:profile.protein_budget_preference??'performance'});
       await schedule.save([{date,plan:future}]);
     }catch(e){setViewError(e instanceof Error?e.message:'برنامهٔ این روز آماده نشد.');}
     finally{setDayLoading(current=>current===date?null:current);}
@@ -546,12 +542,12 @@ export function DashboardPage() {
   };
 
   const changeVisibleMeal = async (index: number) => {
-    if (!viewedPlan || !profile?.dietary_preferences_json || mealChangeInFlight.current) return;
+    if (!engine || !viewedPlan || !profile?.dietary_preferences_json || mealChangeInFlight.current) return;
     const preferences = profile.dietary_preferences_json;
     try {
       await saveMealEdit(() => changeMemberMeal(
         withSwapBaseline(viewedPlan, viewingToday ? editablePlan ?? viewedPlan : viewedPlan),
-        index, preferences, viewingToday ? todayIntake : { skippedSlots: [], extraMeals: [] },
+        index, preferences, viewingToday ? todayIntake : { skippedSlots: [], extraMeals: [] }, engine,
       ));
     } catch (error) {
       if (editContextRef.current === editContext) {
@@ -611,8 +607,8 @@ export function DashboardPage() {
   ]);
 
   const provenance = useMemo(
-    () => buildPlanProvenance(catalog, proteinPolicy),
-    [catalog, proteinPolicy],
+    () => buildPlanProvenance(catalog, proteinPolicy, catalogRevision),
+    [catalog, proteinPolicy, catalogRevision],
   );
   const planReporting = usePlanReporting(
     todayKey,
@@ -621,7 +617,6 @@ export function DashboardPage() {
       profile?.id === user?.id &&
       !profileLoading &&
       !catalogLoading &&
-      !proteinPolicyLoading &&
       !mealProgressLoading &&
       !mealProgressError &&
       mealProgressSavingSlots.size === 0
@@ -740,7 +735,7 @@ export function DashboardPage() {
 
   const swapCandidates = useMemo<MemberSwapOption[]>(() => {
     if (
-      !catalog ||
+      !engine ||
       !swapCurrentComponent ||
       !intakeReady ||
       !profile?.dietary_preferences_json ||
@@ -749,7 +744,7 @@ export function DashboardPage() {
       swapComponentIndex === null
     )
       return [];
-    return getMemberSwapOptions(
+    return engine.getMemberSwapOptions(
       activePlan,
       swapMealIndex,
       swapComponentIndex,
@@ -758,7 +753,7 @@ export function DashboardPage() {
       swapReferenceComponent ?? undefined,
     );
   }, [
-    catalog,
+    engine,
     swapCurrentComponent,
     intakeReady,
     todayIntake,
@@ -817,7 +812,6 @@ export function DashboardPage() {
   if (
     profileLoading ||
     catalogLoading ||
-    proteinPolicyLoading ||
     mealProgressLoading ||
     history.loading ||
     schedule.loading
@@ -846,27 +840,6 @@ export function DashboardPage() {
           <button
             type="button"
             onClick={() => void refetchCatalog()}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-sm font-semibold"
-          >
-            <RefreshCw size={14} />
-            تلاش دوباره
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (proteinPolicyError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-5">
-        <div className="max-w-sm text-center space-y-4">
-          <AlertCircle size={40} className="text-red-500 mx-auto" />
-          <p className="font-semibold text-neutral-700 dark:text-neutral-300">
-            {proteinPolicyError}
-          </p>
-          <button
-            type="button"
-            onClick={() => void refetchProteinPolicy()}
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-sm font-semibold"
           >
             <RefreshCw size={14} />
@@ -914,7 +887,7 @@ export function DashboardPage() {
       >
         <MemberCompanion name={profile?.display_name} message={companionMessage} reactionKey={currentCompanionEvent?.nonce ?? todayKey} onAction={showMeals} days={[todayKey,addPlanDays(todayKey,1),addPlanDays(todayKey,2)]} selectedDate={selectedDate} onSelectDay={date=>void selectDay(date)} />
         {viewedPlan&&<p className='member-muted'>در هدف کاهش یا افزایش وزن، کالری پایه ثابت می‌ماند و روز تمرین بین وعده‌ها بازتوزیع می‌شود؛ در حفظ وزن، سیاست فعلی ۱۵۰ کالری اضافه می‌کند.</p>}
-        {viewedPlan&&consumed&&<MacroSummary title={viewingToday?'انرژی امروز':'انرژی این روز'} targets={viewedPlan.targets} consumed={viewingToday?consumed:computeConsumedMacros(viewedPlan)} planned={planned} isWorkoutDay={isWorkoutDay} workoutControl={<MemberWorkoutToggle value={viewedPlan.isWorkoutDay} disabled={changingMeal||schedule.saving||Boolean(!viewingToday&&dayLoading)||Boolean(viewingToday&&consumedMealSnapshots.post_workout)||mealProgressSavingSlots.size>0||Boolean(mealProgressError)||skipError} onChange={v=>{if(mealChangeInFlight.current)return;if(!viewingToday){const futureTargets=computeNutrition(v)?.targets;if(futureTargets&&profile?.weight&&profile.dietary_preferences_json){try{const future=generateDailyMealPlan(futureTargets,profile.weight,profile.dietary_preferences_json,v,selectedDate+'-v0',{proteinBudgetPreference:profile.protein_budget_preference??'performance'});void schedule.save([{date:selectedDate,plan:future}],true).catch(()=>setViewError('تغییر روز ذخیره نشد.'));}catch{setViewError('تغییر روز انجام نشد.');}}return;}setIsWorkoutDay(v);setGenerationContext({key:generationKey,lockedMeals:Object.values(consumedMealSnapshots),avoidMeals:[],hydrationError:Boolean(mealProgressError)||skipError});}}/>}/>}
+        {viewedPlan&&consumed&&<MacroSummary title={viewingToday?'انرژی امروز':'انرژی این روز'} targets={viewedPlan.targets} consumed={viewingToday?consumed:computeConsumedMacros(viewedPlan)} planned={planned} isWorkoutDay={isWorkoutDay} workoutControl={<MemberWorkoutToggle value={viewedPlan.isWorkoutDay} disabled={changingMeal||schedule.saving||Boolean(!viewingToday&&dayLoading)||Boolean(viewingToday&&consumedMealSnapshots.post_workout)||mealProgressSavingSlots.size>0||Boolean(mealProgressError)||skipError} onChange={v=>{if(mealChangeInFlight.current)return;if(!viewingToday){const futureTargets=computeNutrition(v)?.targets;if(engine&&futureTargets&&profile?.weight&&profile.dietary_preferences_json){try{const future=engine.generateDailyMealPlan(futureTargets,profile.weight,profile.dietary_preferences_json,v,selectedDate+'-v0',{proteinBudgetPreference:profile.protein_budget_preference??'performance'});void schedule.save([{date:selectedDate,plan:future}],true).catch(()=>setViewError('تغییر روز ذخیره نشد.'));}catch{setViewError('تغییر روز انجام نشد.');}}return;}setIsWorkoutDay(v);setGenerationContext({key:generationKey,lockedMeals:Object.values(consumedMealSnapshots),avoidMeals:[],hydrationError:Boolean(mealProgressError)||skipError});}}/>}/>}
         {(schedule.error || scheduleSyncError) && (
           <div className="member-notice" role="status">
             {schedule.error ??
@@ -1028,13 +1001,13 @@ export function DashboardPage() {
         <div className="day-meal-list">{viewedPlan.meals.map((meal,index)=><MealCard compact readOnly={!viewingToday} onSkip={()=>requestSkip(meal)} skipped={isMealSkipped(meal.slot,skipped,todayKey,selectedDate)} key={meal.slot} meal={meal} isConsumedSaving={mealProgressSavingSlots.has(meal.slot)} consumedToggleDisabled={Boolean(mealProgressError)||skipError} onToggleConsumed={()=>handleToggleConsumed(index)} onSwapComponent={componentIndex=>{setDayOpen(false);handleSwapComponent(index,componentIndex);}}/>)}</div>
         {viewingToday&&<details className="day-more-options"><summary>تنوع غذا و کیفیت برنامه</summary><button type="button" className="member-secondary" onClick={()=>{regenerate();setDayOpen(false);}} disabled={Boolean(viewedPlan.meals.every(m=>m.consumed))||mealProgressSavingSlots.size>0||Boolean(mealProgressError)||skipError}><RefreshCw size={15}/>تغییر وعده‌های باقی‌مانده</button>{foodQuality&&<NutritionQualitySummary quality={foodQuality}/>}</details>}
       </MemberDialog>}
-      {weekOpen && activePlan && targets && profile && catalog && (
+      {weekOpen && activePlan && targets && profile && engine && (
         <WeekPlanner
           today={todayKey}
           plan={activePlan}
           targets={targets}
           profile={profile}
-          catalog={catalog}
+          engine={engine}
           schedule={schedule}
           targetsForDay={workout=>computeNutrition(workout)!.targets}
           onClose={() => setWeekOpen(false)}

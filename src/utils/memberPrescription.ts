@@ -1,15 +1,17 @@
-import type { DailyMealPlan, Meal } from '../types/index.ts';
-import { generateDailyMealPlan } from './mealPlanEngine.ts';
+import type { DailyMealPlan, DietaryPreferencesJson, MacroTargets, Meal } from '../types/index.ts';
+import type { MealExperienceContext } from './mealExperience.ts';
+import { generateDailyMealPlan, type MealPlanEngine } from './mealPlanEngine.ts';
 import { prescriptionForSchedule } from './mealPresentation.ts';
 
 /** Keep an independent prescription underneath factual intake, including after undo/reopen. */
-export function generateMemberPrescription(...args: Parameters<typeof generateDailyMealPlan>): DailyMealPlan {
-  const context = args[5];
-  if (!context?.lockedMeals?.length) return generateDailyMealPlan(...args);
-  const baselineArgs: Parameters<typeof generateDailyMealPlan> = [...args];
-  baselineArgs[5] = { ...context, lockedMeals: [] };
-  const baseline = generateDailyMealPlan(...baselineArgs);
-  const withIntake = generateDailyMealPlan(...args);
+export function generateMemberPrescription(
+  targets: MacroTargets, weight: number, preferences: DietaryPreferencesJson, workout: boolean,
+  date?: string, context?: MealExperienceContext, engine?: Pick<MealPlanEngine, 'generateDailyMealPlan'>,
+): DailyMealPlan {
+  const generate = engine?.generateDailyMealPlan ?? generateDailyMealPlan;
+  if (!context?.lockedMeals?.length) return generate(targets, weight, preferences, workout, date, context);
+  const baseline = generate(targets, weight, preferences, workout, date, { ...context, lockedMeals: [] });
+  const withIntake = generate(targets, weight, preferences, workout, date, context);
   return prescriptionForSchedule(withIntake, baseline);
 }
 

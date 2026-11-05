@@ -13,6 +13,8 @@ function scheduleFrom(rows: unknown, context: string) {
   for (const row of (Array.isArray(rows) ? rows as Row[] : [])) {
     if (!row || typeof row.plan_date !== "string" || typeof row.updated_at !== "string") continue;
     versions[row.plan_date] = row.updated_at;
+    // The save RPC returns the version only for rows from another context.
+    if (row.plan === null && row.context_key !== context) continue;
     if (!isPresentablePlan(row.plan)) invalid = true;
     else if (row.context_key === context) {
       if (isPrescriptionPlan(row.plan)) plans[row.plan_date] = row.plan;

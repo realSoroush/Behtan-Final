@@ -94,7 +94,7 @@ const proteinPolicyMigrationSource = readFileSync(
   'utf8'
 );
 const proteinPolicyHookSource = readFileSync(
-  resolve(projectRoot, 'src/hooks/useProteinEnginePolicy.ts'),
+  resolve(projectRoot, 'src/utils/nutritionContext.ts'),
   'utf8'
 );
 const subscriptionMigrationSource = readFileSync(
@@ -130,7 +130,7 @@ assert(allergySeparationMigrationSource.includes("id in ('walnut', 'mixed_nuts')
 assert(proteinPolicyMigrationSource.includes('public.nutrition_protein_policy'), 'Protein runtime-policy migration missing');
 assert(proteinPolicyMigrationSource.includes('weight_loss_rt'), 'Protein runtime policy missing weight_loss_rt');
 assert(proteinPolicyMigrationSource.includes('max_protein_calorie_fraction'), 'Protein runtime policy missing calorie guardrail');
-assert(proteinPolicyHookSource.includes(".from('nutrition_protein_policy')"), 'App is not loading protein policy from Supabase');
+assert(proteinPolicyHookSource.includes(".rpc('nutrition_context_snapshot'"), 'App is not loading protein policy from Supabase');
 assert(subscriptionMigrationSource.includes('public.subscription_plans'), 'Subscription plans migration missing');
 assert(subscriptionMigrationSource.includes('price_toman'), 'Subscription plans need an authoritative toman price');
 assert(subscriptionHookSource.includes(".from('subscription_plans')"), 'Paywall is not loading subscription plans from Supabase');

@@ -3,7 +3,7 @@ import { assertValidNutritionCatalog } from '../src/utils/nutritionCatalog.ts';
 import { installTestNutritionCatalog } from './setup-test-nutrition-catalog.mjs';
 import { generateMemberPrescription } from '../src/utils/memberPrescription.ts';
 import { calculateMacros } from '../src/utils/nutritionHelpers.ts';
-import { generateDailyMealPlan } from '../src/utils/mealPlanEngine.ts';
+import { createMealPlanEngine, generateDailyMealPlan } from '../src/utils/mealPlanEngine.ts';
 import { isPresentablePlan, prescriptionForSchedule } from '../src/utils/mealPresentation.ts';
 import { isStoredMealSnapshot, applyDailyMealSnapshots } from '../src/utils/dailyMealProgress.ts';
 const catalog = installTestNutritionCatalog();
@@ -49,5 +49,17 @@ check('F03 allergy change + undo + JSON reopen preserves safe prescription and o
   const manual = generateMemberPrescription(targets, 80, prefs, false, '2026-11-04', { lockedMeals: [custom], proteinBudgetPreference: 'balanced' });
   assert(manual.meals.every(m => !m.source && m.templateId !== 'custom'));
   assert.deepEqual(eaten, shown.meals.find(m => m.slot === eaten.slot));
+});
+check('independent engines preserve parity and cannot share mutable catalog state', () => {
+  const original = createMealPlanEngine(catalog);
+  assert.deepEqual(original.generateDailyMealPlan(targets, 80, prefs, false, '2026-11-04', { proteinBudgetPreference: 'balanced' }), plan);
+  const alternateCatalog = structuredClone(catalog);
+  alternateCatalog.foods.forEach(food => { food.name = 'نسخه دوم: ' + food.name; });
+  const alternate = createMealPlanEngine(alternateCatalog, '42');
+  alternateCatalog.foods[0].name = 'نباید به موتور برسد';
+  const next = alternate.generateDailyMealPlan(targets, 80, prefs, false, '2026-11-04', { proteinBudgetPreference: 'balanced' });
+  assert(next.meals.flatMap(m => m.components).every(c => c.foodItem.name.startsWith('نسخه دوم: ')));
+  assert.equal(next.nutritionContext.revision, '42');
+  assert.deepEqual(original.generateDailyMealPlan(targets, 80, prefs, false, '2026-11-04', { proteinBudgetPreference: 'balanced' }), plan);
 });
 if (failures.length) { console.error('REGRESSIONS:', failures.join('; ')); process.exitCode = 1; }

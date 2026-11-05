@@ -103,7 +103,7 @@ const phase2bMigration = readFileSync(
   resolve(root, 'supabase/migrations/20260905_010_protein_budget_preference.sql'),
   'utf8'
 );
-const hook = readFileSync(resolve(root, 'src/hooks/useProteinEnginePolicy.ts'), 'utf8');
+const hook = readFileSync(resolve(root, 'src/utils/nutritionContext.ts'), 'utf8');
 const dashboard = readFileSync(resolve(root, 'src/components/dashboard/DashboardPage.tsx'), 'utf8');
 
 assert(migration.includes('public.nutrition_protein_policy'), 'Protein policy table migration missing');
@@ -114,7 +114,7 @@ assert(phase2Migration.includes('weight_loss_rt_min'), 'Editable Loss+RT minimum
 assert(phase2Migration.includes('weight_loss_rt_min <= weight_loss_rt'), 'Minimum/preferred DB range constraint missing');
 assert(phase2bMigration.includes('budget_balanced_position'), 'Budget interpolation policy migration missing');
 assert(phase2bMigration.includes('protein_budget_preference'), 'Per-user budget preference column missing');
-assert(hook.includes(".from('nutrition_protein_policy')"), 'Runtime hook does not read Supabase policy');
+assert(hook.includes(".rpc('nutrition_context_snapshot'"), 'Runtime hook does not read Supabase policy');
 assert(dashboard.includes('proteinPolicy,'), 'Dashboard does not inject runtime policy into nutrition calculation');
 
 console.log('✅ Behtan Supabase Protein Policy smoke test passed');
