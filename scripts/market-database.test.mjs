@@ -17,6 +17,7 @@ export async function testMarketDatabase({ db }) {
     "20261104134358_042_version_member_meal_schedule.sql",
     "20261104182716_045_member_review_and_meal_events.sql",
     "20261104205157_046_member_safety_sync.sql",
+    "20261105094021_047_egg_sesame_allergen_safety.sql",
   ])
     await db.exec(
       await readFile(
@@ -344,6 +345,20 @@ export async function testMarketDatabase({ db }) {
     [celeryIntake, { ...celeryIntake, display_name, phone }, { ...celeryIntake, height_cm: 99 }],
   )).rows[0];
   assert.deepEqual(validation, { sandbox: true, real: true, out_of_bounds: false });
+  for (const allergy of ['egg', 'sesame']) {
+    const a = { ...answers, allergies: [allergy] };
+    const result = (await db.query('select pro_private.valid_intake($1) as sandbox, pro_private.valid_real_intake($2) as real', [a, {...a, display_name, phone}])).rows[0];
+    assert.deepEqual(result, {sandbox:true, real:true});
+  }
+  const migration047 = await readFile(new URL('../supabase/migrations/20261105094021_047_egg_sesame_allergen_safety.sql', import.meta.url), 'utf8');
+  await db.exec(migration047); // repeat-safe without rewriting historical snapshots
+  const eggs = (await db.query("select id,allergy_flags,allergen_assessment from food_items where id in ('egg_whole','egg_white') order by id")).rows;
+  assert.equal(eggs.length,2);
+  for (const egg of eggs) { assert(egg.allergy_flags.includes('egg')); assert.equal(egg.allergen_assessment.egg,'contains'); }
+  for (const assessment of [{egg:'safe'}, {other:'contains'}, {sesame:'assessed_absent'}]) {
+    await assert.rejects(() => db.query("update food_items set allergen_assessment=$1,allergen_assessment_source=null where id='sangak_bread'", [assessment]), /food_items_allergen_assessment_check/);
+  }
+  assert.equal((await db.query("select public.valid_food_allergen_assessment($1,$2) as ok", [{sesame:'assessed_absent'},'synthetic-reviewed-source'])).rows[0].ok,true);
   await as(user);const trialCases=[];
   for(let i=0;i<3;i++)trialCases.push((await db.query('select pro_save_real_case($1,null,0,$2,$3) as c',[org,JSON.stringify({...intake,display_name:'پرونده '+i}),randomUUID()])).rows[0].c);
   await assert.rejects(()=>db.query('select pro_save_real_case($1,null,0,$2,$3)',[org,JSON.stringify({...intake,display_name:'پرونده چهارم'}),randomUUID()]),/PRO_CASE_LIMIT/);

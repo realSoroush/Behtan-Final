@@ -1,3 +1,4 @@
+import { NEW_ALLERGEN_NOTICE } from '@/utils/allergens';
 import { StepHeader } from '@/components/ui/StepHeader';
 import { Button } from '@/components/ui/Button';
 import { OptionCard, CheckboxCard } from '@/components/ui/Card';
@@ -20,6 +21,8 @@ export const ALLERGIES: { value: Allergy; icon: string; label: string }[] = [
   { value: 'soy', icon: '🌱', label: 'سویا' },
   { value: 'seafood', icon: '🦐', label: 'غذاهای دریایی' },
   { value: 'celery', icon: '🥬', label: 'کرفس' },
+  { value: 'egg', icon: '🥚', label: 'تخم‌مرغ' },
+  { value: 'sesame', icon: '🌱', label: 'کنجد' },
 ];
 
 export const PROTEIN_BUDGET_OPTIONS: {
@@ -90,6 +93,7 @@ export function Step7Dietary() {
           آلرژی یا عدم تحمل غذایی{' '}
           <span className="font-normal text-neutral-400">(اختیاری)</span>
         </p>
+        {(data.allergies.includes('egg') || data.allergies.includes('sesame')) && <p className="text-xs mb-3" role="status">{NEW_ALLERGEN_NOTICE}</p>}
         <div className="grid grid-cols-2 gap-2">
           {ALLERGIES.map((a) => (
             <CheckboxCard

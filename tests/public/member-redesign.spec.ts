@@ -479,6 +479,32 @@ test('focusing the app refreshes a remotely updated diet before the next save', 
   await expect(page.getByRole('region', { name: 'حساسیت‌های غذایی' })).toContainText('کرفس');
 });
 
+test('new egg and sesame choices persist with an explicit unknown-data warning', async ({ page }) => {
+  let preferences = { vegetarianStatus: 'none', allergies: [] as string[] };
+  await page.unroute('**/src/hooks/useUserProfile.ts*');
+  await page.route('**/rest/v1/user_profiles?*', route => {
+    if (route.request().method() === 'PATCH') {
+      preferences = route.request().postDataJSON().dietary_preferences_json;
+      expect(preferences.allergies).toEqual(['egg', 'sesame']);
+      return route.fulfill({ json: [{ id: profile.id }] });
+    }
+    return route.fulfill({ json: [{ ...profile, dietary_preferences_json: preferences }] });
+  });
+  await page.reload();
+  await page.getByRole('link', { name: 'حساب من', exact: true }).click();
+  const region = page.getByRole('region', { name: 'حساسیت‌های غذایی' });
+  await region.getByRole('button', { name: 'ویرایش حساسیت‌ها' }).click();
+  const dialog = page.getByRole('dialog', { name: 'ویرایش حساسیت‌های غذایی' });
+  await dialog.getByRole('checkbox', { name: 'تخم‌مرغ', exact: true }).check();
+  await dialog.getByRole('checkbox', { name: 'کنجد', exact: true }).check();
+  await expect(dialog).toContainText('اگر دادهٔ کافی نباشد، ساخت خودکار متوقف می‌شود');
+  await dialog.getByRole('button', { name: 'ذخیرهٔ حساسیت‌ها' }).click();
+  await expect(region).toContainText('تخم‌مرغ، کنجد');
+  await page.reload();
+  await page.getByRole('link', { name: 'حساب من', exact: true }).click();
+  await expect(region).toContainText('تخم‌مرغ، کنجد');
+});
+
 test('account saves celery allergy while preserving existing food preferences', async ({ page }) => {
   const existing = { vegetarianStatus: 'pescatarian', allergies: ['dairy'] };
   let preferences = existing;

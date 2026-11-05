@@ -1,3 +1,4 @@
+import { foodAllowedByAllergens } from './allergens.ts';
 /**
  * mealPlanEngine.ts
  * ─────────────────────────────────────────────────────────────────────────
@@ -19,7 +20,6 @@
  */
 
 import type {
-  Allergy,
   DailyMealPlan,
   DietaryPreferencesJson,
   FoodItem,
@@ -158,7 +158,7 @@ const SLOT_ORDER: MealSlot[] = [
 
 function isFoodAllowed(food: FoodItem, preferences: DietaryPreferencesJson): boolean {
   return (
-    !food.allergyFlags.some((a: Allergy) => preferences.allergies.includes(a)) &&
+    foodAllowedByAllergens(food, preferences.allergies) &&
     !food.excludedForVegetarian.includes(preferences.vegetarianStatus)
   );
 }
