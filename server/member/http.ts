@@ -45,7 +45,7 @@ export function memberHandler(factory = memberService) {
         !body ||
         typeof body !== "object" ||
         Object.keys(body).some((k) => !["action", "input"].includes(k)) ||
-        !["preflight", "training", "training_history"].includes(body.action)
+        !["preflight", "training", "training_history", "meal_schedule"].includes(body.action)
       )
         throw Error("INVALID_REQUEST");
       const result = await factory()(token, body.action, body.input);
@@ -53,26 +53,19 @@ export function memberHandler(factory = memberService) {
       res.end(JSON.stringify(result));
     } catch (e) {
       const message = e instanceof Error ? e.message : "";
-      res.statusCode =
-        message === "AUTH_REQUIRED"
-          ? 401
-          : message === "TOO_LARGE"
-            ? 413
-            : message === "TRAINING_LOCKED"
-              ? 403
-              : 400;
-      const allowed = [
-        "PROFILE_CHANGED",
-        "AUTH_REQUIRED",
-        "TOO_LARGE",
-        "INVALID_REQUEST",
-        "TRAINING_LOCKED",
-        "RATE_LIMITED",
-      ];
+      const status: Record<string, number> = {
+        AUTH_REQUIRED: 401, TOO_LARGE: 413, TRAINING_LOCKED: 403,
+        ACCESS_DENIED: 403, STALE_CONTEXT: 409, STALE_INTAKE: 409,
+        STALE_PLAN: 409, REQUEST_CONFLICT: 409, MEAL_NOT_EDITABLE: 409,
+        NO_FEASIBLE_PLAN: 422, MEDICAL_REVIEW_REQUIRED: 422, INVALID_INTAKE: 422,
+        RATE_LIMITED: 429, MEAL_SCHEDULE_MIGRATION_REQUIRED: 503,
+      };
+      res.statusCode = Object.prototype.hasOwnProperty.call(status, message) ? status[message] : 400;
+      const allowed = ["PROFILE_CHANGED", "INVALID_REQUEST", "INVALID_MEAL_DATE", "INVALID_PLAN"];
       res.end(
         JSON.stringify({
           error:
-            allowed.includes(message) || /^TRAINING_[A-Z_]+$/.test(message)
+            Object.prototype.hasOwnProperty.call(status, message) || allowed.includes(message) || /^TRAINING_[A-Z_]+$/.test(message)
               ? message
               : "ساخت برنامه با اطلاعات و محدودیت‌های فعلی ممکن نشد. هیچ پرداختی انجام نشده؛ برای بررسی با پشتیبانی تماس بگیر.",
         }),
