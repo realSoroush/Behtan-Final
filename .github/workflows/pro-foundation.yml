@@ -68,6 +68,7 @@ jobs:
           path: test-results/
           if-no-files-found: ignore
           retention-days: 7
+      - run: node --experimental-strip-types scripts/member-authoritative-meals.test.mjs
       - run: npm run test:market
       - run: npm run test:security:hardening
       - run: npm run test:production && npm run test:admin && npm run test:medical-safety && npm run test:nutrition && npm run test:meal-progress && npm run test:onboarding && npm run test:routing && npm run test:mobile-meals && npm run test:diagnostics && npm run test:feasibility && npm run test:protein && npm run test:progress

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
+import { testMemberMealCommit } from "./member-authoritative-meals-database.mjs";
 export async function testMarketDatabase({ db }) {
   await db.exec("reset role");
   await db.exec('alter default privileges in schema public revoke update on tables from authenticated');
@@ -19,6 +20,7 @@ export async function testMarketDatabase({ db }) {
     "20261104205157_046_member_safety_sync.sql",
     "20261105094021_047_egg_sesame_allergen_safety.sql",
     "20261105171239_048_nutrition_context_snapshot.sql",
+    "20261105172329_049_authoritative_member_meals.sql",
   ])
     await db.exec(
       await readFile(
@@ -114,6 +116,7 @@ export async function testMarketDatabase({ db }) {
     ).rows[0].n,
     1,
   );
+  await testMemberMealCommit(db, user, other);
   const snapshot = async (known = null) => (await db.query(
     "select nutrition_context_snapshot($1) as result", [known],
   )).rows[0].result;

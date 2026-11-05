@@ -8,6 +8,7 @@ const server = createServer(
     calls++;
     assert.equal(token, "synthetic");
     if (action === "training") throw Error("TRAINING_LOCKED");
+    if (action === "meal_schedule" && input.kind === "rotate") throw Error("STALE_INTAKE");
     return { ok: true, action, input };
   }),
 );
@@ -50,6 +51,9 @@ try {
     (await post(JSON.stringify({ action: "training" }))).status,
     403,
   );
+  const stale = await post(JSON.stringify({ action: "meal_schedule", input: { kind: "rotate" } }));
+  assert.equal(stale.status, 409);
+  assert.deepEqual(await stale.json(), { error: "STALE_INTAKE" });
   console.log(
     "PASS actual member HTTP server: methods, JWT gate, cross-site rejection, media type, stream limit, malformed/injected input, no-store and training denial",
   );
