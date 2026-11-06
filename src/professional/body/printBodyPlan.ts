@@ -1,3 +1,4 @@
+import { showPrintLoading } from '../../utils/printLoading.ts';
 import { printedPlanHtml } from "../printPlan.ts";
 import type { PrintedPlan } from "../menuPlan.ts";
 import { bodyAppendixHtml } from "./appendix.ts";
@@ -11,7 +12,7 @@ export async function printPlanWithBody(
   const popup = window.open("", "_blank");
   if (!popup) throw new Error("اجازه بازشدن پنجره چاپ را در مرورگر فعال کنید.");
   popup.opener = null;
-  popup.document.body.textContent = "در حال آماده‌سازی خروجی…";
+  showPrintLoading(popup, window.location.origin);
   try {
     const [report, specialist] = await Promise.all([bodyApi.forPlan(org, planId), specialistApi.forPlan(org, 'nutrition', planId)]);
     const html = printedPlanHtml(p, window.location.origin, specialist);

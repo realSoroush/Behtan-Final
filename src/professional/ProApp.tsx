@@ -1,3 +1,4 @@
+import { AppLoading } from '@/components/ui/AppLoading';
 import {StudioOverview,type ProView} from './StudioOverview';
 import './studio-shell.css';
 import {track} from '../member/analytics';
@@ -44,7 +45,7 @@ export function ProApp() {
   if (loading)
     return (
       <main className="pro-app" dir="rtl">
-        <p role="status">در حال بررسی ورود…</p>
+        <AppLoading label="در حال بررسی ورود…" variant="page" />
       </main>
     );
   if (!user) return <PhoneAuth />;
@@ -181,7 +182,7 @@ function Workspace({userId,phone,view,navigate,onDirty}:{userId:string;phone:str
   }
   if (!profile?.completed) return <main id="pro-workspace" tabIndex={-1}>
     {error && <p className="pro-error" role="alert">{error}<button disabled={busy} onClick={() => void load()}>تلاش مجدد</button></p>}
-    {!profile && busy && <p role="status">در حال دریافت مشخصات حرفه‌ای…</p>}
+    {!profile && busy && <AppLoading label="در حال دریافت مشخصات حرفه‌ای…" />}
     {profile && <SpecialistProfileForm initial={profile} onSaved={saved => { setProfile(saved); void load(); }} />}
   </main>;
   const roles =
@@ -211,7 +212,7 @@ function Workspace({userId,phone,view,navigate,onDirty}:{userId:string;phone:str
           {error}<button disabled={busy} onClick={()=>void load()}>تلاش مجدد</button>
         </p>
       )}
-      {busy && <p role="status">در حال دریافت فضای کاری…</p>}
+      {busy && <AppLoading label="در حال دریافت فضای کاری…" />}
       {allowed === false && (
         hadAccess.current ? <p role="alert" className="pro-error">دسترسی این حساب به پنل فعال نیست.</p> : <ProOnboarding profile={profile} onComplete={()=>void load()}/>
       )}

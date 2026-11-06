@@ -1,3 +1,4 @@
+import { AppLoading } from '@/components/ui/AppLoading';
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { DailyMealPlan } from "@/types";
@@ -105,9 +106,7 @@ export function MemberAnalytics({
         ))}
       </div>
       {loading ? (
-        <p role="status" className="member-muted">
-          در حال دریافت ثبت‌ها…
-        </p>
+        <AppLoading label="در حال دریافت ثبت‌ها…" />
       ) : state.error ? (
         <div role="alert" className="member-notice">
           دریافت روند وعده‌ها انجام نشد.

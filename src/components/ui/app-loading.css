@@ -1,0 +1,47 @@
+.app-loading {
+  --loading-surface: color-mix(in srgb, currentColor 7%, transparent);
+  --loading-fill: color-mix(in srgb, currentColor 12%, transparent);
+  box-sizing: border-box;
+  color: inherit;
+  padding: 1.125rem;
+  border-radius: 1.125rem;
+  background: var(--loading-surface);
+}
+.app-loading--page {
+  min-height: 100svh;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 1.25rem;
+  border-radius: 0;
+  background: transparent;
+}
+.app-loading--inline { padding: .375rem .625rem; background: transparent; }
+.app-loading__content { display: flex; align-items: center; gap: .75rem; }
+.app-loading__content strong { font-size: .875rem; font-weight: 600; }
+.app-loading__content small { display: block; margin-block-start: .25rem; }
+.app-loading__mascot { flex: none; width: 2.5rem; height: auto; object-fit: contain; }
+.app-loading--page .app-loading__mascot { width: 4.25rem; }
+.app-loading--inline .app-loading__mascot { width: 1.75rem; }
+button .app-loading__mascot { width: 1.1em; height: 1.25em; }
+.app-loading__skeleton {
+  width: min(100%, 22rem);
+  margin-block-start: .85rem;
+  display: grid;
+  gap: .5rem;
+}
+.app-loading__skeleton i {
+  display: block;
+  width: 100%;
+  height: .625rem;
+  border-radius: 1rem;
+  background: var(--loading-fill);
+  animation: app-loading-pulse 1.8s ease-in-out infinite alternate;
+}
+.app-loading__skeleton i:nth-child(2) { width: 76%; }
+.app-loading__skeleton i:nth-child(3) { width: 50%; }
+.app-loading__progress { display: block; width: 100%; height: .65rem; margin-block-start: .75rem; accent-color: #639b46; }
+@keyframes app-loading-pulse { to { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) {
+  .app-loading__skeleton i { animation: none; }
+}

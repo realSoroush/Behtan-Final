@@ -1,3 +1,4 @@
+import { AppLoading } from '@/components/ui/AppLoading';
 import {useEffect,useState} from 'react';
 import {supabase} from '@/lib/supabaseClient';
 import type {ProgressEntry} from '@/utils/progressJournal';
@@ -17,6 +18,6 @@ export function AdminProgress({userId}:{userId:string}) {
     return()=>{active=false;controller.abort();clearTimeout(timeout);};
   },[userId,retry]);
   return <section className="admin-card"><h2>روند وزن و تجربهٔ اجرای برنامه</h2><p>خوداظهاری کاربر؛ این پاسخ‌ها به‌تنهایی باعث تغییر خودکار رژیم نمی‌شوند.</p>
-    {status?<p role="status">{status}<button onClick={()=>setRetry(n=>n+1)}>تلاش دوباره</button></p>:entries.length===0?<p>هنوز گزارشی ثبت نشده است.</p>:<div className="admin-table"><table><thead><tr><th>تاریخ</th><th>وزن</th><th>اجرای برنامه</th><th>گرسنگی</th><th>مانع</th></tr></thead><tbody>{entries.map(e=><tr key={e.entry_date}><td>{new Date(e.entry_date+'T12:00:00').toLocaleDateString('fa-IR')}</td><td>{e.weight_kg?.toLocaleString('fa-IR')??'—'}</td><td>{labels[e.adherence??'']??'—'}</td><td>{labels[e.hunger??'']??'—'}</td><td>{labels[e.difficulty??'']??'—'}</td></tr>)}</tbody></table></div>}
+    {status==='در حال دریافت روند…'?<AppLoading label={status} />:status?<p role="alert">{status}<button onClick={()=>setRetry(n=>n+1)}>تلاش دوباره</button></p>:entries.length===0?<p>هنوز گزارشی ثبت نشده است.</p>:<div className="admin-table"><table><thead><tr><th>تاریخ</th><th>وزن</th><th>اجرای برنامه</th><th>گرسنگی</th><th>مانع</th></tr></thead><tbody>{entries.map(e=><tr key={e.entry_date}><td>{new Date(e.entry_date+'T12:00:00').toLocaleDateString('fa-IR')}</td><td>{e.weight_kg?.toLocaleString('fa-IR')??'—'}</td><td>{labels[e.adherence??'']??'—'}</td><td>{labels[e.hunger??'']??'—'}</td><td>{labels[e.difficulty??'']??'—'}</td></tr>)}</tbody></table></div>}
   </section>;
 }

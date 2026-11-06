@@ -1,3 +1,4 @@
+import { AppLoading } from '@/components/ui/AppLoading';
 import { PanelSelect } from '@/components/ui/PanelSelect';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { caseApi } from "./caseApi";
@@ -128,7 +129,7 @@ export function CaseWorkspace({
           {error}
         </p>
       )}
-      {busy && <p role="status">در حال دریافت پرونده‌ها…</p>}
+      {busy && <AppLoading label="در حال دریافت پرونده‌ها…" />}
       {!busy && !error && records.length === 0 && (
         <p>هنوز پرونده‌ای در دسترس شما نیست.</p>
       )}
@@ -421,7 +422,7 @@ function CaseDetail({
           {notice}
         </p>
       )}
-      {busy && <p role="status">در حال بررسی و ذخیره…</p>}
+      {busy && <AppLoading label="در حال بررسی و ذخیره…" variant="inline" />}
       {access?.can_manage && (
         <details className="pro-permissions" open={!access.can_edit}>
           <summary>تخصیص متخصص و مجوزهای آزمایش</summary>
@@ -524,7 +525,7 @@ function CaseDetail({
         </div>
       )}
       {masked && access?.can_edit && (
-        <p role="status">در حال بررسی مجدد دسترسی…</p>
+        <AppLoading label="در حال بررسی مجدد دسترسی…" />
       )}
       {access?.can_edit && shown && (
         <div hidden={masked}>

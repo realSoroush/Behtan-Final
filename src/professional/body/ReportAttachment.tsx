@@ -1,3 +1,4 @@
+import { AppLoading, LoadingMascot } from '@/components/ui/AppLoading';
 import { useEffect, useRef, useState } from "react";
 import { PanelSelect } from "@/components/ui/PanelSelect";
 import { bodyApi, bodyError } from "./api";
@@ -19,11 +20,13 @@ export function ReportAttachment({
     [selected, setSelected] = useState(""),
     [attached, setAttached] = useState(false),
     [busy, setBusy] = useState(false),
+    [loading, setLoading] = useState(true),
     [error, setError] = useState("");
   const pending = useRef(false);
   useEffect(() => {
     let live = true;
     setError("");
+    setLoading(true);
     setAttached(false);
     setRows([]);
     setSelected("");
@@ -38,7 +41,8 @@ export function ReportAttachment({
       })
       .catch((e) => {
         if (live) setError(bodyError(e));
-      });
+      })
+      .finally(() => { if (live) setLoading(false); });
     return () => {
       live = false;
     };
@@ -51,7 +55,7 @@ export function ReportAttachment({
           {error}
         </p>
       )}
-      {attached ? (
+      {loading ? <AppLoading label="در حال دریافت گزارش‌های بدن…" /> : attached ? (
         <p role="status">
           گزارش تأییدشده به این برنامه متصل است و در انتهای PDF درج می‌شود.
         </p>
@@ -94,7 +98,7 @@ export function ReportAttachment({
                   }
                 }}
               >
-                تأیید و پیوست به PDF این برنامه
+                {busy ? <><LoadingMascot />در حال پیوست گزارش…</> : "تأیید و پیوست به PDF این برنامه"}
               </button>
             </>
           ) : (

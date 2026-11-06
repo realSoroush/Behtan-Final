@@ -1,3 +1,4 @@
+import { AppLoading, LoadingMascot } from '@/components/ui/AppLoading';
 import { useEffect, useState } from 'react';
 import { Check } from 'lucide-react';
 import type { DailyMealPlan, MealComponent } from '@/types';
@@ -8,9 +9,11 @@ import { MemberDialog } from './MemberDialog';
 
 const n = (value: number) => Math.round(value).toLocaleString('fa-IR');
 
-export function MemberSwapSheet({ isOpen, onClose, currentComponent, currentPlan, candidates, onSelect, stale = false }: {
+export function MemberSwapSheet({ isOpen, onClose, currentComponent, currentPlan, candidates, onSelect, stale = false, loading = false, unavailable = false }: {
   isOpen: boolean;
   stale?: boolean;
+  loading?: boolean;
+  unavailable?: boolean;
   onClose: () => void;
   currentComponent: MealComponent | null;
   currentPlan: DailyMealPlan | null;
@@ -53,7 +56,9 @@ export function MemberSwapSheet({ isOpen, onClose, currentComponent, currentPlan
   return <MemberDialog title="جایگزینی غذا" onClose={onClose} dismissible={!saving}>
     <div className="swap-current-v2"><span>به‌جای</span><strong>{currentComponent.foodItem.name}</strong><span>{componentAmount(currentComponent)}</span></div>
     <p className="member-muted">گزینه‌ها با ثبت‌های امروز و هدف روزانه سازگارند.</p>
-    <div className="swap-options-v2">{candidates.length ? candidates.map(option => (
+    <div className="swap-options-v2">{loading ? <AppLoading label="در حال آماده‌سازی جایگزین‌ها…" />
+      : unavailable ? <p role="alert">جایگزین‌ها بارگذاری نشدند. پنجره را ببند و دوباره تلاش کن.</p>
+      : candidates.length ? candidates.map(option => (
       <button type="button" className="swap-option-v2" key={option.foodItem.id} data-food-id={option.foodItem.id}
         disabled={saving} aria-pressed={option.foodItem.id === selectedId}
         onClick={() => { setSelectedId(option.foodItem.id); setError(''); }}>
@@ -76,7 +81,7 @@ export function MemberSwapSheet({ isOpen, onClose, currentComponent, currentPlan
     <div className="swap-confirm-bar">
       <p aria-live="polite">{pending ? `${pending.foodItem.name} · ${componentAmount(pending.replacementComponent)}` : 'یک جایگزین انتخاب کن'}</p>
       <button type="button" className="member-primary" disabled={!pending || saving || stale} onClick={() => void confirm()}>
-        {saving ? 'در حال ذخیره…' : 'تأیید جایگزینی'}<Check size={17} />
+        {saving ? <><LoadingMascot />در حال ذخیره…</> : <>تأیید جایگزینی<Check size={17} /></>}
       </button>
     </div>
   </MemberDialog>;

@@ -1,3 +1,4 @@
+import { AppLoading } from '@/components/ui/AppLoading';
 import { PanelSelect } from '@/components/ui/PanelSelect';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
@@ -93,7 +94,7 @@ export function AdminTestScenarios({ adminId }: { adminId: string }) {
 
   return <section className="admin-test-layout">
     <aside className="admin-card admin-test-sidebar"><h2>سناریوهای تست</h2><p className="admin-note">پرسونای تستی حساب واقعی، پرداخت یا اشتراک ایجاد نمی‌کند.</p><button type="button" onClick={begin}>سناریوی تازه</button>
-      {loading ? <p>در حال دریافت…</p> : rows.map(row => <button type="button" key={row.id} className={`admin-test-row ${currentId === row.id ? 'is-active' : ''}`} onClick={() => open(row)}>{row.label}<small>{new Date(row.updated_at).toLocaleString('fa-IR')}</small></button>)}
+      {loading ? <AppLoading label="در حال دریافت سناریوها…" /> : rows.map(row => <button type="button" key={row.id} className={`admin-test-row ${currentId === row.id ? 'is-active' : ''}`} onClick={() => open(row)}>{row.label}<small>{new Date(row.updated_at).toLocaleString('fa-IR')}</small></button>)}
     </aside>
     <div className="admin-test-main"><section className="admin-card"><h2>آزمایش برنامهٔ غذایی</h2><p className="admin-note">پاسخ‌ها را مانند آنبوردینگ پر کن، سپس برنامه را با موتور و کاتالوگ فعلی ببین. این پیش‌نمایش یک روز تازه، پیش از ثبت مصرف وعده‌هاست.</p>
       <label>نام سناریو<input value={label} maxLength={80} placeholder="مثلاً کاهش وزن، کم‌تحرک" onChange={e => setLabel(e.target.value)} /></label>

@@ -69,7 +69,7 @@ export function memberService() {
     if (error || !data.user?.phone_confirmed_at || !data.user.phone)
       throw Error("AUTH_REQUIRED");
     const user = data.user.id;
-    if (action === "meal_schedule") return processMemberMealSchedule(user, input, mealScheduleDependencies(admin));
+    if (action === "meal_schedule") return processMemberMealSchedule(user, input, mealScheduleDependencies(admin, url));
     const profileResult = await admin
       .from("user_profiles")
       .select("*")

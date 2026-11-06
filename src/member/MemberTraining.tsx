@@ -1,3 +1,4 @@
+import { AppLoading } from '@/components/ui/AppLoading';
 import {TrainingSetup,useTrainingDraft} from './TrainingSetup';
 import { trainingError } from "../professional/training/api";
 import { useEffect, useState } from "react";
@@ -100,7 +101,7 @@ export function MemberTraining(_props: { profile: UserProfile }) {
     }
   };
   if (access === null && !error)
-    return <p role="status">در حال دریافت برنامه تمرین…</p>;
+    return <AppLoading label="در حال دریافت برنامه تمرین…" />;
   const active = plan?.weeks[week - 1].sessions[session];
   return (
     <section className="member-training member-surface space-y-5">

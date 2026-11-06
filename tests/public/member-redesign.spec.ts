@@ -55,6 +55,8 @@ const fixtures = new WeakMap<Page, {
   revision: string;
   intakeRevision: number;
   saved: DailyMealPlan[];
+  dayReads: number;
+  weekReads: number;
   dispatch: (input: unknown) => Promise<unknown>;
 }>();
 
@@ -86,7 +88,7 @@ test.beforeEach(async ({ page }) => {
       expires_at: 4_000_000_000, user: { id },
     }));
   }, profile);
-  const fixture = { profile: profile as unknown as UserProfile, catalog, revision: '1', intakeRevision: 0,
+  const fixture = { profile: profile as unknown as UserProfile, catalog, revision: '1', intakeRevision: 0, dayReads: 0, weekReads: 0,
     saved: [] as DailyMealPlan[], dispatch: (input: unknown): Promise<unknown> => processMemberMealSchedule(profile.id, input, deps) };
   fixtures.set(page, fixture);
   const schedule: Record<string, NonNullable<MemberDayState["schedule"]>> = {};
@@ -129,6 +131,7 @@ test.beforeEach(async ({ page }) => {
     expect(action).toBe('meal_schedule');
     expect(route.request().headers()['authorization']).toBe('Bearer synthetic-test-token');
     expect(input.plan).toBeUndefined();
+    if (input.kind === 'read') fixture.dayReads++;
     try { return await route.fulfill({ json: await fixture.dispatch(input) }); }
     catch (error) {
       const code = (error as Error).message;
@@ -138,9 +141,11 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/rest/v1/**", async (r) => {
     const url = r.request().url(), body = r.request().postDataJSON();
     if (url.includes("/rpc/save_member_meal_schedule_v3")) throw Error("Browser sent a legacy plan write");
-    if (url.includes("/member_meal_schedule"))
+    if (url.includes("/member_meal_schedule")) {
+      fixture.weekReads++;
       return r.fulfill({ json: Object.entries(schedule).filter(([date]) => date !== '2026-11-04')
         .map(([plan_date, row]) => ({ plan_date, ...row })) });
+    }
     if (url.includes("/member_extra_foods")) {
       fixture.intakeRevision++;
       if (r.request().method() === "POST") extras.set(body.id, body.meal_snapshot);
@@ -179,6 +184,36 @@ test.beforeEach(async ({ page }) => {
   await page.goto("/tests/public/member-harness.html");
   await expect(page.locator("#today-panel .member-meal-card")).toHaveCount(1);
 });
+test('today and normal rotation avoid schedule re-downloads; week loads on demand', async ({ page }) => {
+  const fixture = fixtures.get(page)!;
+  expect(fixture.weekReads).toBe(0);
+  expect(fixture.dayReads).toBe(1);
+  const card = page.locator('#today-panel .member-meal-card');
+  const before = await card.locator('h3').textContent();
+  await card.getByRole('button', { name: 'تغییر وعده', exact: true }).click();
+  await expect(card.locator('h3')).not.toHaveText(before!);
+  expect(fixture.dayReads).toBe(1);
+  expect(fixture.weekReads).toBe(0);
+
+  let finish!: () => void;
+  const release = new Promise<void>(resolve => { finish = resolve; });
+  await page.route('**/rest/v1/member_meal_schedule?*', async route => {
+    await release;
+    return route.fallback();
+  });
+  try {
+    await page.getByRole('button', { name: /نمایش وعده‌های امروز/ }).click();
+    await page.getByRole('button', { name: /نمایش وعده‌های هفته/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'برنامهٔ هفت روز آینده' });
+    await expect(dialog.getByRole('status')).toHaveText('در حال دریافت برنامهٔ هفته…');
+    await expect(dialog.locator('.app-loading__skeleton')).toBeVisible();
+    await expect(card).toBeVisible();
+    finish();
+    await expect(dialog.getByRole('button', { name: /آماده‌سازی و ذخیرهٔ برنامه/ })).toBeVisible();
+    expect(fixture.weekReads).toBe(1);
+  } finally { finish(); }
+});
+
 test("next meal only, today/week controls, actual food SVG and accessible spotlight", async ({
   page,
 }) => {
@@ -198,9 +233,19 @@ test("next meal only, today/week controls, actual food SVG and accessible spotli
   await expect(page.getByRole("dialog").locator(".member-meal-card")).toHaveCount(6);
   await expect(page.locator("#today-panel .member-meal-card")).toHaveCount(1);
   await page.getByRole("button", { name: /نمایش وعده‌های هفته/ }).click();
-  await page
-    .getByRole("button", { name: "آماده‌سازی و ذخیرهٔ برنامهٔ هفته" })
-    .click();
+  let releaseFirstDay!: () => void;
+  const delayed = new Promise<void>(resolve => { releaseFirstDay = resolve; });
+  await page.route(apiRoute, async route => {
+    const { input } = route.request().postDataJSON();
+    if (input.kind === 'generate' && input.date === '2026-11-05') await delayed;
+    return route.fallback();
+  });
+  try {
+    await page.getByRole("button", { name: "آماده‌سازی و ذخیرهٔ برنامهٔ هفته" }).click();
+    const progress = page.getByRole('progressbar');
+    await expect(progress).toHaveAttribute('value', '0');
+    await expect(progress).toHaveAttribute('max', '6');
+  } finally { releaseFirstDay(); }
   await expect(page.locator(".week-dates .is-ready")).toHaveCount(7, { timeout: 40_000 });
   await page.locator(".week-dates button").nth(1).click();
   await expect(page.locator(".week-meal")).toHaveCount(6);

@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabaseClient';
 import type { OnboardingData, UserProfile } from '@/types';
 import { toPersistedOnboardingDraft } from '@/utils/bodyScanPrivacy';
 
-interface UseUserProfileReturn {
+export interface UseUserProfileReturn {
   profile: UserProfile | null;
   loading: boolean;
   error: string | null;
@@ -32,7 +32,7 @@ export function useUserProfile(userId: string | undefined, refreshOnReturn = fal
   // mistake an as-yet-unfetched profile for "no saved profile".
   const loading = Boolean(userId) && (fetching || loadedUserId !== userId);
 
-  const fetch = useCallback(async () => {
+  const fetch = useCallback(async (background = false) => {
     if (!userId) {
       requestSequence.current++;
       setProfile(null);
@@ -42,7 +42,8 @@ export function useUserProfile(userId: string | undefined, refreshOnReturn = fal
     }
 
     const sequence = ++requestSequence.current;
-    setFetching(true); setError(null);
+    if (!background) setFetching(true);
+    setError(null);
     try {
       const {data, error: sbError} = await supabase.from('user_profiles').select('*').eq('id', userId).abortSignal(AbortSignal.timeout(15000)).maybeSingle();
       if (sequence !== requestSequence.current) return;
@@ -66,7 +67,7 @@ export function useUserProfile(userId: string | undefined, refreshOnReturn = fal
     const refresh = async () => {
       if (document.visibilityState !== 'visible' || pending) return;
       pending = true;
-      try { await fetch(); }
+      try { await fetch(true); }
       finally { pending = false; }
     };
     window.addEventListener('focus', refresh);

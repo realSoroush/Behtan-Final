@@ -1,3 +1,4 @@
+import { showPrintLoading } from '../utils/printLoading.ts';
 import { lineDescription, nutritionTotals, dayLabel, trainingGroups, groupLabel, fa, type FoodSnapshot, type TrainingPrescription, type NutritionTotals } from './studioModel.ts';
 import { specialistHtml, type SpecialistIdentity } from './specialistProfile.ts';
 export interface AuthoredLine {
@@ -68,7 +69,7 @@ export async function printAuthored(p: AuthoredSnapshot, name: string, org: stri
   if (!w)
     throw new Error("پنجره چاپ مسدود شد؛ اجازهٔ بازشدن پنجره را فعال کنید.");
   w.opener = null;
-  w.document.body.textContent = 'در حال آماده‌سازی خروجی…';
+  showPrintLoading(w, window.location.origin);
   try {
     // Loaded only for a user-initiated print; pure HTML builders remain server-testable.
     const { specialistApi } = await import('./specialistApi');

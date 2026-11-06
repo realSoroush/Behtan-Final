@@ -1,10 +1,11 @@
+import { AppLoading, LoadingMascot } from '@/components/ui/AppLoading';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { paymentRequest, startCheckout, type BillingStatus, type PaymentOrder } from '@/lib/payments';
 import { Step11Paywall } from '@/components/onboarding/Step11Paywall';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { CompanionCard } from '@/components/companion/CompanionCard';
 import { APP_LOGO_PATH, APP_NAME_FA } from '@/constants/brand';
-import { ShieldCheck, RefreshCw, LogOut, Loader2 } from 'lucide-react';
+import { ShieldCheck, RefreshCw, LogOut } from 'lucide-react';
 import '../onboarding/onboarding.css';
 import './billing.css';
 import { formatSubscriptionPrice } from '@/utils/subscriptionPlans';
@@ -68,12 +69,10 @@ export function BillingAccess({children,onSignOut}:{children:ReactNode;onSignOut
   },[waitingForReturn,busy,token,refresh,returnAttempts]);
 
   if((!status && !error) || (token && (busy || waitingForReturn || confirmedReturn)))return (
-    <main dir="rtl" className="onboarding-app onboarding-loading" aria-busy="true">
-      <Loader2 size={30} className="animate-spin" aria-hidden="true" />
-      <div role="status" aria-live="polite" className="billing-loading">
-        <p>{token ? 'در حال بررسی پرداختت…' : 'در حال دریافت وضعیت اشتراکت…'}</p>
+    <main dir="rtl" className="onboarding-app">
+      <AppLoading variant="page" label={token ? 'در حال بررسی پرداختت…' : 'در حال دریافت وضعیت اشتراکت…'}>
         {token && <small>تا مشخص‌شدن نتیجه، پرداخت دیگری انجام نده.</small>}
-      </div>
+      </AppLoading>
     </main>
   );
 
@@ -125,7 +124,7 @@ export function BillingAccess({children,onSignOut}:{children:ReactNode;onSignOut
             {o.status==='pending' && <div className="billing-order-actions"><button type="button" disabled={busy} onClick={()=>void refresh(o.token)}>بررسی پرداخت</button>{o.paymentUrl && <a href={o.paymentUrl}>ادامهٔ پرداخت</a>}</div>}
           </article>)}</div>
         </details>}
-        <button type="button" disabled={busy} onClick={()=>void refresh(token ?? undefined)} className="billing-refresh"><RefreshCw size={15} className={busy?'animate-spin':''}/>{busy?'در حال بررسی…':'به‌روزرسانی وضعیت اشتراک'}</button>
+        <button type="button" disabled={busy} onClick={()=>void refresh(token ?? undefined)} className="billing-refresh">{busy ? <LoadingMascot /> : <RefreshCw size={15} />}{busy?'در حال بررسی…':'به‌روزرسانی وضعیت اشتراک'}</button>
       </main>
     </div>
     <footer className="onboarding-footer">به‌تن همراه توست؛ از همین‌جا ادامه می‌دهیم.</footer>

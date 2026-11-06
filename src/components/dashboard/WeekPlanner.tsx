@@ -1,5 +1,6 @@
+import { AppLoading } from '@/components/ui/AppLoading';
 import {workoutForDate} from '@/member/nutrition';
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import type {
   DailyMealPlan,
   UserProfile,
@@ -12,6 +13,9 @@ type Schedule = {
   plans: Record<string, DailyMealPlan>;
   saving: boolean;
   error: string | null;
+  weekError: string | null;
+  weekReady: boolean;
+  loadWeek: () => Promise<void>;
   submit: (date: string, intent: MealIntent) => Promise<void>;
 };
 export function WeekPlanner({
@@ -33,19 +37,27 @@ export function WeekPlanner({
     [error, setError] = useState("");
   const [building, setBuilding] = useState(false);
   const [view,setView]=useState<'meals'|'ingredients'>('meals');
-  const [progress,setProgress]=useState(0);
+  useEffect(() => {
+    const sync = () => { if (document.visibilityState === 'visible') void schedule.loadWeek(); };
+    sync();
+    window.addEventListener('focus', sync);
+    document.addEventListener('visibilitychange', sync);
+    return () => {
+      window.removeEventListener('focus', sync);
+      document.removeEventListener('visibilitychange', sync);
+    };
+  }, [schedule.loadWeek]);
   const alive=useRef(true);
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
-  const days = Array.from({ length: 7 }, (_, i) => addPlanDays(today, i));
+  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addPlanDays(today, i)), [today]);
   const current = selected === today ? plan : schedule.plans[selected];
   const generate = async () => {
     setError("");
     setBuilding(true);
     try {
-      for (const [offset, date] of days.slice(1).entries()) {
+      for (const date of days.slice(1)) {
         if (!alive.current) return;
         if (schedule.plans[date]) continue;
-        setProgress(offset + 1);
         await schedule.submit(date, {
           kind: 'generate', regenerate: false,
           workout: workoutForDate(date, profile.workout_weekdays, profile.workout_days ?? 0),
@@ -68,7 +80,7 @@ export function WeekPlanner({
   };
   const available = days.every((d) => d === today || schedule.plans[d]);
   const readyPlans=days.flatMap(date=>date===today?[plan]:schedule.plans[date]?[schedule.plans[date]]:[]);
-  const ingredients=sumPlanIngredients(readyPlans);
+  const ingredients=view === "ingredients" ? sumPlanIngredients(readyPlans) : [];
   return (
     <MemberDialog title="برنامهٔ هفت روز آینده" onClose={onClose} wide>
       <p className="member-muted">
@@ -104,28 +116,29 @@ export function WeekPlanner({
           </button>
         ))}
       </div>
-      {schedule.error ? (
+      {building && <AppLoading label={`${(readyPlans.length - 1).toLocaleString("fa-IR")} از ۶ روز آماده شد`}
+        progress={{ value: readyPlans.length - 1, max: 6 }} />}
+      {!schedule.weekReady && !schedule.weekError && !schedule.error && <AppLoading label="در حال دریافت برنامهٔ هفته…" />}
+      {schedule.error || schedule.weekError ? (
         <div role="alert" className="member-notice">
-          {schedule.error}
+          {schedule.error ?? schedule.weekError}
           <button
             type="button"
             className="member-secondary"
-            onClick={() => void onRetry()}
+            onClick={() => void (schedule.error ? onRetry().then(schedule.loadWeek) : schedule.loadWeek())}
           >
             تلاش دوباره
           </button>
         </div>
       ) : (
-        !available && (
+        schedule.weekReady && !available && !building && (
           <button
             type="button"
             className="member-primary"
             onClick={() => void generate()}
             disabled={building || schedule.saving}
           >
-            {building || schedule.saving
-              ? `در حال آماده‌سازی ${progress.toLocaleString("fa-IR")} از ۶…`
-              : "آماده‌سازی و ذخیرهٔ برنامهٔ هفته"}
+            آماده‌سازی و ذخیرهٔ برنامهٔ هفته
           </button>
         )
       )}
@@ -152,7 +165,7 @@ export function WeekPlanner({
                 className="member-secondary"
                 role="switch"
                 aria-checked={current.isWorkoutDay}
-                disabled={schedule.saving || building || Boolean(schedule.error)}
+                disabled={schedule.saving || building || Boolean(schedule.error || schedule.weekError)}
                 onClick={() => void changeWorkout()}
               >
                 {current.isWorkoutDay

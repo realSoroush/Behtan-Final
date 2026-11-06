@@ -1,8 +1,8 @@
+import { AppLoading, LoadingMascot } from '@/components/ui/AppLoading';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
   Camera,
-  Loader2,
   RefreshCw,
   SwitchCamera,
 } from 'lucide-react';
@@ -331,7 +331,7 @@ export function BodyScanCamera({ consentGranted, onCapture }: BodyScanCameraProp
               className="absolute right-3 top-3 z-20 flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-black/55 text-white backdrop-blur-sm transition-colors hover:bg-black/70 disabled:cursor-not-allowed disabled:opacity-45"
               aria-label="تعویض دوربین جلو و عقب"
             >
-              {isSwitching ? <Loader2 size={22} className="animate-spin" /> : <SwitchCamera size={23} />}
+              {isSwitching ? <LoadingMascot /> : <SwitchCamera size={23} />}
             </button>
 
             <span className="absolute left-3 top-4 z-20 rounded-xl bg-black/55 px-2.5 py-1.5 text-xs font-medium text-white backdrop-blur-sm">
@@ -365,9 +365,7 @@ export function BodyScanCamera({ consentGranted, onCapture }: BodyScanCameraProp
 
         {status === 'requesting' && (
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-neutral-900 px-6 text-center text-white">
-            <Loader2 size={36} className="animate-spin text-primary-400" />
-            <p className="font-semibold">در انتظار اجازه دوربین…</p>
-            <p className="text-sm text-neutral-300">در پیام مرورگر، گزینه Allow را انتخاب کنید.</p>
+            <AppLoading label="در انتظار اجازه دوربین…"><small>در پیام مرورگر، گزینه Allow را انتخاب کنید.</small></AppLoading>
           </div>
         )}
 
@@ -392,7 +390,7 @@ export function BodyScanCamera({ consentGranted, onCapture }: BodyScanCameraProp
 
         {status === 'active' && !videoReady && (
           <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-neutral-900/75 text-white">
-            <Loader2 size={30} className="animate-spin" />
+            <AppLoading label="در حال آماده‌سازی دوربین…" />
           </div>
         )}
       </div>

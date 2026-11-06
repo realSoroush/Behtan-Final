@@ -1,3 +1,4 @@
+import { AppLoading } from '@/components/ui/AppLoading';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
 import { realCaseApi } from './realCaseApi';
@@ -48,7 +49,7 @@ export function NutritionStudio({ content, mutate, intake, org, record, revision
     <div className="studio-columns">
       <aside className="studio-bank"><h4>بانک مواد غذایی</h4><small>مقادیر از کاتالوگ به‌تن · مبنای وزن مشخص</small><input type="search" aria-label="جستجوی ماده غذایی" value={search} placeholder="نام ماده غذایی…" onChange={e => setSearch(e.target.value)} />
         <div className="studio-categories">{['همه', ...new Set(foods.map(f => f.role))].map(c => <button type="button" key={c} aria-pressed={category === c} onClick={() => setCategory(c)}>{roles[c] || c}</button>)}</div>
-        {busy && <p role="status">در حال دریافت بانک غذایی…</p>}
+        {busy && <AppLoading label="در حال دریافت بانک غذایی…" />}
         <div className="studio-bank-list">{foods.filter(f => (category === 'همه' || f.role === category) && normalizedSearch(f.name).includes(normalizedSearch(search))).map(f => {
           const conflict = intake && (f.allergyFlags.some(a => intake.allergies.includes(a)) || f.excludedForVegetarian.includes(intake.vegetarian_status));
           return <button type="button" key={f.id} aria-label={'افزودن ' + f.name} disabled={section.lines.length >= 30} draggable onDragStart={e => { drag.current = { type: 'food', id: f.id }; e.dataTransfer.setData('text/plain', f.id); }} onDragEnd={() => { drag.current = null; }} onClick={() => add(f)}><span><strong>{f.name}</strong><small>{basis[f.preparationState || 'ready']} · {fa(f.kcalPerUnit / f.gramsPerUnit * 100)} کالری / ۱۰۰ گرم</small>{conflict && <small className="studio-allergy">با حساسیت یا ترجیح پرونده تطبیق دهید</small>}</span><Plus size={16} /></button>;

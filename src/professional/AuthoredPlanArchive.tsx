@@ -1,3 +1,4 @@
+import { AppLoading } from '@/components/ui/AppLoading';
 import { useEffect, useState } from 'react';
 import { FileDown, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
@@ -36,7 +37,7 @@ export function AuthoredPlanArchive({ org, record, name }: { org: string; record
 
   return <section className="studio studio-history" aria-label="آرشیو برنامه‌های اختصاصی" aria-busy={busy}>
     <div className="studio-row"><h4>سوابق برنامه‌های اختصاصی</h4><button type="button" disabled={busy} onClick={() => { setPage(0); setReload(n => n + 1); }}><RefreshCw size={16} />به‌روزرسانی آرشیو اختصاصی</button></div>
-    {busy && <p role="status">در حال دریافت برنامه‌های اختصاصی…</p>}
+    {busy && <AppLoading label="در حال دریافت برنامه‌های اختصاصی…" />}
     {error && <p role="alert" className="pro-error">{error}</p>}
     {printError && <p role="alert" className="pro-error">{printError}</p>}
     {!busy && !error && !rows.length && <p className="pro-muted">هنوز برنامهٔ اختصاصی ثبت نشده است.</p>}

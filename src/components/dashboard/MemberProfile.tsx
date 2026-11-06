@@ -1,3 +1,4 @@
+import { AppLoading } from '@/components/ui/AppLoading';
 import {ProfileCompletion} from '@/member/ProfileCompletion';
 import {BodyReview} from '@/member/BodyReview';
 import {ExperienceCards} from '@/member/ExperienceCards';
@@ -160,9 +161,7 @@ export function MemberProfile({
             </button>
           </p>
         ) : !history ? (
-          <p role="status" className="text-sm text-neutral-500">
-            در حال دریافت…
-          </p>
+          <AppLoading label="در حال دریافت اشتراک‌ها…" />
         ) : (
           <>
             {active && (

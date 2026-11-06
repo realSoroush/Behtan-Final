@@ -1,9 +1,10 @@
+import { AppLoading } from '@/components/ui/AppLoading';
 import {track} from '@/member/analytics';
 import { CompanionCard } from '@/components/companion/CompanionCard';
 import { getOnboardingCompanion } from '@/components/companion/companionState';
 import { APP_LOGO_PATH, APP_NAME_FA } from '@/constants/brand';
 import { useEffect, useRef, useState } from 'react';
-import { AlertCircle, Check, Loader2, ShieldCheck } from 'lucide-react';
+import { AlertCircle, Check, ShieldCheck } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useOnboardingStore } from '@/hooks/useOnboardingStore';
 import { useUserProfile } from '@/hooks/useUserProfile';
@@ -263,7 +264,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
   if (!isReadyForCurrentUser) {
     if(profileError)return <div className="onboarding-app onboarding-loading" role="alert"><AlertCircle size={28}/><p>اطلاعات قبلی‌ات دریافت نشد.</p><p>اتصال را بررسی کن و دوباره تلاش کن.</p><button type="button" className="onboarding-retry" onClick={()=>void refetchProfile()}>تلاش دوباره</button></div>;
-    return <div className="onboarding-app onboarding-loading" role="status"><Loader2 size={28} className="animate-spin"/><p>در حال بازیابی اطلاعاتت…</p></div>;
+    return <div className="onboarding-app"><AppLoading variant="page" label="در حال بازیابی اطلاعاتت…" /></div>;
   }
 
   return <div className="onboarding-app" dir="rtl">
@@ -290,7 +291,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             </motion.div>
           </AnimatePresence>
         </fieldset>
-        {isSubmitting&&<div className="onboarding-saving" role="status"><Loader2 size={16} className="animate-spin"/><span>در حال ذخیرهٔ اطلاعات…</span></div>}
+        {isSubmitting&&<div className="onboarding-saving"><AppLoading variant="inline" label="در حال ذخیرهٔ اطلاعات…" /></div>}
       </main>
     </div>
     <footer className="onboarding-footer">به‌تن همراه توست؛ هر پاسخ، یک قدم به برنامهٔ مناسب‌تر.</footer>

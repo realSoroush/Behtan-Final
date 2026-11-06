@@ -1,3 +1,4 @@
+import { AppLoading } from '@/components/ui/AppLoading';
 import {fromPrintedPlan} from './studioModel';
 import {AuthoredPlanEditor} from './AuthoredPlanEditor';
 import {AuthoredPlanArchive} from './AuthoredPlanArchive';
@@ -139,7 +140,7 @@ export function RealCaseWorkspace({
           {error}
         </p>
       )}
-      {busy && <p role="status">در حال دریافت پرونده‌ها…</p>}
+      {busy && <AppLoading label="در حال دریافت پرونده‌ها…" />}
       {!busy && !error && !rows.length && (
         <div className="pro-empty pro-directory-empty"><span className="pro-empty-icon"><FolderHeart size={30} /></span><h3>{query ? 'پرونده‌ای پیدا نشد' : 'اولین همراهی از اینجا شروع می‌شود.'}</h3><p>{query ? 'نام یا شماره را دوباره بررسی کنید.' : 'برای شروع، اولین مراجع را با «پرونده جدید» ثبت کنید.'}</p>{query && <button onClick={()=>{setSearch('');setQuery('');setPage(0);}}>نمایش همه مراجعان</button>}</div>
       )}
@@ -443,7 +444,7 @@ function RealCaseDetail({
           {notice}
         </p>
       )}
-      {busy && <p role="status">در حال انجام…</p>}
+      {busy && <AppLoading label="در حال انجام…" variant="inline" />}
       {connectionWarning && (
         <p role="status" className="pro-muted">
           اتصال موقتاً برقرار نیست؛ تغییرات شما حفظ شده‌اند. پس از اتصال، بررسی دوباره انجام می‌شود.
@@ -627,7 +628,7 @@ function RealCaseDetail({
                 )}
                 {plan && previewOpen && (
                   <>
-                    <PanelModal title="برنامه غذایی مراجع" busy={busy} onClose={()=>setPreviewOpen(false)}>{error&&<p role="alert" className="pro-error">{error}</p>}{notice&&<p role="status" className="pro-success">{notice}</p>}{busy&&<p role="status">در حال انجام…</p>}<PlanPreview plan={plan} /><button disabled={busy||!access?.can_write||!access?.modules?.nutrition||dirty||stale} onClick={()=>{setAuthoredSeed(fromPrintedPlan(plan));setPreviewOpen(false);setAuthoredOpen(true);}}>تدوین منوی اول هر وعده در استودیوی تغذیه</button>{planId&&id&&<ReportAttachment org={org} record={id} plan={planId} revision={plan.intake_revision} canWrite={Boolean(access?.can_write)&&!archived}/>}
+                    <PanelModal title="برنامه غذایی مراجع" busy={busy} onClose={()=>setPreviewOpen(false)}>{error&&<p role="alert" className="pro-error">{error}</p>}{notice&&<p role="status" className="pro-success">{notice}</p>}{busy&&<AppLoading label="در حال انجام…" variant="inline" />}<PlanPreview plan={plan} /><button disabled={busy||!access?.can_write||!access?.modules?.nutrition||dirty||stale} onClick={()=>{setAuthoredSeed(fromPrintedPlan(plan));setPreviewOpen(false);setAuthoredOpen(true);}}>تدوین منوی اول هر وعده در استودیوی تغذیه</button>{planId&&id&&<ReportAttachment org={org} record={id} plan={planId} revision={plan.intake_revision} canWrite={Boolean(access?.can_write)&&!archived}/>}
                     <div className="pro-actions">
                       <button
                         disabled={busy || archived || Boolean(planId) || dirty || stale || !access?.can_write || !access?.modules?.nutrition}

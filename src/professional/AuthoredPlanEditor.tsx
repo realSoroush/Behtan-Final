@@ -1,3 +1,4 @@
+import { AppLoading } from '@/components/ui/AppLoading';
 import { ManualTrainingBuilder } from './training/ManualTrainingBuilder';
 import { NutritionStudio } from './NutritionStudio';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -105,7 +106,7 @@ export function AuthoredPlanEditor({ org, record, revision, kind, name, canWrite
       <div className="studio-save-bar"><span>{saved ? 'نسخه تأییدشده ثبت شده' : dirty ? 'تغییرات ثبت نشده' : 'آماده تدوین برنامه'}</span><div className="pro-actions"><button className="pro-primary" disabled={busy || Boolean(validation) || !content.reviewed || Boolean(saved)} onClick={() => void save()}><Save size={17} />{request.current ? 'تلاش مجدد ثبت نسخه' : 'ثبت نسخهٔ تأییدشده'}</button>{saved && <button disabled={busy} onClick={() => void printAuthored(saved, name, org).catch(e => setError(message(e)))}><FileDown size={17} />PDF نسخه ثبت‌شده</button>}</div></div>
     </>}
     <section className="studio-history"><div className="studio-row"><h3>سوابق برنامه‌های اختصاصی</h3><button type="button" disabled={historyBusy} onClick={() => void load(page)}><RefreshCw size={16} />دریافت سوابق</button></div>
-      {historyBusy && <p role="status">در حال دریافت سوابق…</p>}{historyError && <p role="alert" className="pro-error">{historyError}</p>}
+      {historyBusy && <AppLoading label="در حال دریافت سوابق…" />}{historyError && <p role="alert" className="pro-error">{historyError}</p>}
       {loaded && !historyBusy && !historyError && !rows.length && <p className="pro-muted">هنوز برنامهٔ اختصاصی ثبت نشده است.</p>}
       {rows.map(p => <article className="pro-authored-snapshot" key={p.id}><div><strong>{p.content.title}</strong><small>{new Date(p.recorded_at).toLocaleString('fa-IR')} · نسخه پرونده {p.intake_revision.toLocaleString('fa-IR')}</small></div><div className="pro-actions">
         <button disabled={busy} onClick={() => setViewing(viewing?.id === p.id ? null : p)}>مشاهده نسخه</button>

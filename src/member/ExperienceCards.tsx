@@ -1,3 +1,4 @@
+import { AppLoading } from '@/components/ui/AppLoading';
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import type { ProgressEntry } from "../utils/progressJournal";
@@ -40,7 +41,7 @@ export function ExperienceCards({ userId }: { userId: string }) {
   return (
     <section className="member-experience-cards space-y-3">
       <h2 className="font-bold">۵ تجربهٔ آخر تو</h2>
-      {loading ? <p role="status" className="member-muted">در حال دریافت تجربه‌ها…</p> : error ? (
+      {loading ? <AppLoading label="در حال دریافت تجربه‌ها…" /> : error ? (
         <div role="alert"><p>دریافت تجربه‌ها انجام نشد.</p><button type="button" className="member-secondary" onClick={()=>setRetry(v=>v+1)}>تلاش دوباره</button></div>
       ) : !rows.length ? (
         <p className="member-muted">

@@ -1,5 +1,6 @@
+import { AppLoading } from '@/components/ui/AppLoading';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, ArrowRight, Loader2, RefreshCw, ShieldCheck, X } from 'lucide-react';
+import { AlertCircle, ArrowRight, RefreshCw, ShieldCheck, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { StepHeader } from '@/components/ui/StepHeader';
 import { Button } from '@/components/ui/Button';
@@ -234,11 +235,9 @@ export function Step10Analysis() {
             exit={{ opacity: 0 }}
             className="flex flex-col items-center gap-4 py-12"
           >
-            <Loader2 size={40} className="animate-spin text-primary-500" />
-            <p className="font-medium text-neutral-600 dark:text-neutral-400">در حال تحلیل امن تصویر…</p>
-            <p className="text-center text-sm text-neutral-400">
-              بسته به سرعت اینترنت ممکن است تا ۴۵ ثانیه طول بکشد.
-            </p>
+            <AppLoading label="در حال تحلیل امن تصویر…">
+              <small>بسته به سرعت اینترنت ممکن است تا ۴۵ ثانیه طول بکشد.</small>
+            </AppLoading>
             <button
               type="button"
               onClick={handleBackToImage}

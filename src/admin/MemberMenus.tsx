@@ -1,3 +1,4 @@
+import { LoadingMascot } from '@/components/ui/AppLoading';
 import { PanelSelect } from '@/components/ui/PanelSelect';
 import { useEffect, useState } from "react";
 import { memberRpc } from "../member/api";
@@ -234,7 +235,7 @@ export function MemberMenus() {
             افزودن ماده غذایی
           </button>
           <button disabled={busy || !items.length}>
-            {busy ? "در حال ذخیره…" : "ذخیره منو"}
+            {busy ? <><LoadingMascot />در حال ذخیره…</> : "ذخیره منو"}
           </button>
         </form>
       )}
