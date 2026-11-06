@@ -242,7 +242,8 @@ test("next meal only, today/week controls, actual food SVG and accessible spotli
   });
   try {
     await page.getByRole("button", { name: "آماده‌سازی و ذخیرهٔ برنامهٔ هفته" }).click();
-    const progress = page.getByRole('progressbar');
+    const progress = page.getByRole('dialog', { name: 'برنامهٔ هفت روز آینده' })
+      .getByRole('progressbar', { name: /از ۶ روز آماده شد/ });
     await expect(progress).toHaveAttribute('value', '0');
     await expect(progress).toHaveAttribute('max', '6');
   } finally { releaseFirstDay(); }
