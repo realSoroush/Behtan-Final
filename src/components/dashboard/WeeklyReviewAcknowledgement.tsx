@@ -1,3 +1,4 @@
+import { AppLoading } from '@/components/ui/AppLoading';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { MemberDialog } from './MemberDialog';
@@ -79,7 +80,7 @@ export function WeeklyReviewAcknowledgement({ userId, reviewKey, recommendation 
   };
 
   if (status === 'read') return <p role="status" className="text-xs">پیشنهاد مرور شد.</p>;
-  if (status === 'loading') return <p role="status" className="text-xs">در حال دریافت وضعیت مرور…</p>;
+  if (status === 'loading') return <AppLoading variant="inline" label="در حال دریافت وضعیت مرور…" />;
 
   return (
     <>

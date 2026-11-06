@@ -1,3 +1,4 @@
+import { AppLoading } from '@/components/ui/AppLoading';
 import {trainingLine} from '../studioModel';
 import {AuthoredPlanEditor} from '../AuthoredPlanEditor';
 import type {AuthoredContent} from '../authoredPlan';
@@ -197,7 +198,7 @@ export function TrainingPanel({
           {notice}
         </p>
       )}
-      {busy && <p role="status">در حال انجام…</p>}
+      {busy && <AppLoading label="در حال انجام…" variant="inline" />}
       {!canWrite && (
         <p role="status" className="pro-muted">
           ساخت و تأیید برنامه متوقف است؛ برنامه‌های قبلی و PDFهای تأییدشده قابل

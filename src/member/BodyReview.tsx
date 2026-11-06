@@ -1,3 +1,4 @@
+import { AppLoading } from '@/components/ui/AppLoading';
 import { useEffect, useState, useRef } from "react";
 import { useOnboardingStore } from "../hooks/useOnboardingStore";
 import { createEmptyOnboardingData, type BodyScanResult, type UserProfile } from "../types";
@@ -73,7 +74,7 @@ export function BodyReview({
       {error ? (
         <p role="alert">{error}</p>
       ) : !ready ? (
-        <p>در حال آماده‌سازی…</p>
+        <AppLoading label="در حال آماده‌سازی…" />
       ) : step >= 11 ? (
         <div>
           <p>{scanResult ? "نتیجه ثبت شد." : "تحلیل انجام نشد؛ هر وقت خواستی می‌توانی دوباره به این بخش برگردی."}</p>

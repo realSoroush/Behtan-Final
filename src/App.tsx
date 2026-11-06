@@ -1,3 +1,4 @@
+import { AppLoading } from '@/components/ui/AppLoading';
 import {track} from '@/member/analytics';
 import { MarketingEntry } from '@/components/marketing-entry';
 import { useEffect, useState,lazy,Suspense } from 'react';
@@ -5,7 +6,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { PhoneAuth } from '@/components/PhoneAuth';
 const OnboardingWizard=lazy(()=>import('@/components/onboarding/OnboardingWizard').then(m=>({default:m.OnboardingWizard})));
-const DashboardPage=lazy(()=>import('@/components/dashboard/DashboardPage').then(m=>({default:m.DashboardPage})));
+const loadDashboard = () => import('@/components/dashboard/DashboardPage');
+const DashboardPage = lazy(() => loadDashboard().then(m => ({default: m.DashboardPage})));
 import { SafetyReviewPage } from '@/components/safety/SafetyReviewPage';
 import { MedicalSafetyBlockedPage } from '@/components/safety/MedicalSafetyBlockedPage';
 import { evaluateProfileMedicalEligibility } from '@/utils/medicalEligibility';
@@ -28,13 +30,14 @@ function AppContent() {
   const { user, loading: authLoading, error: authError, signOut } = useAuth();
   const authenticatedUserId = user?.id;
   useEffect(()=>{if(authenticatedUserId)track('app_open');},[authenticatedUserId]);
+  const profileState = useUserProfile(user?.id, true);
   const {
     profile,
     loading: profileLoading,
     error: profileError,
     refetch: refetchProfile,
     upsertProfile,
-  } = useUserProfile(user?.id);
+  } = profileState;
   const [reviewingSafetyForUserId, setReviewingSafetyForUserId] = useState<string | null>(null);
   const [authRequested, setAuthRequested] = useState(isAuthRequested);
 
@@ -57,17 +60,16 @@ function AppContent() {
     window.scrollTo({ top: 0, behavior: 'auto' });
   };
 
+  useEffect(() => {
+    if (!profile?.onboarding_completed || profile.id !== authenticatedUserId ||
+        !evaluateProfileMedicalEligibility(profile).canGenerateAutomaticPlan) return;
+    void loadDashboard().catch(() => { /* The route boundary handles a failed import. */ });
+  }, [profile, authenticatedUserId]);
+
   if (window.location.pathname.replace(/\/$/, '') === '/professionals') return <MarketingEntry professional />;
   if (authError || (user && profileError && !profileLoading)) return <main dir="rtl" className="min-h-screen flex flex-col items-center justify-center gap-4 p-6"><p role="alert">{authError || profileError}</p><button className="rounded-xl bg-primary-600 text-white px-5 py-3" onClick={() => authError ? location.reload() : void refetchProfile()}>تلاش دوباره</button></main>;
   if (authLoading || (user && profileLoading)) {
-    return (
-      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 flex items-center justify-center">
-        <div className="text-center space-y-3">
-          <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-neutral-500 dark:text-neutral-400 text-sm">در حال بارگذاری...</p>
-        </div>
-      </div>
-    );
+    return <AppLoading variant="page" label={authLoading ? "در حال بررسی ورود…" : "در حال دریافت حساب…"} />;
   }
 
   if (!user) {
@@ -110,7 +112,7 @@ function AppContent() {
     );
   }
 
-  return <BillingAccess key={user.id} onSignOut={signOut}><DashboardPage /></BillingAccess>;
+  return <BillingAccess key={user.id} onSignOut={signOut}><DashboardPage session={{ user, signOut, profileState }} /></BillingAccess>;
 }
 
-export default function App(){return <Suspense fallback={<div role='status' className='p-8 text-center'>در حال آماده‌سازی به‌تن…</div>}><AppContent/></Suspense>;}
+export default function App(){return <Suspense fallback={<AppLoading variant="page" label="در حال آماده‌سازی به‌تن…" />}><AppContent/></Suspense>;}

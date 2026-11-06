@@ -1,5 +1,6 @@
+import { LoadingMascot } from '@/components/ui/AppLoading';
 import { useState } from 'react';
-import { Check, ChevronDown, RefreshCw, Loader2, Utensils, Undo2, SkipForward, CookingPot } from 'lucide-react';
+import { Check, ChevronDown, RefreshCw, Utensils, Undo2, SkipForward, CookingPot } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import type { Meal } from '@/types';
 import { memberRecipes } from '@/utils/memberRecipes';
@@ -28,16 +29,16 @@ export function MemberMealCard({ meal, compact = false, readOnly = false, isCons
   const title = meal.source?(meal.estimated?'وعدهٔ دلخواه · تخمینی':'وعدهٔ دلخواه · ثبت دستی'):meal.components.slice(0, 2).map(c => c.foodItem.name).join(' و ');
   const companions = meal.components.slice(2).map(c => c.foodItem.name).join('، ');
   const toggle = <button type="button" className="member-primary meal-consume-button" onClick={onToggleConsumed} disabled={disabled} aria-pressed={meal.consumed} aria-label={meal.consumed ? 'علامت‌گذاری وعده به‌عنوان مصرف‌نشده' : 'علامت‌گذاری وعده به‌عنوان مصرف‌شده'}>
-    {isConsumedSaving ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}<span>{isConsumedSaving ? 'در حال ثبت…' : readOnly?'ثبت در روز این برنامه':meal.consumed ? 'بازگرداندن وعده' : 'این وعده را خوردم'}</span>
+    {isConsumedSaving ? <LoadingMascot /> : <Check size={18} />}<span>{isConsumedSaving ? 'در حال ثبت…' : readOnly?'ثبت در روز این برنامه':meal.consumed ? 'بازگرداندن وعده' : 'این وعده را خوردم'}</span>
   </button>;
   return <article data-meal-slot={meal.slot} className={`member-meal-card member-meal-v3${compact ? ' is-compact' : ''}${meal.consumed ? ' is-consumed' : ''}`}>
     {compact ? <div className="day-meal-summary">
       <div className="day-meal-thumbnail"><FoodPlate meal={meal} /></div>
-      <div><span className="meal-slot-label">{meal.label}{meal.consumed ? ' · ثبت شده' : ''}</span><h3>{title}</h3><span className="day-meal-energy">{n(meal.totalKcal)} کالری</span>{meal.consumed&&!readOnly&&<button type="button" className="day-meal-undo" aria-label={`بازگرداندن ${meal.label}`} disabled={disabled} onClick={onToggleConsumed}>{isConsumedSaving?<Loader2 size={14} className="animate-spin"/>:<Undo2 size={14}/>}بازگرداندن</button>}</div>
+      <div><span className="meal-slot-label">{meal.label}{meal.consumed ? ' · ثبت شده' : ''}</span><h3>{title}</h3><span className="day-meal-energy">{n(meal.totalKcal)} کالری</span>{meal.consumed&&!readOnly&&<button type="button" className="day-meal-undo" aria-label={`بازگرداندن ${meal.label}`} disabled={disabled} onClick={onToggleConsumed}>{isConsumedSaving?<LoadingMascot />:<Undo2 size={14}/>}بازگرداندن</button>}</div>
       <button type="button" className="day-meal-expand" aria-label={`جزئیات ${meal.label}`} aria-expanded={expanded} onClick={() => setExpanded(!expanded)}><ChevronDown size={19} /></button>
     </div> : <>
       <div className="meal-visual-surface">
-      {onChangeMeal&&<div className="meal-change-row"><button type="button" disabled={changing||meal.consumed||changeDisabled} onClick={onChangeMeal}>{changing?<Loader2 size={15} className="animate-spin"/>:<RefreshCw size={15}/>}تغییر وعده</button></div>}
+      {onChangeMeal&&<div className="meal-change-row"><button type="button" disabled={changing||meal.consumed||changeDisabled} onClick={onChangeMeal}>{changing?<LoadingMascot />:<RefreshCw size={15}/>}تغییر وعده</button></div>}
       <div className="meal-v3-hero"><div className="meal-v3-copy"><span className="meal-slot-label"><Utensils size={14} />{meal.label}</span><h3>{title}</h3>{companions && <p>همراه با {companions}</p>}<span className="meal-energy-v3"><b>{n(meal.totalKcal)}</b> کالری</span></div><PlateButton meal={meal} onSwapComponent={readOnly || meal.consumed || disabled || changeDisabled ? undefined : onSwapComponent} /></div>
       </div>
       <div className="meal-macro-chips">{[['پروتئین', meal.totalProtein], ['کربوهیدرات', meal.totalCarbs], ['چربی', meal.totalFat]].map(([label, value]) => <span key={label}><b>{n(Number(value))}</b> گرم {label}</span>)}</div>

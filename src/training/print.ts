@@ -1,3 +1,4 @@
+import { showPrintLoading } from '../utils/printLoading.ts';
 import type { TrainingPlan } from "./types.ts";
 import { WEEKDAYS, EQUIPMENT } from "./engine.ts";
 import { specialistHtml, type SpecialistIdentity } from '../professional/specialistProfile.ts';
@@ -33,7 +34,7 @@ export async function printTraining(p: TrainingPlan, loadSpecialist?: () => Prom
   win.opener = null;
   let timer: number | undefined;
   try {
-    win.document.body.textContent = 'در حال آماده‌سازی خروجی…';
+    showPrintLoading(win, window.location.origin);
     const specialist = loadSpecialist ? await loadSpecialist() : undefined;
     win.document.open();
     win.document.write(trainingHtml(p, window.location.origin, specialist));

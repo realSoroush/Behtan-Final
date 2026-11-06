@@ -1,5 +1,5 @@
+import { LoadingMascot } from '@/components/ui/AppLoading';
 import { type ButtonHTMLAttributes, type ReactNode } from 'react';
-import { Loader2 } from 'lucide-react';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -51,7 +51,7 @@ export function Button({
       disabled={disabled || loading}
       {...props}
     >
-      {loading && <Loader2 size={18} className="animate-spin" />}
+      {loading && <LoadingMascot />}
       {children}
     </button>
   );

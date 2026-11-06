@@ -1,3 +1,4 @@
+import { AppLoading } from '@/components/ui/AppLoading';
 import {AdminMarketing} from "./AdminMarketing";
 import {AdminProCatalog,AdminProModules} from './AdminProCatalog';
 import {PanelModal} from "@/components/ui/PanelModal";
@@ -35,7 +36,7 @@ export function AdminProfessional(){
  <AdminProCatalog/>
  <AdminMarketing/>
  {renewals.length>0&&<section className="admin-renewal-list"><h3>درخواست‌های تمدید</h3>{renewals.map(r=><div className="admin-sub" key={r.id}><strong>{r.name}</strong><span>{date(r.created_at)}</span><button disabled={busy} onClick={()=>{const o=data.rows.find(x=>x.id===r.organization_id);if(o)setSelected(o);else{setSearch(r.organization_id);setQuery(r.organization_id);setPage(0);}}}>بررسی فضای کاری</button><button disabled={busy} onClick={async()=>{if(!window.confirm('بررسی این درخواست تمام شده است؟ این اقدام به‌تنهایی اعتبار را تمدید نمی‌کند.'))return;setBusy(true);try{await rpc('admin_pro_resolve_renewal',{p_id:r.id});setTick(t=>t+1);}catch(e){setError(explain(e));}finally{setBusy(false);}}}>پایان بررسی درخواست</button></div>)}</section>}
- {busy&&<p role="status">در حال دریافت…</p>}
+ {busy&&<AppLoading label="در حال دریافت…" />}
  <div className="admin-table"><table><thead><tr><th>فضای کاری / اعضا</th><th>دسترسی</th><th>پرونده / برنامه</th><th>پایان اعتبار</th><th>مدیریت</th></tr></thead><tbody>{data.rows.map(o=><tr key={o.id}><td>{o.name}{o.members.map(m=><small key={m.user_id}><bdi>{m.phone}</bdi> · {m.roles.map(r=>({owner:'مالک',practitioner:'کارشناس',assistant:'پذیرش'})[r]||r).join('، ')}{m.phone_confirmed===false?' · در انتظار تأیید شماره':''}</small>)}</td><td>{o.status!=='active'?'فضای کاری معلق':o.license_status==='suspended'?'دسترسی معلق':o.license_status?'مجوز دستی':'دسترسی آزمایشی'}</td><td>{fa(o.case_count)} / {fa(o.plan_count)}<small>ظرفیت: {o.case_limit?fa(o.case_limit):'آزمایشی'}</small></td><td>{date(o.expires_at??o.pilot_expires_at)}</td><td><button disabled={busy} onClick={()=>setSelected(o)}>مدیریت فضای کاری</button></td></tr>)}</tbody></table></div>
  <div className="admin-tools"><button disabled={busy||page===0} onClick={()=>setPage(p=>p-1)}>قبلی</button><span>صفحه {fa(page+1)} · {fa(data.total)} فضای کاری</span><button disabled={busy||(page+1)*25>=data.total} onClick={()=>setPage(p=>p+1)}>بعدی</button></div>
  {selected&&<PanelModal title="مدیریت فضای کاری" busy={modalBusy} onClose={()=>setSelected(null)}><LicenseEditor onBusy={setModalBusy} key={selected.id+':'+selected.revision} org={selected} onClose={()=>setSelected(null)} onSaved={()=>{setSelected(null);setTick(t=>t+1);}}/></PanelModal>}</section>;

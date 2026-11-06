@@ -4,15 +4,10 @@ import {Dumbbell} from 'lucide-react';
 import {supabase} from '@/lib/supabaseClient';
 import {memberNutrition,workoutForDate} from '@/member/nutrition';
 import {track} from '@/member/analytics';
-import {MemberTraining} from '@/member/MemberTraining';
 import './member-app.css';
 import { MemberMealConfirmation } from './MemberMealConfirmation';
 import { isCurrentMealConfirmation, type PendingMealConfirmation } from '@/utils/memberMealConfirmation';
-import { FoodScanPanel } from './FoodScanPanel';
 import { scannedMeal, type FoodScanResult } from '@/utils/foodScan';
-import { ProgressJournal } from './ProgressJournal';
-import { MemberAnalytics } from './MemberAnalytics';
-import { WeekPlanner } from './WeekPlanner';
 import { useMemberMealSchedule, type MealIntent } from '@/hooks/useMemberMealSchedule';
 import { MemberRequestError } from '@/member/api';
 import { isMealSnapshot } from '@/utils/mealValidation';
@@ -22,11 +17,10 @@ import { MemberCompanion } from './MemberCompanion';
 import { MemberDialog } from './MemberDialog';
 import { MemberWorkoutToggle } from './MemberWorkoutToggle';
 import { getDailyCompanion } from '@/components/companion/companionState';
-import { BehtanMascot } from '@/components/companion/BehtanMascot';
+import { AppLoading } from '@/components/ui/AppLoading';
 import { usePlanReporting } from '@/hooks/usePlanReporting';
 import { buildPlanProvenance } from '@/utils/planProvenance';
-import { MemberProfile } from './MemberProfile';
-import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef, lazy, Suspense } from 'react';
 import {
   LogOut,
   RefreshCw,
@@ -45,15 +39,12 @@ import { NutritionQualitySummary } from './NutritionQualitySummary';
 import { MemberMealCard as MealCard } from './MemberMealCard';
 import { MemberSwapSheet as FoodSwapModal } from './MemberSwapSheet';
 import { useAuth } from '@/hooks/useAuth';
-import { useUserProfile } from '@/hooks/useUserProfile';
+import { useUserProfile, type UseUserProfileReturn } from '@/hooks/useUserProfile';
 import { useNutritionCatalog } from '@/hooks/useNutritionCatalog';
 import {
   toPersianDigits,
 } from '@/utils/nutritionHelpers';
-import {
-  createMealPlanEngine,
-  type MemberSwapOption,
-} from '@/utils/mealPlanEngine';
+import type { MemberSwapOption } from '@/utils/mealPlanEngine';
 import type {
   DailyMealPlan,
   MacroTargets,
@@ -72,6 +63,13 @@ import {
 import {
   evaluateProfileMedicalEligibility,
 } from '@/utils/medicalEligibility';
+
+const MemberTraining = lazy(() => import('@/member/MemberTraining').then(module => ({ default: module.MemberTraining })));
+const FoodScanPanel = lazy(() => import('./FoodScanPanel').then(module => ({ default: module.FoodScanPanel })));
+const ProgressJournal = lazy(() => import('./ProgressJournal').then(module => ({ default: module.ProgressJournal })));
+const MemberAnalytics = lazy(() => import('./MemberAnalytics').then(module => ({ default: module.MemberAnalytics })));
+const WeekPlanner = lazy(() => import('./WeekPlanner').then(module => ({ default: module.WeekPlanner })));
+const MemberProfile = lazy(() => import('./MemberProfile').then(module => ({ default: module.MemberProfile })));
 
 // ============================================================================
 // Helper: compute consumed macros from meal checkboxes
@@ -111,19 +109,27 @@ function computeConsumedMacros(
 // DashboardPage
 // ============================================================================
 
-export function DashboardPage() {
+type DashboardSession = Pick<ReturnType<typeof useAuth>, 'user' | 'signOut'> & {
+  profileState: UseUserProfileReturn;
+};
+
+export function DashboardPage({ session }: { session?: DashboardSession }) {
+  return session ? <Dashboard {...session} /> : <StandaloneDashboard />;
+}
+
+function StandaloneDashboard() {
   const { user, signOut } = useAuth();
+  const profileState = useUserProfile(user?.id, true);
+  return <Dashboard user={user} signOut={signOut} profileState={profileState} />;
+}
+
+function Dashboard({ user, signOut, profileState }: DashboardSession) {
   const activeUserId = useRef(user?.id);
   useEffect(() => {
     activeUserId.current = user?.id;
     return () => { activeUserId.current = undefined; };
   }, [user?.id]);
-  const {
-    profile,
-    loading: profileLoading,
-    error: profileError,
-    refetch: refetchProfile,
-  } = useUserProfile(user?.id, true);
+  const { profile, loading: profileLoading, error: profileError, refetch: refetchProfile } = profileState;
   const {
     catalog,
     policy: proteinPolicy,
@@ -132,7 +138,6 @@ export function DashboardPage() {
     error: catalogError,
     refetch: refetchCatalog,
   } = useNutritionCatalog(user?.id);
-  const engine = useMemo(() => catalog ? createMealPlanEngine(catalog, catalogRevision) : null, [catalog, catalogRevision]);
 
   const [section, setSection] = useState<'today' | 'profile' | 'progress' | 'training'>(
     () =>
@@ -312,9 +317,15 @@ export function DashboardPage() {
     setViewDate(date);
     setViewError('');
     setDayOpen(false);
-    if (date === todayKey || schedule.plans[date] || !profile || !nutritionResult || !intakeReady) return;
-    await submitDay(date, { kind: 'generate', regenerate: false,
-      workout: workoutForDate(date, profile.workout_weekdays, profile.workout_days ?? 0) });
+    if (date === todayKey || !profile || !nutritionResult) return;
+    if (!intakeReady) {
+      if (!schedule.plans[date]) setViewError('ابتدا صبر کن تا برنامه و ثبت‌های روز آماده شوند.');
+      return;
+    }
+    try { await schedule.prepareDay(date, workoutForDate(date, profile.workout_weekdays, profile.workout_days ?? 0)); }
+    catch (error) {
+      if (generationRef.current === generationKey) setViewError(error instanceof Error ? error.message : 'دریافت برنامه انجام نشد.');
+    }
   };
 
   const changeVisibleMeal = async (index: number) => {
@@ -492,6 +503,21 @@ export function DashboardPage() {
       ? (swapBaselineComponent(mealPlan,activePlan?.meals[swapMealIndex]?.slot??'',swapComponentIndex))
       : null;
 
+  const [swapModule, setSwapModule] = useState<typeof import('@/utils/mealPlanEngine') | null>(null);
+  const [swapEngineError, setSwapEngineError] = useState(false);
+  useEffect(() => {
+    if (swapMealIndex === null || swapModule) return;
+    let active = true;
+    setSwapEngineError(false);
+    void import('@/utils/mealPlanEngine')
+      .then(module => { if (active) setSwapModule(module); })
+      .catch(() => { if (active) setSwapEngineError(true); });
+    return () => { active = false; };
+  }, [swapMealIndex, swapModule]);
+  const engine = useMemo(() => swapModule && catalog
+    ? swapModule.createMealPlanEngine(catalog, catalogRevision) : null,
+  [swapModule, catalog, catalogRevision]);
+
   const swapCandidates = useMemo<MemberSwapOption[]>(() => {
     if (
       !engine ||
@@ -526,12 +552,12 @@ export function DashboardPage() {
     swapComponentIndex,
   ]);
   useEffect(() => {
-    if (swapCurrentComponent && catalog && intakeReady && profile?.dietary_preferences_json &&
+    if (swapCurrentComponent && engine && intakeReady && profile?.dietary_preferences_json &&
       swapCandidates.length === 0 && !reportedEmptySwap.current) {
       reportedEmptySwap.current = true;
       track('meal_change_unavailable');
     }
-  }, [swapCurrentComponent, catalog, intakeReady, profile, swapCandidates.length]);
+  }, [swapCurrentComponent, engine, intakeReady, profile, swapCandidates.length]);
 
 
   const consumed = activePlan ? computeConsumedMacros({...activePlan,meals:[...activePlan.meals,...extraFoods.map(f=>({...f.meal_snapshot,consumed:true}))]}) : null;
@@ -558,23 +584,8 @@ export function DashboardPage() {
   });
   const showMeals = () => setDayOpen(true);
 
-  // ---- Loading / error states ----
-  if (
-    profileLoading ||
-    catalogLoading ||
-    schedule.loading
-  ) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-3">
-          <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <BehtanMascot mood="thinking" />
-          <p className="text-neutral-500 dark:text-neutral-400">
-            در حال دریافت برنامه‌ات…
-          </p>
-        </div>
-      </div>
-    );
+  if (profileLoading || catalogLoading || schedule.loading) {
+    return <AppLoading variant="page" label="در حال دریافت برنامه‌ات…" />;
   }
 
   if (catalogError) {
@@ -629,7 +640,7 @@ export function DashboardPage() {
         <div><div className="member-brand-v2"><img src={APP_LOGO_PATH} alt={`لوگوی ${APP_NAME_FA}`} /><span>به‌تن<small>{today}</small></span></div><div className="member-header-actions"><ThemeToggle /><button type="button" className="member-icon-button" aria-label="حساب من" onClick={()=>navigate('profile')}><UserRound size={19}/></button></div></div>
       </header>
 
-      {scanOpen&&activePlan&&catalog?<div className="member-scan-page"><FoodScanPanel meals={activePlan.meals} catalog={catalog.foods} onBack={()=>setScanOpen(false)} onSave={saveScannedFood}/></div>:<div
+      {scanOpen&&activePlan&&catalog?<div className="member-scan-page"><Suspense fallback={<AppLoading label="در حال بازکردن اسکن غذا…" />}><FoodScanPanel meals={activePlan.meals} catalog={catalog.foods} onBack={()=>setScanOpen(false)} onSave={saveScannedFood}/></Suspense></div>:<div
         hidden={section !== 'today'}
         id="today-panel"
         className="max-w-md mx-auto px-4 py-5 space-y-4"
@@ -705,9 +716,9 @@ export function DashboardPage() {
           {nextIndex>=0?<div id={`meal-${viewedPlan.meals[nextIndex].slot}`} tabIndex={-1}><MealCard readOnly={!viewingToday} onChangeMeal={viewingToday ? ()=>void changeVisibleMeal(nextIndex) : undefined} changing={schedule.saving} changeDisabled={changesBlocked} onSkip={()=>requestSkip(viewedPlan.meals[nextIndex])} key={viewedPlan.meals[nextIndex].slot} meal={viewedPlan.meals[nextIndex]} isConsumedSaving={schedule.saving} consumedToggleDisabled={!intakeReady} onToggleConsumed={()=>handleToggleConsumed(nextIndex)} onSwapComponent={index=>handleSwapComponent(nextIndex,index)}/></div>:<div className="member-complete"><Check size={24}/><p>برای اصلاح یا مرور ثبت‌ها، برنامهٔ امروز را باز کن.</p></div>}
           <div className="member-plan-actions"><button type="button" className="member-secondary" aria-expanded={dayOpen} onClick={()=>setDayOpen(true)}><CalendarDays size={19}/><span className="day-entry-copy"><b>{viewingToday?'نمایش وعده‌های امروز':'نمایش همهٔ وعده‌های این روز'}</b><small>مرور غذاها و اصلاح ثبت‌ها</small></span><span>←</span></button></div></section>
         ) : (
-          <div className="text-center py-12 text-neutral-400 dark:text-neutral-500">
-            <p>{schedule.saving ? 'در حال ساخت برنامهٔ این روز…' : !nutritionResult && !profileLoading ? 'اطلاعات برنامهٔ خودکار کامل نیست یا به بررسی متخصص نیاز دارد.' : schedule.error ? 'برنامه در دسترس نیست.' : 'برنامه غذایی در حال آماده‌سازی است…'}</p>
-          </div>
+          schedule.error || !nutritionResult || viewError
+            ? <p className="member-muted">{schedule.error ? 'برنامه در دسترس نیست.' : !nutritionResult ? 'اطلاعات برنامهٔ خودکار کامل نیست یا به بررسی متخصص نیاز دارد.' : 'برنامهٔ این روز آماده نیست.'}</p>
+            : <AppLoading label={schedule.saving ? 'در حال آماده‌سازی برنامهٔ این روز…' : 'در حال دریافت برنامهٔ غذایی…'} />
         )}
       </div>}
 
@@ -718,21 +729,21 @@ export function DashboardPage() {
         {viewingToday&&<details className="day-more-options"><summary>تنوع غذا و کیفیت برنامه</summary><button type="button" className="member-secondary" onClick={()=>{regenerate();setDayOpen(false);}} disabled={Boolean(viewedPlan.meals.every(m=>m.consumed))||!intakeReady}><RefreshCw size={15}/>تغییر وعده‌های باقی‌مانده</button>{foodQuality&&<NutritionQualitySummary quality={foodQuality}/>}</details>}
       </MemberDialog>}
       {weekOpen && activePlan && profile && (
-        <WeekPlanner
+        <Suspense fallback={<AppLoading label="در حال بازکردن برنامهٔ هفته…" />}><WeekPlanner
           today={todayKey}
           plan={activePlan}
           profile={profile}
           schedule={schedule}
           onRetry={refreshSchedule}
           onClose={() => setWeekOpen(false)}
-        />
+        /></Suspense>
       )}
       {progressVisited && user && (
         <div
           hidden={section !== 'progress'}
           className="member-progress-panel max-w-md mx-auto px-4 py-6 space-y-5"
         >
-          <MemberAnalytics
+          <Suspense fallback={<AppLoading label="در حال بازکردن روند…" />}><MemberAnalytics
             userId={user.id}
             today={todayKey}
             currentPlan={activePlan}
@@ -744,21 +755,21 @@ export function DashboardPage() {
             active={section === 'progress'}
             profile={profile!}
             policy={proteinPolicy!}
-          />
+          /></Suspense>
         </div>
       )}
-      {section==='training'&&profile&&<div className='max-w-md mx-auto px-4 py-6'><MemberTraining profile={profile}/></div>}
+      {section==='training'&&profile&&<div className='max-w-md mx-auto px-4 py-6'><Suspense fallback={<AppLoading label="در حال بازکردن تمرین…" />}><MemberTraining profile={profile}/></Suspense></div>}
       {profileVisited && profile && (
         <div
           hidden={section !== 'profile'}
           id="profile-panel"
           className="max-w-md mx-auto px-4 py-6"
         >
-          <div className="account-heading-v2"><span>حساب من</span><button type="button" aria-label="خروج از حساب" onClick={signOut}><LogOut size={16}/>خروج</button></div><MemberProfile
+          <div className="account-heading-v2"><span>حساب من</span><button type="button" aria-label="خروج از حساب" onClick={signOut}><LogOut size={16}/>خروج</button></div><Suspense fallback={<AppLoading label="در حال بازکردن حساب…" />}><MemberProfile
             key={`${profile.id}:${todayKey}`}
             profile={profile}
             today={todayKey}
-          />
+          /></Suspense>
         </div>
       )}
       <nav
@@ -804,6 +815,8 @@ export function DashboardPage() {
         currentComponent={swapCurrentComponent}
         currentPlan={activePlan}
         candidates={swapCandidates}
+        loading={!engine && !swapEngineError}
+        unavailable={swapEngineError}
         onSelect={handleSwapSelect}
       />
     </div>

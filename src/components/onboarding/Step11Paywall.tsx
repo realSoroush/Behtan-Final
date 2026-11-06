@@ -1,8 +1,9 @@
+import { AppLoading } from '@/components/ui/AppLoading';
 import {TrainingSetup,useTrainingDraft} from '@/member/TrainingSetup';
 import {track} from '@/member/analytics';
 import {periodOffer} from '@/member/offers';
 import { useEffect, useRef, useState } from 'react';
-import { AlertCircle, Check, Loader2, RefreshCw, Star } from 'lucide-react';
+import { AlertCircle, Check, RefreshCw, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { StepHeader } from '@/components/ui/StepHeader';
 import { Button } from '@/components/ui/Button';
@@ -174,12 +175,7 @@ export function Step11Paywall({ onComplete, checkout = false }: { onComplete: (p
       {!checkout&&<OnboardingReview data={data}/>}
 
       {loading ? (
-        <div className="flex min-h-48 items-center justify-center rounded-3xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-          <div className="space-y-3 text-center text-neutral-500 dark:text-neutral-400" aria-live="polite">
-            <Loader2 size={28} className="mx-auto animate-spin text-primary-500" />
-            <p className="text-sm">در حال دریافت پلن‌ها...</p>
-          </div>
-        </div>
+        <AppLoading label="در حال دریافت پلن‌ها…" />
       ) : error ? (
         <div role="alert" className="rounded-3xl border border-red-200 bg-red-50 p-5 text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
           <div className="flex items-start gap-2">

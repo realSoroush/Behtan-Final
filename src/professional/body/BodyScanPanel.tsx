@@ -1,3 +1,4 @@
+import { AppLoading } from '@/components/ui/AppLoading';
 import { useEffect, useRef, useState } from "react";
 import { PanelSelect } from "@/components/ui/PanelSelect";
 import { PanelModal } from "@/components/ui/PanelModal";
@@ -108,7 +109,7 @@ export function BodyScanPanel({
           {error}
         </p>
       )}
-      {busy && <p role="status">در حال پردازش؛ این پنجره را باز نگه دارید…</p>}
+      {busy && <AppLoading label="در حال پردازش؛ این پنجره را باز نگه دارید…" variant="inline" />}
       <fieldset disabled={!canWrite || busy || pending}>
         <div className="body-photo-grid">
           {views.map((view) => (

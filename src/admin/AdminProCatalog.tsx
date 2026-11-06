@@ -1,3 +1,4 @@
+import { AppLoading } from '@/components/ui/AppLoading';
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { PanelModal } from "@/components/ui/PanelModal";
@@ -55,6 +56,7 @@ export function AdminProCatalog() {
         </button>
       </div>
       {error && <p role="alert">{error}</p>}
+      {busy && <AppLoading label="در حال دریافت تعرفه‌ها…" />}
       <div className="admin-pro-offer-grid">
         {rows.map((o) => (
           <article key={o.code}>
@@ -301,6 +303,7 @@ export function AdminProModules({
         گزارش بدن در هر دو نوع پنل فعال است. غیرفعال‌کردن ماژول، ساخت جدید را
         می‌بندد و سوابق را حفظ می‌کند.
       </p>
+      {!data && !error && <AppLoading label="در حال دریافت ماژول‌های پنل…" />}
       {error && <p role="alert">{error}</p>}
       {notice && <p role="status">{notice}</p>}
       <div className="admin-tools">

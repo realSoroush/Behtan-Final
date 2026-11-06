@@ -1,3 +1,4 @@
+import { AppLoading } from '@/components/ui/AppLoading';
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 type Review = {
@@ -140,6 +141,7 @@ export function AdminMarketing() {
         قیمت‌های پرو از «تعرفه‌های پنل متخصصین» و قیمت‌های اپ از اشتراک‌های فعلی
         خوانده می‌شوند. این بخش قیمت یا مجوز اشتراک را تغییر نمی‌دهد.
       </p>
+      {busy && <AppLoading variant={revision ? "inline" : "panel"} label={revision ? "در حال به‌روزرسانی محتوا…" : "در حال دریافت محتوا…"} />}
       {error && <p role="alert">{error}</p>}
       {notice && <p role="status">{notice}</p>}
       <form

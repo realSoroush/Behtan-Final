@@ -1,9 +1,9 @@
+import { LoadingMascot } from '@/components/ui/AppLoading';
 import { useCallback, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Camera,
   CheckCircle2,
-  Loader2,
   LockKeyhole,
   Upload,
   X,
@@ -294,7 +294,7 @@ export function Step9BodyScan() {
       >
         <div className="mb-4 flex justify-center gap-4 text-neutral-400">
           {isPreparingImage ? (
-            <Loader2 size={36} className="animate-spin text-primary-500" />
+            <LoadingMascot />
           ) : (
             <>
               <Camera size={36} />

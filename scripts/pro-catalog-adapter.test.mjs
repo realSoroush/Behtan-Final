@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import {supabasePlanDependencies} from '../server/proPlanSupabase.ts';
+import {createClient} from '@supabase/supabase-js';
+import {mealScheduleDependencies} from '../server/member/mealSchedule.ts';
 import {processPlanRequest} from '../server/proPlanService.ts';
 const fixture=JSON.parse(readFileSync(new URL('./fixtures/nutrition-catalog.fixture.json',import.meta.url),'utf8'));
 const f = fixture;
@@ -84,6 +86,8 @@ const policy = {
 const actor=randomUUID(),org=randomUUID(),record=randomUUID();
 const answers={display_name:'Adapter fixture',phone:'',gender:'female',birth_date:'1992-04-23',height_cm:165,weight_kg:75,goal:'weight_loss',activity_level:'sedentary',workout_days:0,training_type:'none',protein_budget:'economic',vegetarian_status:'none',allergies:[],medical_conditions:[],pregnancy_status:'not_pregnant',eating_disorder_status:'none',medications_present:false,injuries_present:false,safety_confirmed:true,screening_version:1};
 const originalFetch=globalThis.fetch,environment={...process.env};let permitted=true,credential=true,missingPolicy=false,writable=true,nutrition=true,referenceReads=0,stageCalls=0;
+let catalogRevision='12';
+const knownRevisions=[];
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json'}});
 try{
  Object.assign(process.env,{VITE_SUPABASE_URL:'https://adapter-test.supabase.co',VITE_SUPABASE_ANON_KEY:'public-fixture',SUPABASE_SERVICE_ROLE_KEY:'server-fixture',PRO_SERVER_PLANS_ENABLED:'true'});
@@ -96,7 +100,10 @@ try{
  referenceReads++;assert.equal(headers.get('apikey'),'server-fixture','Pro reference reads must not use B2C user credentials');
  if(!credential)return json({code:'42501',message:'permission denied'},403);
  assert.equal(name,'nutrition_context_snapshot');
- return json({schema_version:1,revision:'12',food_rows:foods,
+ const {p_known_revision:known}=JSON.parse(init.body);
+ knownRevisions.push(known);
+ if (known===catalogRevision) return json({schema_version:1,revision:catalogRevision});
+ return json({schema_version:1,revision:catalogRevision,food_rows:foods,
    substitute_rows:f.FOOD_SUBSTITUTES.flatMap(g=>g.substituteIds.map(id=>({food_item_id:g.foodItemId,substitute_food_item_id:id,is_active:true}))),
    template_rows:templates,slot_rows:slots,policy_row:missingPolicy?null:policy});
  };
@@ -108,5 +115,18 @@ try{
  nutrition=false;await assert.rejects(()=>processPlanRequest(body,'fixture-user',supabasePlanDependencies()),e=>e.code==='PRO_MODULE_DISABLED');assert.equal(referenceReads,reads);nutrition=true;
  missingPolicy=true;await assert.rejects(()=>processPlanRequest(body,'fixture-user',supabasePlanDependencies()),e=>e.code==='PRO_CATALOG_UNAVAILABLE');missingPolicy=false;
  credential=false;await assert.rejects(()=>processPlanRequest(body,'fixture-user',supabasePlanDependencies()),e=>e.code==='PRO_SERVER_CREDENTIAL_INVALID');
+ credential=true;
+ knownRevisions.length=0;
+ const client=createClient(process.env.VITE_SUPABASE_URL,'server-fixture',{auth:{persistSession:false,autoRefreshToken:false}});
+ const loadMemberCatalog=source=>mealScheduleDependencies(client,source).loadContext();
+ const cold=await loadMemberCatalog('first-project');
+ assert.equal(await loadMemberCatalog('first-project'),cold,'Warm calls reuse the parsed catalog after checking its revision');
+ catalogRevision='13';
+ const updated=await loadMemberCatalog('first-project');
+ assert.notEqual(updated,cold);
+ assert.equal(updated.revision,'13');
+ assert.notEqual(await loadMemberCatalog('second-project'),updated);
+ assert.deepEqual(knownRevisions,[null,'12','12',null]);
+ console.log('PASS warm member catalog: conditional revision RPC, revision rollover and source isolation');
  console.log('PASS real Supabase SDK adapter: Pro-only generation and catalog, user JWT case isolation, no reference reads after denial, missing policy and invalid server key classified correctly');
 }finally{globalThis.fetch=originalFetch;for(const key of Object.keys(process.env))if(!(key in environment))delete process.env[key];Object.assign(process.env,environment);}

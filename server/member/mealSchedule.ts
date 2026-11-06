@@ -5,12 +5,16 @@ import { memberNutrition } from '../../src/member/nutrition.ts';
 import { changeMemberMeal, MealChangeUnavailableError } from '../../src/utils/changeMemberMeal.ts';
 import { applyDailyMealSnapshots, type DailyMealSnapshots } from '../../src/utils/dailyMealProgress.ts';
 import { historyOfMeals, MEAL_POLICY_VERSION } from '../../src/utils/mealExperience.ts';
-import { createMealPlanEngine, MealPlanFeasibilityError, MealPlanGenerationError } from '../../src/utils/mealPlanEngine.ts';
+import { createMealPlanEngine, MealPlanFeasibilityError, MealPlanGenerationError, type MealPlanEngine } from '../../src/utils/mealPlanEngine.ts';
 import { swapBaselineComponent, withSwapBaseline } from '../../src/utils/mealPresentation.ts';
 import { isMealSnapshot, isPrescriptionPlan, MEAL_SLOTS } from '../../src/utils/mealValidation.ts';
 import { generateMemberPrescription } from '../../src/utils/memberPrescription.ts';
 import { memberProfileContext, memberScheduleContext } from '../../src/utils/memberScheduleContext.ts';
 import { readNutritionContext, type NutritionContext } from '../../src/utils/nutritionContext.ts';
+
+// Only shared nutrition data and its immutable engine are reused in a warm runtime.
+let catalogCache: { source: string; context: NutritionContext } | undefined;
+const engines = new WeakMap<NutritionContext, MealPlanEngine>();
 
 type Revision = { date: string; requestId: string; catalogRevision: string; intakeRevision: string; expectedUpdatedAt: string | null };
 type Intent = (Revision & { kind: 'generate'; workout: boolean; regenerate: boolean })
@@ -112,13 +116,18 @@ export async function processMemberMealSchedule(user: string, input: unknown, de
   if (state.intake_revision !== request.intakeRevision) throw Error('STALE_INTAKE');
   if ((state.schedule?.updated_at ?? null) !== request.expectedUpdatedAt) throw Error('STALE_PLAN');
   if (!await deps.reserve(user)) throw Error('RATE_LIMITED');
-  const { revision, catalog, policy } = await deps.loadContext();
+  const nutritionContext = await deps.loadContext();
+  const { revision, catalog, policy } = nutritionContext;
   if (revision !== request.catalogRevision) throw Error('STALE_CONTEXT');
   const { profile } = state;
   const preferences = profile.dietary_preferences_json;
   if (!preferences || !profile.weight) throw Error('MEDICAL_REVIEW_REQUIRED');
   const { checkins, intake } = parseIntake(state);
-  const engine = createMealPlanEngine(catalog, revision);
+  let engine = engines.get(nutritionContext);
+  if (!engine) {
+    engine = createMealPlanEngine(catalog, revision);
+    engines.set(nutritionContext, engine);
+  }
   const context = memberScheduleContext(profile, catalog, policy);
   // The browser context fingerprint is for display/cache compatibility. Bind
   // edits to a separate strong key derived only from the server's inputs.
@@ -172,7 +181,7 @@ export async function processMemberMealSchedule(user: string, input: unknown, de
   });
 }
 
-export function mealScheduleDependencies(db: SupabaseClient): MealScheduleDependencies {
+export function mealScheduleDependencies(db: SupabaseClient, source: string): MealScheduleDependencies {
   const call = async <T>(name: string, args: Record<string, unknown>): Promise<T> => {
     const signal = AbortSignal.timeout(12000);
     const { data, error } = await db.rpc(name, args).abortSignal(signal).retry(false);
@@ -182,7 +191,12 @@ export function mealScheduleDependencies(db: SupabaseClient): MealScheduleDepend
   };
   return {
     read: (p_user, p_day, p_request_id) => call('member_read_meal_day', { p_user, p_day, p_request_id }),
-    loadContext: () => readNutritionContext(db, AbortSignal.timeout(12000)),
+    loadContext: async () => {
+      const cached = catalogCache?.source === source ? catalogCache.context : undefined;
+      const context = await readNutritionContext(db, AbortSignal.timeout(12000), cached);
+      catalogCache = { source, context };
+      return context;
+    },
     reserve: p_user => call('member_reserve_compute', { p_user, p_action: 'meal_schedule' }),
     commit: input => call('member_commit_meal_day', input),
   };

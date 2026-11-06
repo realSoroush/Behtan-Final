@@ -1,3 +1,5 @@
+@import "./components/ui/app-loading.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
