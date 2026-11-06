@@ -1,23 +1,23 @@
 import {extraFoodOperation,finishExtraFoodOperation} from '@/member/extraFoodOperation';
 import {isMealSkipped} from '@/member/mealStatus';
-import {Dumbbell} from 'lucide-react';
 import {supabase} from '@/lib/supabaseClient';
 import {memberNutrition,workoutForDate} from '@/member/nutrition';
 import {track} from '@/member/analytics';
-import './member-app.css';
 import { MemberMealConfirmation } from './MemberMealConfirmation';
 import { isCurrentMealConfirmation, type PendingMealConfirmation } from '@/utils/memberMealConfirmation';
 import { scannedMeal, type FoodScanResult } from '@/utils/foodScan';
-import { useMemberMealSchedule, type MealIntent } from '@/hooks/useMemberMealSchedule';
+import { useMemberMealSchedule, type MealIntent, type IntakePreview } from '@/hooks/useMemberMealSchedule';
 import { MemberRequestError } from '@/member/api';
 import { isMealSnapshot } from '@/utils/mealValidation';
 import { memberProfileContext, memberScheduleContext } from '@/utils/memberScheduleContext';
 import { addPlanDays, swapBaselineComponent } from '@/utils/mealPresentation';
+import { MemberHomeShell, type MemberSection } from './MemberHomeShell';
+import { MemberEnergyPolicyNote, MemberEnergySkeleton, MemberMealSkeleton, MemberScanEntry, memberTodayClass } from './MemberHomeSkeleton';
 import { MemberCompanion } from './MemberCompanion';
 import { MemberDialog } from './MemberDialog';
 import { MemberWorkoutToggle } from './MemberWorkoutToggle';
 import { getDailyCompanion } from '@/components/companion/companionState';
-import { AppLoading } from '@/components/ui/AppLoading';
+import { AppLoading, LoadingMascot } from '@/components/ui/AppLoading';
 import { usePlanReporting } from '@/hooks/usePlanReporting';
 import { buildPlanProvenance } from '@/utils/planProvenance';
 import { useCallback, useEffect, useMemo, useState, useRef, lazy, Suspense } from 'react';
@@ -25,12 +25,8 @@ import {
   LogOut,
   RefreshCw,
   AlertCircle,
-  Utensils,
-  UserRound,
   Check,
-  TrendingUp,
   CalendarDays,
-  ScanLine,
   Undo2,
   X,
 } from 'lucide-react';
@@ -51,8 +47,6 @@ import type {
   MealComponent,
   Meal,
 } from '@/types';
-import { APP_LOGO_PATH, APP_NAME_FA } from '@/constants/brand';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { evaluateDailyFoodQuality } from '@/utils/nutritionQuality';
 import {
   applyDailyMealSnapshots,
@@ -139,7 +133,7 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
     refetch: refetchCatalog,
   } = useNutritionCatalog(user?.id);
 
-  const [section, setSection] = useState<'today' | 'profile' | 'progress' | 'training'>(
+  const [section, setSection] = useState<MemberSection>(
     () =>
       window.location.hash === '#training' ? 'training' : window.location.hash === '#profile'
         ? 'profile'
@@ -175,7 +169,7 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
     window.addEventListener('hashchange', sync);
     return () => window.removeEventListener('hashchange', sync);
   }, []);
-  const navigate = (next: 'today' | 'profile' | 'progress' | 'training') => {
+  const navigate = (next: MemberSection) => {
     setScanOpen(false);
     if (next === section) return;
     window.location.hash = next;
@@ -226,8 +220,8 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
     [profile],
   );
   const scheduledToday = schedule.plans[todayKey];
-  const consumedMealSnapshots = schedule.day?.checkins ?? emptyCheckins;
-  const skipped = schedule.day?.skipped ?? emptySkipped;
+  const consumedMealSnapshots = schedule.displayDay?.checkins ?? emptyCheckins;
+  const skipped = schedule.displayDay?.skipped ?? emptySkipped;
   const isWorkoutDay = scheduledToday?.isWorkoutDay ?? (Boolean(consumedMealSnapshots.post_workout) ||
     Boolean(profile && workoutForDate(todayKey, profile.workout_weekdays, profile.workout_days ?? 0)));
   const nutritionResult = useMemo(() => {
@@ -255,7 +249,7 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
     skippedSlots: skipped,
     extraMeals: extraFoods.map(row => row.meal_snapshot),
   }), [skipped, extraFoods]);
-  const intakeReady = Boolean(schedule.day && !schedule.error && !schedule.saving);
+  const intakeReady = Boolean(schedule.day && !schedule.error && !schedule.saving && !schedule.syncingIntake);
   const scheduleVersion = JSON.stringify([schedule.versions[todayKey], schedule.day?.intakeRevision]);
   const legacyPlan = Boolean(mealPlan && !schedule.day?.schedule?.server_verified);
   const changesBlocked = !intakeReady || legacyPlan;
@@ -341,10 +335,10 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
     void generateToday(isWorkoutDay || Boolean(consumedMealSnapshots.post_workout), Boolean(mealPlan));
   };
 
-  const changeIntake = async (task: () => Promise<void>, fallback: string) => {
+  const changeIntake = async (task: (signal: AbortSignal) => Promise<void>, fallback: string, preview?: IntakePreview) => {
     if (!intakeReady || !user) throw Error('ابتدا ثبت‌های روز را دریافت کن.');
     setViewError('');
-    try { await schedule.changeIntake(task); }
+    try { await schedule.changeIntake(task, preview); }
     catch {
       if (generationRef.current === generationKey) setViewError(fallback);
       throw Error(fallback);
@@ -353,29 +347,30 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
 
   const setMealConsumed = async (meal: Meal, consumed: boolean) => {
     if (!user || (consumed && !isMealSnapshot(meal, meal.slot))) throw Error('اطلاعات وعده معتبر نیست.');
-    await changeIntake(async () => {
+    await changeIntake(async signal => {
       const { error } = consumed
         ? await supabase.from('daily_meal_checkins').upsert({ user_id: user.id, plan_date: todayKey,
           meal_slot: meal.slot, template_id: meal.templateId, meal_snapshot: { ...meal, consumed: true },
-          consumed_at: new Date().toISOString() }, { onConflict: 'user_id,plan_date,meal_slot' }).retry(false)
+          consumed_at: new Date().toISOString() }, { onConflict: 'user_id,plan_date,meal_slot' }).abortSignal(signal).retry(false)
         : await supabase.from('daily_meal_checkins').delete().eq('user_id', user.id)
-          .eq('plan_date', todayKey).eq('meal_slot', meal.slot).retry(false);
+          .eq('plan_date', todayKey).eq('meal_slot', meal.slot).abortSignal(signal).retry(false);
       if (error) throw error;
-    }, 'ثبت وضعیت این وعده انجام نشد. دوباره تلاش کن.');
+    }, 'ثبت وضعیت این وعده انجام نشد. دوباره تلاش کن.',
+    consumed ? { kind: 'record', slot: meal.slot, meal } : { kind: 'undo-record', slot: meal.slot });
     if (user.id === activeUserId.current) track(consumed ? 'meal_recorded' : 'meal_undone');
   };
 
   const skipMeal = async (slot: Meal['slot'], undo: boolean) => {
     if (!user || !intakeReady) return;
     try {
-      await changeIntake(async () => {
+      await changeIntake(async signal => {
         const { error } = undo
           ? await supabase.from('member_skipped_meals').delete().eq('user_id', user.id)
-            .eq('plan_date', todayKey).eq('slot', slot).retry(false)
+            .eq('plan_date', todayKey).eq('slot', slot).abortSignal(signal).retry(false)
           : await supabase.from('member_skipped_meals').upsert({ user_id: user.id, plan_date: todayKey, slot },
-            { onConflict: 'user_id,plan_date,slot' }).retry(false);
+            { onConflict: 'user_id,plan_date,slot' }).abortSignal(signal).retry(false);
         if (error) throw error;
-      }, 'ثبت وضعیت وعده انجام نشد.');
+      }, 'ثبت وضعیت وعده انجام نشد.', { kind: undo ? 'undo-skip' : 'skip', slot });
       if (user.id === activeUserId.current) track('meal_skipped');
     } catch { /* The error is displayed in the day view. */ }
   };
@@ -385,10 +380,10 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
     if (!original || !user || !intakeReady) throw Error('وعده در حال ثبت است یا آماده نیست.');
     const meal = scannedMeal(result, slot, original.label);
     if (independent) {
-      await changeIntake(async () => {
+      await changeIntake(async signal => {
         const operation = await extraFoodOperation([user.id, todayKey, slot, result]);
         const { error } = await supabase.from('member_extra_foods').upsert({ id: operation.id, user_id: user.id,
-          plan_date: todayKey, meal_slot: slot, meal_snapshot: meal }, { onConflict: 'id', ignoreDuplicates: true }).retry(false);
+          plan_date: todayKey, meal_slot: slot, meal_snapshot: meal }, { onConflict: 'id', ignoreDuplicates: true }).abortSignal(signal).retry(false);
         if (error) throw error;
         finishExtraFoodOperation(operation.id);
       }, 'ثبت غذای اضافه انجام نشد. دوباره تلاش کن.');
@@ -403,9 +398,9 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
   const removeExtra = async (id: string) => {
     if (!user || !intakeReady) return;
     try {
-      await changeIntake(async () => {
+      await changeIntake(async signal => {
         const { error } = await supabase.from('member_extra_foods').delete().eq('id', id)
-          .eq('user_id', user.id).eq('plan_date', todayKey).retry(false);
+          .eq('user_id', user.id).eq('plan_date', todayKey).abortSignal(signal).retry(false);
         if (error) throw error;
       }, 'بازگرداندن غذا انجام نشد.');
     } catch { /* The error is displayed in the day view. */ }
@@ -577,81 +572,44 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
   const companionMessage = getDailyCompanion({
     total: activePlan?.meals.length ?? 0,
     consumed: activePlan?.meals.filter((meal) => meal.consumed).length ?? 0,
-    saving: schedule.saving,
+    saving: schedule.saving || Boolean(schedule.pendingIntake),
     error: Boolean(schedule.error || planReporting.error),
     planError: generationError?.key === generationKey,
     event: currentCompanionEvent?.type,
   });
   const showMeals = () => setDayOpen(true);
 
-  if (profileLoading || catalogLoading || schedule.loading) {
-    return <AppLoading variant="page" label="در حال دریافت برنامه‌ات…" />;
-  }
-
-  if (catalogError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-5">
-        <div className="max-w-sm text-center space-y-4">
-          <AlertCircle size={40} className="text-red-500 mx-auto" />
-          <p className="font-semibold text-neutral-700 dark:text-neutral-300">
-            {catalogError}
-          </p>
-          <button
-            type="button"
-            onClick={() => void refetchCatalog()}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-sm font-semibold"
-          >
-            <RefreshCw size={14} />
-            تلاش دوباره
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (profileError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-5">
-        <div className="text-center space-y-3">
-          <AlertCircle size={40} className="text-red-500 mx-auto" />
-          <p className="font-semibold text-neutral-700 dark:text-neutral-300">
-            {profileError}
-          </p>
-          <button type="button" className="member-secondary" onClick={() => void refetchProfile()}>
-            تلاش دوباره
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Today's date in Persian-style display
-  const today = new Date().toLocaleDateString('fa-IR', {
-    timeZone: MEMBER_TIME_ZONE,
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  });
+  const dataLoading = profileLoading || catalogLoading || schedule.loading;
+  const loadError = profileError || catalogError;
+  const loadingPlan = !viewedPlan && !loadError && !schedule.error && !viewError &&
+    generationError?.key !== generationKey && (dataLoading || (viewingToday ? Boolean(nutritionResult) : schedule.saving));
+  const energyTitle = viewingToday ? 'انرژی امروز' : 'انرژی این روز';
+  const mealTitle = viewingToday ? 'وعدهٔ بعدی' : 'اولین وعدهٔ این روز';
+  const pendingIntake = schedule.pendingIntake;
+  const changingPlan = schedule.saving && !pendingIntake;
+  const intakeFeedback = viewingToday && pendingIntake &&
+    <p className="meal-intake-status" role="status"><LoadingMascot /> در حال ذخیرهٔ وضعیت وعده…</p>;
 
   const nextIndex = viewedPlan ? viewedPlan.meals.findIndex(m=>!m.consumed&&!isMealSkipped(m.slot,skipped,todayKey,selectedDate)) : -1;
   return (
-    <div className="member-app min-h-screen bg-neutral-50 dark:bg-neutral-950 pb-[calc(6rem+env(safe-area-inset-bottom))]">
-      <header className="member-topbar-v2">
-        <div><div className="member-brand-v2"><img src={APP_LOGO_PATH} alt={`لوگوی ${APP_NAME_FA}`} /><span>به‌تن<small>{today}</small></span></div><div className="member-header-actions"><ThemeToggle /><button type="button" className="member-icon-button" aria-label="حساب من" onClick={()=>navigate('profile')}><UserRound size={19}/></button></div></div>
-      </header>
-
+    <MemberHomeShell section={section} navigate={navigate}>
       {scanOpen&&activePlan&&catalog?<div className="member-scan-page"><Suspense fallback={<AppLoading label="در حال بازکردن اسکن غذا…" />}><FoodScanPanel meals={activePlan.meals} catalog={catalog.foods} onBack={()=>setScanOpen(false)} onSave={saveScannedFood}/></Suspense></div>:<div
         hidden={section !== 'today'}
         id="today-panel"
-        className="max-w-md mx-auto px-4 py-5 space-y-4"
+        className={memberTodayClass}
       >
-        <MemberCompanion name={profile?.display_name} message={companionMessage} reactionKey={currentCompanionEvent?.nonce ?? todayKey} onAction={showMeals} days={[todayKey,addPlanDays(todayKey,1),addPlanDays(todayKey,2)]} selectedDate={selectedDate} onSelectDay={date=>void selectDay(date)} />
-        {viewedPlan&&<p className='member-muted'>در هدف کاهش یا افزایش وزن، کالری پایه ثابت می‌ماند و روز تمرین بین وعده‌ها بازتوزیع می‌شود؛ در حفظ وزن، سیاست فعلی ۱۵۰ کالری اضافه می‌کند.</p>}
-        {viewedPlan&&consumed&&<MacroSummary title={viewingToday?'انرژی امروز':'انرژی این روز'} targets={viewedPlan.targets} consumed={viewingToday?consumed:computeConsumedMacros(viewedPlan)} planned={viewingToday?planned:computeConsumedMacros(viewedPlan,false)} isWorkoutDay={viewedPlan.isWorkoutDay} workoutControl={<MemberWorkoutToggle value={viewedPlan.isWorkoutDay} disabled={!intakeReady||Boolean(viewingToday&&consumedMealSnapshots.post_workout)} onChange={workout=>void submitDay(selectedDate,{kind:'generate',workout,regenerate:false})}/>}/>}
+        <MemberCompanion loading={dataLoading} name={profile?.display_name} message={companionMessage} reactionKey={currentCompanionEvent?.nonce ?? todayKey} onAction={showMeals} days={[todayKey,addPlanDays(todayKey,1),addPlanDays(todayKey,2)]} selectedDate={selectedDate} onSelectDay={dataLoading ? undefined : date=>void selectDay(date)} />
+        {(viewedPlan || loadingPlan) && <MemberEnergyPolicyNote />}
+        {viewedPlan&&consumed&&<MacroSummary title={energyTitle} targets={viewedPlan.targets} consumed={viewingToday?consumed:computeConsumedMacros(viewedPlan)} planned={viewingToday?planned:computeConsumedMacros(viewedPlan,false)} isWorkoutDay={viewedPlan.isWorkoutDay} workoutControl={<MemberWorkoutToggle value={viewedPlan.isWorkoutDay} disabled={!intakeReady||Boolean(viewingToday&&consumedMealSnapshots.post_workout)} onChange={workout=>void submitDay(selectedDate,{kind:'generate',workout,regenerate:false})}/>}/>}
+        {loadingPlan && <MemberEnergySkeleton title={energyTitle} />}
+        {loadError && <div className="member-notice" role="alert">
+          {loadError}
+          <button type="button" onClick={() => void (profileError ? refetchProfile() : refetchCatalog())}>تلاش دوباره</button>
+        </div>}
         {schedule.error && (
           <div className="member-notice" role="status">
             {schedule.error}
-            <button type="button" onClick={() => void refreshSchedule()} disabled={schedule.saving}>
+            <button type="button" onClick={() => void refreshSchedule()} disabled={schedule.saving || schedule.syncingIntake}>
               {schedule.conflict ? 'بازکردن نسخهٔ تازه' : 'تلاش دوباره'}
             </button>
           </div>
@@ -683,11 +641,12 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
             کاملاً در محدودهٔ هدف قرار نگرفت.{' '}
           </p>
         )}
+        {!dayOpen && intakeFeedback}
         {viewingToday&&receipt?.key===generationKey&&activePlan?.meals.some(m=>m.slot===receipt.slot&&m.consumed)&&<div className="meal-receipt" role="status"><Check size={17}/><span>{receipt.label} ثبت شد</span><button type="button" disabled={!intakeReady} onClick={()=>{const index=activePlan.meals.findIndex(m=>m.slot===receipt.slot);if(index>=0)handleToggleConsumed(index);}}><Undo2 size={15}/>برگردان</button><button type="button" aria-label="بستن پیام ثبت وعده" onClick={()=>setReceipt(null)}><X size={16}/></button></div>}
 
         {viewingToday&&extraFoods.length>0&&<section className="member-chart-card"><h2>غذاهای اضافهٔ امروز</h2>{extraFoods.map(row=><article key={row.id} className="py-3"><strong>{row.meal_snapshot.label} · وعدهٔ دلخواه</strong><p>{row.meal_snapshot.components.map(c=>`${c.foodItem.name}: ${Math.round(c.grams).toLocaleString('fa-IR')} گرم${c.foodItem.preparationState==='dry'?' خشک':c.foodItem.preparationState==='raw'?' خام':c.foodItem.preparationState==='cooked'?' پخته':''}`).join('، ')}</p><small>{Math.round(row.meal_snapshot.totalKcal).toLocaleString('fa-IR')} کالری</small><button type="button" className="member-secondary" disabled={!intakeReady} onClick={()=>void removeExtra(row.id)}>بازگرداندن ثبت</button></article>)}</section>}
-        <button type="button" className="food-scan-entry" disabled={!activePlan || !intakeReady} onClick={()=>{setScanOpen(true);setViewDate(todayKey);window.scrollTo({top:0});}}><ScanLine size={24}/><span><b>غذات رو چک کن</b><small>تخمین کالری از عکس، با امکان اصلاح مقدار</small></span><span>←</span></button>
-        {viewError&&<p role="alert" className="member-notice">{viewError}{!viewedPlan&&<button type="button" onClick={()=>void selectDay(selectedDate)}>تلاش دوباره</button>}</p>}
+        <MemberScanEntry disabled={!activePlan || !intakeReady} onClick={() => { setScanOpen(true); setViewDate(todayKey); window.scrollTo({ top: 0 }); }} />
+        {viewError&&!dayOpen&&<p role="alert" className="member-notice">{viewError}{!viewedPlan&&<button type="button" onClick={()=>void selectDay(selectedDate)}>تلاش دوباره</button>}</p>}
         {/* Meals section */}
         {!schedule.error && !viewedPlan && generationError?.key === generationKey ? (
           <div className="rounded-2xl border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/30 p-5 text-center space-y-3">
@@ -713,19 +672,22 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
           </div>
         ) : viewedPlan ? (
           <section className="member-next-section"><div className="member-next-heading"><div><span className="member-eyebrow">برنامهٔ شخصی تو</span><h2 id="daily-meals" tabIndex={-1}>{nextIndex<0?'امروزت کامل شد':viewingToday?'وعدهٔ بعدی':'اولین وعدهٔ این روز'}</h2></div><span className="daily-count-pill">{toPersianDigits(viewedPlan.meals.filter(m=>m.consumed).length)} از {toPersianDigits(viewedPlan.meals.length)} ثبت شده</span></div>
-          {nextIndex>=0?<div id={`meal-${viewedPlan.meals[nextIndex].slot}`} tabIndex={-1}><MealCard readOnly={!viewingToday} onChangeMeal={viewingToday ? ()=>void changeVisibleMeal(nextIndex) : undefined} changing={schedule.saving} changeDisabled={changesBlocked} onSkip={()=>requestSkip(viewedPlan.meals[nextIndex])} key={viewedPlan.meals[nextIndex].slot} meal={viewedPlan.meals[nextIndex]} isConsumedSaving={schedule.saving} consumedToggleDisabled={!intakeReady} onToggleConsumed={()=>handleToggleConsumed(nextIndex)} onSwapComponent={index=>handleSwapComponent(nextIndex,index)}/></div>:<div className="member-complete"><Check size={24}/><p>برای اصلاح یا مرور ثبت‌ها، برنامهٔ امروز را باز کن.</p></div>}
+          {nextIndex>=0?<div id={`meal-${viewedPlan.meals[nextIndex].slot}`} tabIndex={-1}><MealCard readOnly={!viewingToday} onChangeMeal={viewingToday ? ()=>void changeVisibleMeal(nextIndex) : undefined} changing={changingPlan} changeDisabled={changesBlocked} onSkip={()=>requestSkip(viewedPlan.meals[nextIndex])} key={viewedPlan.meals[nextIndex].slot} meal={viewedPlan.meals[nextIndex]} isConsumedSaving={pendingIntake?.slot === viewedPlan.meals[nextIndex].slot} consumedToggleDisabled={!intakeReady} onToggleConsumed={()=>handleToggleConsumed(nextIndex)} onSwapComponent={index=>handleSwapComponent(nextIndex,index)}/></div>:<div className="member-complete"><Check size={24}/><p>برای اصلاح یا مرور ثبت‌ها، برنامهٔ امروز را باز کن.</p></div>}
           <div className="member-plan-actions"><button type="button" className="member-secondary" aria-expanded={dayOpen} onClick={()=>setDayOpen(true)}><CalendarDays size={19}/><span className="day-entry-copy"><b>{viewingToday?'نمایش وعده‌های امروز':'نمایش همهٔ وعده‌های این روز'}</b><small>مرور غذاها و اصلاح ثبت‌ها</small></span><span>←</span></button></div></section>
         ) : (
-          schedule.error || !nutritionResult || viewError
-            ? <p className="member-muted">{schedule.error ? 'برنامه در دسترس نیست.' : !nutritionResult ? 'اطلاعات برنامهٔ خودکار کامل نیست یا به بررسی متخصص نیاز دارد.' : 'برنامهٔ این روز آماده نیست.'}</p>
-            : <AppLoading label={schedule.saving ? 'در حال آماده‌سازی برنامهٔ این روز…' : 'در حال دریافت برنامهٔ غذایی…'} />
+          loadingPlan ? <MemberMealSkeleton title={mealTitle} /> :
+            !loadError && !schedule.error && !viewError && <p className="member-muted">
+              {nutritionResult ? 'برنامهٔ این روز آماده نیست.' : 'اطلاعات برنامهٔ خودکار کامل نیست یا به بررسی متخصص نیاز دارد.'}
+            </p>
         )}
       </div>}
 
       {dayOpen&&viewedPlan&&<MemberDialog title={viewingToday?'وعده‌های امروز':'وعده‌های این روز'} onClose={()=>setDayOpen(false)} wide>
+        {intakeFeedback}
+        {viewError && <p role="alert" className="member-notice">{viewError}</p>}
         <div className="day-sheet-intro"><div><span>{new Date(selectedDate+'T12:00:00').toLocaleDateString('fa-IR',{weekday:'long',day:'numeric',month:'long'})}</span><strong>{toPersianDigits(viewedPlan.meals.filter(m=>m.consumed).length)} از {toPersianDigits(viewedPlan.meals.length)} وعده ثبت شده</strong></div><span>{toPersianDigits(viewedPlan.targets.targetCalories)}<small> کالری هدف</small></span></div>
         <button type="button" className="member-primary week-entry-button" onClick={()=>{setDayOpen(false);setWeekOpen(true);}}><CalendarDays size={17}/>نمایش وعده‌های هفته<span>←</span></button>
-        <div className="day-meal-list">{viewedPlan.meals.map((meal,index)=><MealCard compact readOnly={!viewingToday} onSkip={()=>requestSkip(meal)} skipped={isMealSkipped(meal.slot,skipped,todayKey,selectedDate)} key={meal.slot} meal={meal} isConsumedSaving={schedule.saving} consumedToggleDisabled={!intakeReady} changeDisabled={changesBlocked} onToggleConsumed={()=>handleToggleConsumed(index)} onSwapComponent={componentIndex=>{setDayOpen(false);handleSwapComponent(index,componentIndex);}}/>)}</div>
+        <div className="day-meal-list">{viewedPlan.meals.map((meal,index)=><MealCard compact readOnly={!viewingToday} onSkip={()=>requestSkip(meal)} skipped={isMealSkipped(meal.slot,skipped,todayKey,selectedDate)} key={meal.slot} meal={meal} isConsumedSaving={pendingIntake?.slot === meal.slot} consumedToggleDisabled={!intakeReady} changeDisabled={changesBlocked} onToggleConsumed={()=>handleToggleConsumed(index)} onSwapComponent={componentIndex=>{setDayOpen(false);handleSwapComponent(index,componentIndex);}}/>)}</div>
         {viewingToday&&<details className="day-more-options"><summary>تنوع غذا و کیفیت برنامه</summary><button type="button" className="member-secondary" onClick={()=>{regenerate();setDayOpen(false);}} disabled={Boolean(viewedPlan.meals.every(m=>m.consumed))||!intakeReady}><RefreshCw size={15}/>تغییر وعده‌های باقی‌مانده</button>{foodQuality&&<NutritionQualitySummary quality={foodQuality}/>}</details>}
       </MemberDialog>}
       {weekOpen && activePlan && profile && (
@@ -738,7 +700,7 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
           onClose={() => setWeekOpen(false)}
         /></Suspense>
       )}
-      {progressVisited && user && (
+      {progressVisited && user && profile && proteinPolicy && (
         <div
           hidden={section !== 'progress'}
           className="member-progress-panel max-w-md mx-auto px-4 py-6 space-y-5"
@@ -753,8 +715,8 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
             userId={user.id}
             today={todayKey}
             active={section === 'progress'}
-            profile={profile!}
-            policy={proteinPolicy!}
+            profile={profile}
+            policy={proteinPolicy}
           /></Suspense>
         </div>
       )}
@@ -772,36 +734,6 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
           /></Suspense>
         </div>
       )}
-      <nav
-        aria-label="منوی اصلی"
-        className="member-bottom-nav fixed bottom-0 inset-x-0 z-30 pb-[env(safe-area-inset-bottom)]"
-      >
-        <div className="max-w-md mx-auto grid grid-cols-4 gap-2 px-5 py-2">
-          {(
-            [
-              { id: 'today', label: 'برنامهٔ امروز', icon: Utensils },
-              { id: 'progress', label: 'روند من', icon: TrendingUp },
-              { id: 'training', label: 'تمرین', icon: Dumbbell },
-              { id: 'profile', label: 'حساب من', icon: UserRound },
-            ] as const
-          ).map((item) => (
-            <a
-              key={item.id}
-              href={`#${item.id}`}
-              onClick={(e) => {
-                e.preventDefault();
-                navigate(item.id);
-              }}
-              aria-current={section === item.id ? 'page' : undefined}
-              className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl text-xs font-semibold transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600 ${section === item.id ? 'bg-primary-50 text-primary-800 dark:bg-primary-900/30 dark:text-primary-200' : 'text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800'}`}
-            >
-              <item.icon size={21} aria-hidden="true" />
-              <span>{item.label}</span>
-            </a>
-          ))}
-        </div>
-      </nav>
-
       {pendingMeal&&<MemberMealConfirmation meal={pendingMeal.meal} action={pendingMeal.action} onConfirm={confirmPendingMeal} onCancel={()=>setPendingMeal(null)}/> }
 
       {/* Swap modal */}
@@ -819,6 +751,6 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
         unavailable={swapEngineError}
         onSelect={handleSwapSelect}
       />
-    </div>
+    </MemberHomeShell>
   );
 }

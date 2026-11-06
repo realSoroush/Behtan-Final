@@ -10,7 +10,7 @@ import '../onboarding/onboarding.css';
 import './billing.css';
 import { formatSubscriptionPrice } from '@/utils/subscriptionPlans';
 
-export function BillingAccess({children,onSignOut}:{children:ReactNode;onSignOut:()=>Promise<void>}) {
+export function BillingAccess({children,onSignOut,loadingFallback}:{children:ReactNode;onSignOut:()=>Promise<void>;loadingFallback?:ReactNode}) {
   const [status,setStatus]=useState<BillingStatus|null>(null);
   const [error,setError]=useState<string|null>(null);
   const [busy,setBusy]=useState(true);
@@ -67,6 +67,8 @@ export function BillingAccess({children,onSignOut}:{children:ReactNode;onSignOut
     const timer=window.setTimeout(()=>void refresh(token),3000);
     return()=>window.clearTimeout(timer);
   },[waitingForReturn,busy,token,refresh,returnAttempts]);
+
+  if (!status && !error && !token && loadingFallback) return <>{loadingFallback}</>;
 
   if((!status && !error) || (token && (busy || waitingForReturn || confirmedReturn)))return (
     <main dir="rtl" className="onboarding-app">

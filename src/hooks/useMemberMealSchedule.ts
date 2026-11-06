@@ -22,6 +22,10 @@ export type MealIntent =
   | { kind: 'generate'; workout: boolean; regenerate: boolean }
   | { kind: 'rotate'; slot: MealSlot }
   | { kind: 'swap'; slot: MealSlot; componentIndex: number; foodId: string; units: number };
+export type IntakePreview =
+  | { kind: 'record'; slot: MealSlot; meal: Meal }
+  | { kind: 'undo-record' | 'skip' | 'undo-skip'; slot: MealSlot };
+
 type Mutation = MealIntent & {
   date: string;
   requestId: string;
@@ -67,6 +71,18 @@ function withRow(state: Schedule, date: string, context: string | null, row: Omi
   return { ...state, plans, versions };
 }
 
+function withIntakePreview(day: Day | null, preview?: IntakePreview): Day | null {
+  if (!day || !preview) return day;
+  const { slot } = preview;
+  const checkins = { ...day.checkins };
+  if (preview.kind === 'record') checkins[slot] = { ...preview.meal, consumed: true };
+  else if (preview.kind !== 'undo-skip') delete checkins[slot];
+  const skipped = preview.kind === 'skip'
+    ? [...day.skipped.filter(value => value !== slot), slot]
+    : preview.kind === 'undo-record' ? day.skipped : day.skipped.filter(value => value !== slot);
+  return { ...day, checkins, skipped };
+}
+
 export function useMemberMealSchedule(
   userId: string | undefined,
   today: string,
@@ -81,6 +97,9 @@ export function useMemberMealSchedule(
   const current = useRef(state);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const busy = useRef(false);
+  const [preview, setPreview] = useState<{ key: string; change: IntakePreview; saving: boolean } | null>(null);
+  const [syncKey, setSyncKey] = useState<string | null>(null);
+  const syncing = useRef<{ key: string } | null>(null);
   const readController = useRef<AbortController | null>(null);
   const weekController = useRef<AbortController | null>(null);
   const scope = useRef<AbortController | null>(null);
@@ -104,7 +123,7 @@ export function useMemberMealSchedule(
   }, [userId, catalogRevision, profileContext]);
 
   const refresh = useCallback(async (force = false) => {
-    if (!enabled || currentKey.current !== key || (!force && (busy.current || pending.current?.key === key))) return;
+    if (!enabled || currentKey.current !== key || (!force && (busy.current || syncing.current?.key === key || pending.current?.key === key))) return;
     if (!force && readController.current) return;
     readController.current?.abort();
     const controller = new AbortController();
@@ -117,6 +136,7 @@ export function useMemberMealSchedule(
       const base = latest.key === key ? latest : { key, ...empty };
       publish({ ...withRow(base, today, context, day.schedule),
         day, error: null, conflict: false, contextStale: false });
+      setPreview(previous => previous?.key === key ? null : previous);
     } catch (error) {
       if (controller.signal.aborted) return;
       const previous = current.current;
@@ -160,6 +180,7 @@ export function useMemberMealSchedule(
     scope.current = controller;
     conflictedDay.current = null;
     if (pending.current?.key !== key) pending.current = null;
+    setPreview(previous => previous?.key === key ? previous : null);
     void refresh(current.current.key !== key);
     const sync = () => { if (document.visibilityState === 'visible' && !current.current.conflict) void refresh(); };
     window.addEventListener('focus', sync);
@@ -178,7 +199,7 @@ export function useMemberMealSchedule(
   }, [key, refresh]);
 
   const exclusive = useCallback(async (task: () => Promise<void>) => {
-    if (busy.current || currentKey.current !== key) throw Error(busyMessage);
+    if (busy.current || syncing.current?.key === key || currentKey.current !== key) throw Error(busyMessage);
     busy.current = true;
     readController.current?.abort();
     setSavingKey(key);
@@ -304,17 +325,43 @@ export function useMemberMealSchedule(
       catalogRevision, intakeRevision: day.intakeRevision, expectedUpdatedAt: day.schedule?.updated_at ?? null });
   }), [catalogRevision, key, today, context, readDay, exclusive, publish, send]);
 
-  const changeIntake = useCallback(async (task: () => Promise<void>) => exclusive(async () => {
+  const changeIntake = useCallback(async (
+    task: (signal: AbortSignal) => Promise<void>,
+    change?: IntakePreview,
+  ) => exclusive(async () => {
     const latest = current.current;
-    if (latest.key !== key || !latest.day || latest.error || pending.current) throw Error(busyMessage);
+    const owner = scope.current;
+    if (!owner || owner.signal.aborted || latest.key !== key || !latest.day || latest.error || pending.current)
+      throw Error(busyMessage);
     if (state.key !== key || state.day?.intakeRevision !== latest.day.intakeRevision ||
         state.versions[today] !== latest.versions[today]) throw Error(conflictMessage);
-    try { await task(); }
-    finally { await refresh(true); }
+
+    if (change) setPreview({ key, change, saving: true });
+    try {
+      await task(AbortSignal.any([owner.signal, AbortSignal.timeout(12000)]));
+      if (change && !owner.signal.aborted && currentKey.current === key) setPreview({ key, change, saving: false });
+    } catch (error) {
+      setPreview(previous => previous?.key === key ? null : previous);
+      throw error;
+    } finally {
+      if (!owner.signal.aborted && currentKey.current === key) {
+        const sync = { key };
+        syncing.current = sync;
+        setSyncKey(key);
+        // Report the write outcome immediately. Revision-sensitive actions stay
+        // disabled until an authoritative read reconciles this preview.
+        void refresh(true).finally(() => {
+          if (syncing.current === sync) {
+            syncing.current = null;
+            setSyncKey(null);
+          }
+        });
+      }
+    }
   }), [key, today, state, exclusive, refresh]);
 
   const retry = useCallback(async () => {
-    if (busy.current || currentKey.current !== key) return;
+    if (busy.current || syncing.current?.key === key || currentKey.current !== key) return;
     const operation = pending.current;
     if (operation?.key === key) await exclusive(() => send(operation.input, true));
     else {
@@ -340,6 +387,10 @@ export function useMemberMealSchedule(
   }, [key, today, context, exclusive, refresh, send, readDay, publish]);
 
   const visible = state.key === key ? state : empty;
+  const activePreview = preview?.key === key && !visible.contextStale ? preview : null;
   return { ...visible, loading: enabled && state.key !== key, saving: savingKey !== null,
+    displayDay: withIntakePreview(visible.day, activePreview?.change),
+    pendingIntake: activePreview?.saving ? activePreview.change : null,
+    syncingIntake: syncKey === key,
     submit, prepareDay, loadWeek, changeIntake, retry };
 }

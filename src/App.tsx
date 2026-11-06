@@ -1,3 +1,4 @@
+import { MemberHomePlaceholder } from '@/components/dashboard/MemberHomeSkeleton';
 import { AppLoading } from '@/components/ui/AppLoading';
 import {track} from '@/member/analytics';
 import { MarketingEntry } from '@/components/marketing-entry';
@@ -112,7 +113,13 @@ function AppContent() {
     );
   }
 
-  return <BillingAccess key={user.id} onSignOut={signOut}><DashboardPage session={{ user, signOut, profileState }} /></BillingAccess>;
+  const placeholder = <MemberHomePlaceholder />;
+  const paymentReturn = new URLSearchParams(window.location.search).has('payment');
+  return <Suspense fallback={paymentReturn ? <AppLoading variant="page" label="در حال بررسی پرداختت…" /> : placeholder}>
+    <BillingAccess key={user.id} onSignOut={signOut} loadingFallback={placeholder}>
+      <Suspense fallback={placeholder}><DashboardPage session={{ user, signOut, profileState }} /></Suspense>
+    </BillingAccess>
+  </Suspense>;
 }
 
 export default function App(){return <Suspense fallback={<AppLoading variant="page" label="در حال آماده‌سازی به‌تن…" />}><AppContent/></Suspense>;}
