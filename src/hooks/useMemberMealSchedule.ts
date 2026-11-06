@@ -1,160 +1,230 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
-import { addPlanDays } from "@/utils/mealPresentation";
-import { isMealPlan as isPresentablePlan, isPrescriptionPlan } from '@/utils/mealValidation';
-import type { DailyMealPlan, DietaryPreferencesJson } from "@/types";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { supabase } from '@/lib/supabaseClient';
+import { memberRequest, MemberRequestError } from '@/member/api';
+import { addPlanDays } from '@/utils/mealPresentation';
+import { isMealPlan, isPrescriptionPlan } from '@/utils/mealValidation';
+import type { DailyMealPlan, Meal, MealSlot } from '@/types';
+import type { DailyMealSnapshots } from '@/utils/dailyMealProgress';
+
 type Row = { plan_date: string; plan: unknown; context_key: string; updated_at: string };
-const emptySchedule = { plans: {}, versions: {} };
+type Day = {
+  date: string;
+  catalogRevision: string | null;
+  profileContext: string;
+  intakeRevision: string;
+  schedule: (Omit<Row, 'plan_date'> & { server_verified: boolean; server_authored: boolean }) | null;
+  checkins: DailyMealSnapshots;
+  skipped: MealSlot[];
+  extras: Meal[];
+  extraFoodIds: string[];
+};
+export type MealIntent =
+  | { kind: 'generate'; workout: boolean; regenerate: boolean }
+  | { kind: 'rotate'; slot: MealSlot }
+  | { kind: 'swap'; slot: MealSlot; componentIndex: number; foodId: string; units: number };
+type Mutation = MealIntent & {
+  date: string;
+  requestId: string;
+  catalogRevision: string;
+  intakeRevision: string;
+  expectedUpdatedAt: string | null;
+};
+type Schedule = {
+  key: string;
+  day: Day | null;
+  plans: Record<string, DailyMealPlan>;
+  versions: Record<string, string>;
+  error: string | null;
+  conflict: boolean;
+  contextStale: boolean;
+};
 
-function scheduleFrom(rows: unknown, context: string) {
-  const plans: Record<string, DailyMealPlan> = {};
-  const versions: Record<string, string> = {};
-  let invalid = false;
-  for (const row of (Array.isArray(rows) ? rows as Row[] : [])) {
-    if (!row || typeof row.plan_date !== "string" || typeof row.updated_at !== "string") continue;
-    versions[row.plan_date] = row.updated_at;
-    // The save RPC returns the version only for rows from another context.
-    if (row.plan === null && row.context_key !== context) continue;
-    if (!isPresentablePlan(row.plan)) invalid = true;
-    else if (row.context_key === context) {
-      if (isPrescriptionPlan(row.plan)) plans[row.plan_date] = row.plan;
-      // Legacy intake-bearing schedules are rebuilt underneath intact checkins.
-    }
-  }
-  return { plans, versions, invalid };
-}
-
-const conflictMessage = "برنامه در دستگاه یا پنجرهٔ دیگری تغییر کرده است. نسخهٔ تازه را باز کن و دوباره انتخاب کن.";
+const empty: Omit<Schedule, 'key'> = { day: null, plans: {}, versions: {}, error: null, conflict: false, contextStale: false };
+const conflictMessage = 'برنامه در دستگاه یا پنجرهٔ دیگری تغییر کرده است. نسخهٔ تازه را باز کن و دوباره انتخاب کن.';
+const unknownOutcome = 'نتیجهٔ ذخیره هنوز مشخص نیست. دوباره همان درخواست را بررسی کن.';
+const unavailable = 'دریافت برنامهٔ ذخیره‌شده انجام نشد. دوباره تلاش کن.';
+const busyMessage = 'ابتدا صبر کن تا برنامه و ثبت‌های روز آماده شوند.';
+const message = (error: unknown, fallback: string) => error instanceof MemberRequestError ? error.message : fallback;
+const canRetry = (error: unknown) => !(error instanceof MemberRequestError) || error.status >= 500;
 
 export function useMemberMealSchedule(
   userId: string | undefined,
   today: string,
   context: string | null,
-  dietaryPreferences: DietaryPreferencesJson | null,
+  catalogRevision: string | null,
+  profileContext: string | null,
 ) {
-  const key = `${userId}:${today}:${context}`;
-  const keyRef = useRef(key);
-  keyRef.current = key;
-  const [state, setState] = useState<{
-    key: string;
-    plans: Record<string, DailyMealPlan>;
-    versions: Record<string, string>;
-    error: string | null;
-    conflict?: boolean;
-    profileChanged?: boolean;
-  }>({ key: "", ...emptySchedule, error: null });
-  const conflictKey = useRef<string | null>(null);
-  const [retry, setRetry] = useState(0);
-  const [saving, setSaving] = useState(false);
-  const queue = useRef<Promise<unknown>>(Promise.resolve());
-  useEffect(() => {
-    if (!userId || !context) return;
-    let alive = true;
+  const key = JSON.stringify([userId, today, context, catalogRevision, profileContext]);
+  const currentKey = useRef(key);
+  currentKey.current = key;
+  const [state, setState] = useState<Schedule>({ key: '', ...empty });
+  const current = useRef(state);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const busy = useRef(false);
+  const readController = useRef<AbortController | null>(null);
+  const scope = useRef<AbortController | null>(null);
+  const pending = useRef<{ key: string; input: Mutation } | null>(null);
+  const enabled = Boolean(userId && context && catalogRevision);
+
+  const publish = useCallback((next: Schedule) => {
+    if (currentKey.current !== key) return;
+    current.current = next;
+    setState(next);
+  }, [key]);
+
+  const readDay = useCallback(async (date: string, signal?: AbortSignal) => {
+    const day = await memberRequest<Day>('meal_schedule', { input: { kind: 'read', date } }, { userId, signal });
+    if (!day || day.date !== date || !day.catalogRevision || day.extras.length !== day.extraFoodIds.length)
+      throw new MemberRequestError('سرویس برنامهٔ غذایی هنوز آماده نیست.', 'MEAL_SCHEDULE_MIGRATION_REQUIRED', 503);
+    if (day.catalogRevision !== catalogRevision || day.profileContext !== profileContext)
+      throw new MemberRequestError('پروفایل یا نسخهٔ داده‌های تغذیه تغییر کرده است. نسخهٔ تازه را باز کن.', 'STALE_CONTEXT', 409);
+    return day;
+  }, [userId, catalogRevision, profileContext]);
+
+  const refresh = useCallback(async (force = false) => {
+    if (!enabled || currentKey.current !== key || (!force && (busy.current || pending.current?.key === key))) return;
+    readController.current?.abort();
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
-    void (async () => {
-      try {
-        const { data, error } = await supabase
-          .from("member_meal_schedule")
-          .select("plan_date,plan,context_key,updated_at")
-          .eq("user_id", userId)
-          .gte("plan_date", today)
-          .lte("plan_date", addPlanDays(today, 6))
-          .abortSignal(controller.signal);
-        const parsed = error ? emptySchedule : scheduleFrom(data, context);
-        if (alive)
-          setState({
-            key,
-            ...parsed,
-            error: error
-              ? "دریافت برنامهٔ ذخیره‌شده انجام نشد. برنامهٔ فعلی قابل‌استفاده است؛ برای هفته دوباره تلاش کن."
-              : ('invalid' in parsed && parsed.invalid) ? 'برنامهٔ ذخیره‌شده نیازمند بررسی است؛ داده حذف نشده است. با پشتیبانی تماس بگیر.' : null,
-          });
-      } catch {
-        if (alive)
-          setState({
-            key,
-            ...emptySchedule,
-            error: "اتصال به برنامهٔ هفتگی برقرار نشد.",
-          });
-      } finally {
-        clearTimeout(timeout);
-      }
-    })();
-    return () => {
-      alive = false;
-      controller.abort();
-      clearTimeout(timeout);
-    };
-  }, [userId, today, context, key, retry]);
-  const save = useCallback(
-    async (days: { date: string; plan: DailyMealPlan }[], replace = false, mealEdit = false) => {
-      if (!context || !userId || key !== state.key || state.error)
-        throw Error("ابتدا برنامهٔ ذخیره‌شده را دوباره دریافت کن.");
-      if (!days.every(day => isPrescriptionPlan(day.plan))) throw Error('برنامهٔ پیشنهادی معتبر نیست؛ دوباره دریافت کن.');
-      const versionedDays = days.map(day => ({
-        ...day,
-        expected_updated_at: state.versions[day.date] ?? null,
-      }));
-      const task = async () => {
-        if (conflictKey.current === key) throw Error(conflictMessage);
-        if (keyRef.current !== key)
-          throw Error("اطلاعات مبنای برنامه تغییر کرده است.");
-        setSaving(true);
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000);
-        try {
-          const { data, error } = await supabase
-            .rpc("save_member_meal_schedule_v3", {
-              p_today: today,
-              p_context: context,
-              p_days: versionedDays,
-              p_replace: replace,
-              p_expected_diet: dietaryPreferences,
-              p_meal_edit: mealEdit,
-            })
-            .abortSignal(controller.signal)
-            .retry(false);
-          if (error?.message === "MEAL_SCHEDULE_CONFLICT" || error?.message === "MEAL_PROFILE_CHANGED") {
-            const message = error.message === "MEAL_PROFILE_CHANGED"
-              ? "ترجیحات غذایی در دستگاه دیگری تغییر کرده‌اند. نسخهٔ تازه را باز کن."
-              : conflictMessage;
-            if (keyRef.current === key) {
-              conflictKey.current = key;
-              setState(current => ({
-                ...current, error: message, conflict: true,
-                profileChanged: error.message === "MEAL_PROFILE_CHANGED",
-              }));
-            }
-            throw Error(message);
-          }
-          if (error) throw Error("برنامه ذخیره نشد. دوباره تلاش کن.");
-          const updated = scheduleFrom(data, context);
-          if (updated.invalid) throw Error('پاسخ ذخیرهٔ برنامه معتبر نیست؛ دوباره دریافت کن.');
-          if (keyRef.current === key) setState({ key, ...updated, error: null });
-          return updated.plans;
-        } finally {
-          clearTimeout(timeout);
-          if (keyRef.current === key) setSaving(false);
+    readController.current = controller;
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]);
+    try {
+      const [day, week] = await Promise.all([
+        readDay(today, signal),
+        supabase.from('member_meal_schedule').select('plan_date,plan,context_key,updated_at')
+          .eq('user_id', userId!).gt('plan_date', today).lte('plan_date', addPlanDays(today, 6))
+          .abortSignal(signal).retry(false),
+      ]);
+      if (controller.signal.aborted) return;
+      if (week.error) throw week.error;
+      const plans: Schedule['plans'] = {};
+      const versions: Schedule['versions'] = {};
+      const rows: Row[] = day.schedule ? [{ ...day.schedule, plan_date: today }, ...week.data] : week.data;
+      for (const row of rows) {
+        if (row.context_key === context && !isMealPlan(row.plan)) {
+          throw new MemberRequestError('برنامهٔ ذخیره‌شده نیازمند بررسی است. با پشتیبانی تماس بگیر.', 'INVALID_PLAN', 422);
         }
-      };
-      const pending = queue.current.catch(() => {}).then(task);
-      queue.current = pending;
-      return pending;
-    },
-    [context, userId, key, state.key, state.error, state.versions, today, dietaryPreferences],
-  );
-  return {
-    plans: state.key === key ? state.plans : {},
-    loading: Boolean(userId && context) && state.key !== key,
-    error: state.key === key ? state.error : null,
-    saving,
-    save,
-    profileChanged: state.key === key && Boolean(state.profileChanged),
-    conflict: state.key === key && Boolean(state.conflict),
-    retry: () => {
-      if (conflictKey.current === key) window.location.reload();
-      else setRetry((n) => n + 1);
-    },
-  };
+        versions[row.plan_date] = row.updated_at;
+        if (row.context_key === context && isPrescriptionPlan(row.plan)) plans[row.plan_date] = row.plan;
+      }
+      publish({ key, day, plans, versions, error: null, conflict: false, contextStale: false });
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      const previous = current.current;
+      const conflict = error instanceof MemberRequestError && error.status === 409;
+      const contextStale = error instanceof MemberRequestError && ['STALE_CONTEXT', 'ACCESS_DENIED', 'AUTH_REQUIRED'].includes(error.code);
+      publish({ ...(previous.key === key ? previous : { key, ...empty }),
+        error: message(error, unavailable), conflict, contextStale });
+    }
+  }, [enabled, key, readDay, today, userId, context, publish]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    scope.current = controller;
+    if (pending.current?.key !== key) pending.current = null;
+    void refresh(current.current.key !== key);
+    const sync = () => { if (document.visibilityState === 'visible' && !current.current.conflict) void refresh(); };
+    window.addEventListener('focus', sync);
+    window.addEventListener('online', sync);
+    document.addEventListener('visibilitychange', sync);
+    return () => {
+      controller.abort();
+      readController.current?.abort();
+      window.removeEventListener('focus', sync);
+      window.removeEventListener('online', sync);
+      document.removeEventListener('visibilitychange', sync);
+    };
+  }, [key, refresh]);
+
+  const exclusive = useCallback(async (task: () => Promise<void>) => {
+    if (busy.current || currentKey.current !== key) throw Error(busyMessage);
+    busy.current = true;
+    readController.current?.abort();
+    setSavingKey(key);
+    try {
+      await task();
+    } finally {
+      busy.current = false;
+      setSavingKey(null);
+    }
+  }, [key]);
+
+  const send = useCallback(async (input: Mutation) => {
+    const signal = scope.current?.signal;
+    if (!signal || signal.aborted || currentKey.current !== key) throw Error(busyMessage);
+    const attempt = () => memberRequest('meal_schedule', { input }, {
+      userId, signal: AbortSignal.any([signal, AbortSignal.timeout(60000)]),
+    });
+    try {
+      try { await attempt(); }
+      catch (error) {
+        if (!canRetry(error) || signal.aborted || currentKey.current !== key) throw error;
+        await attempt();
+      }
+    } catch (error) {
+      if (signal.aborted || currentKey.current !== key) throw error;
+      if (canRetry(error)) {
+        pending.current = { key, input };
+        publish({ ...current.current, error: unknownOutcome, conflict: false });
+        throw Error(unknownOutcome);
+      }
+      pending.current = null;
+      if (error instanceof MemberRequestError) {
+        const contextStale = ['STALE_CONTEXT', 'ACCESS_DENIED', 'AUTH_REQUIRED'].includes(error.code);
+        if (error.status === 409 || contextStale) {
+          publish({ ...current.current, error: error.message, conflict: error.status === 409, contextStale });
+        }
+      }
+      throw error;
+    }
+    if (signal.aborted || currentKey.current !== key) return;
+    pending.current = null;
+    await refresh(true);
+  }, [userId, key, publish, refresh]);
+
+  const submit = useCallback(async (date: string, intent: MealIntent) => exclusive(async () => {
+    const snapshot = current.current;
+    if (!catalogRevision || snapshot.key !== key || !snapshot.day || snapshot.error || pending.current) throw Error(busyMessage);
+    // Today uses exactly the snapshot from which the controls were rendered.
+    const signal = scope.current?.signal;
+    if (!signal || signal.aborted) throw Error(busyMessage);
+    let day;
+    try {
+      day = date === today ? state.day : await readDay(date, AbortSignal.any([signal, AbortSignal.timeout(15000)]));
+    }
+    catch (error) {
+      if (error instanceof MemberRequestError && error.code === 'STALE_CONTEXT')
+        publish({ ...snapshot, error: error.message, conflict: true, contextStale: true });
+      throw error;
+    }
+    const expectedUpdatedAt = state.versions[date] ?? null;
+    if (state.key !== key || !day || (day.schedule?.updated_at ?? null) !== expectedUpdatedAt ||
+        (snapshot.versions[date] ?? null) !== expectedUpdatedAt ||
+        (date === today && day.intakeRevision !== snapshot.day.intakeRevision)) {
+      publish({ ...snapshot, conflict: true, error: conflictMessage });
+      throw Error(conflictMessage);
+    }
+    if (signal.aborted || currentKey.current !== key) throw Error(busyMessage);
+    await send({ ...intent, date, requestId: crypto.randomUUID(), catalogRevision,
+      intakeRevision: day.intakeRevision, expectedUpdatedAt });
+  }), [catalogRevision, key, today, readDay, send, exclusive, publish, state]);
+
+  const changeIntake = useCallback(async (task: () => Promise<void>) => exclusive(async () => {
+    const latest = current.current;
+    if (latest.key !== key || !latest.day || latest.error || pending.current) throw Error(busyMessage);
+    if (state.key !== key || state.day?.intakeRevision !== latest.day.intakeRevision ||
+        state.versions[today] !== latest.versions[today]) throw Error(conflictMessage);
+    try { await task(); }
+    finally { await refresh(true); }
+  }), [key, today, state, exclusive, refresh]);
+
+  const retry = useCallback(async () => {
+    if (busy.current || currentKey.current !== key) return;
+    const operation = pending.current;
+    if (operation?.key === key) await exclusive(() => send(operation.input));
+    else await refresh();
+  }, [key, exclusive, refresh, send]);
+
+  const visible = state.key === key ? state : empty;
+  return { ...visible, loading: enabled && state.key !== key, saving: savingKey !== null,
+    submit, changeIntake, retry };
 }

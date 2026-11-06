@@ -8,6 +8,7 @@ export function memberHandler(factory = memberService) {
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("X-Content-Type-Options", "nosniff");
+    let mealSchedule = false;
     try {
       if (req.method !== "POST") {
         res.statusCode = 405;
@@ -48,6 +49,7 @@ export function memberHandler(factory = memberService) {
         !["preflight", "training", "training_history", "meal_schedule"].includes(body.action)
       )
         throw Error("INVALID_REQUEST");
+      mealSchedule = body.action === "meal_schedule";
       const result = await factory()(token, body.action, body.input);
       res.statusCode = 200;
       res.end(JSON.stringify(result));
@@ -58,16 +60,17 @@ export function memberHandler(factory = memberService) {
         ACCESS_DENIED: 403, STALE_CONTEXT: 409, STALE_INTAKE: 409,
         STALE_PLAN: 409, REQUEST_CONFLICT: 409, MEAL_NOT_EDITABLE: 409,
         NO_FEASIBLE_PLAN: 422, MEDICAL_REVIEW_REQUIRED: 422, INVALID_INTAKE: 422,
-        RATE_LIMITED: 429, MEAL_SCHEDULE_MIGRATION_REQUIRED: 503,
+        RATE_LIMITED: 429, MEAL_SCHEDULE_MIGRATION_REQUIRED: 503, TIMEOUT: 504,
       };
-      res.statusCode = Object.prototype.hasOwnProperty.call(status, message) ? status[message] : 400;
       const allowed = ["PROFILE_CHANGED", "INVALID_REQUEST", "INVALID_MEAL_DATE", "INVALID_PLAN"];
+      const known = Object.prototype.hasOwnProperty.call(status, message) || allowed.includes(message) || /^TRAINING_[A-Z_]+$/.test(message);
+      res.statusCode = Object.prototype.hasOwnProperty.call(status, message) ? status[message] : (mealSchedule && !known ? 503 : 400);
       res.end(
         JSON.stringify({
           error:
-            Object.prototype.hasOwnProperty.call(status, message) || allowed.includes(message) || /^TRAINING_[A-Z_]+$/.test(message)
+            known
               ? message
-              : "ساخت برنامه با اطلاعات و محدودیت‌های فعلی ممکن نشد. هیچ پرداختی انجام نشده؛ برای بررسی با پشتیبانی تماس بگیر.",
+              : mealSchedule ? "MEAL_SCHEDULE_UNAVAILABLE" : "ساخت برنامه با اطلاعات و محدودیت‌های فعلی ممکن نشد. هیچ پرداختی انجام نشده؛ برای بررسی با پشتیبانی تماس بگیر.",
         }),
       );
     }

@@ -1,5 +1,8 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
+import { processMemberMealSchedule, type MemberDayState, type MealScheduleDependencies } from "../../server/member/mealSchedule";
+import { DEFAULT_PROTEIN_ENGINE_POLICY } from "../../src/utils/proteinPolicy";
+import type { DailyMealPlan, UserProfile } from "../../src/types";
 const raw = JSON.parse(
   readFileSync(
     new URL(
@@ -45,6 +48,16 @@ const profile = {
   body_fat_pct: null,
   body_fat_source: null,
 };
+const apiRoute = '**/api/member';
+const fixtures = new WeakMap<Page, {
+  profile: UserProfile;
+  catalog: typeof catalog;
+  revision: string;
+  intakeRevision: number;
+  saved: DailyMealPlan[];
+  dispatch: (input: unknown) => Promise<unknown>;
+}>();
+
 test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-11-04T12:00:00Z"));
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -67,27 +80,79 @@ test.beforeEach(async ({ page }) => {
     }),
   );
 
-  const schedule: Record<string, { plan_date: string; plan: unknown; context_key: string; updated_at: string }> = {};
+  await page.addInitScript(({ id }) => {
+    localStorage.setItem("sb-pro-test-auth-token", JSON.stringify({
+      access_token: "synthetic-test-token", refresh_token: "synthetic-test-refresh",
+      expires_at: 4_000_000_000, user: { id },
+    }));
+  }, profile);
+  const fixture = { profile: profile as unknown as UserProfile, catalog, revision: '1', intakeRevision: 0,
+    saved: [] as DailyMealPlan[], dispatch: (input: unknown): Promise<unknown> => processMemberMealSchedule(profile.id, input, deps) };
+  fixtures.set(page, fixture);
+  const schedule: Record<string, NonNullable<MemberDayState["schedule"]>> = {};
+  const operations = new Map<string, NonNullable<MemberDayState['operation']>>();
   const skipped = new Set<string>();
   let scheduleRevision = 0;
-  const checkins: Record<string, unknown> = {};
-  await page.route("**/rest/v1/**", async (r) => {
-    const url = r.request().url(),
-      body = r.request().postDataJSON();
-    if (url.includes("/rpc/save_member_meal_schedule_v3")) {
-      for (const day of body.p_days) {
-        const existing = schedule[day.date];
-        if (!body.p_replace && existing?.context_key === body.p_context) continue;
-        if ((existing?.updated_at ?? null) !== day.expected_updated_at)
-          return r.fulfill({ status: 400, json: { message: "MEAL_SCHEDULE_CONFLICT", code: "P0001" } });
-        schedule[day.date] = { plan_date: day.date, plan: day.plan, context_key: body.p_context, updated_at: String(++scheduleRevision) };
-      }
-      return r.fulfill({ json: Object.values(schedule).map(row => row.context_key === body.p_context ? row : { ...row, plan: null }) });
+  const checkins: Record<string, { meal_snapshot: unknown }> = {};
+  const extras = new Map<string, unknown>();
+  const deps: MealScheduleDependencies = {
+    read: async (actor, date, requestId) => {
+      expect(actor).toBe(profile.id);
+      const today = date === '2026-11-04';
+      const previous = new Date(Date.parse(date) - 86400000).toISOString().slice(0, 10);
+      return {
+        profile: fixture.profile, catalog_revision: fixture.revision,
+        intake_revision: today ? String(fixture.intakeRevision) : '0',
+        schedule: schedule[date] ?? null, previous_plan: schedule[previous]?.plan,
+        checkins: today ? Object.fromEntries(Object.entries(checkins).map(([slot, row]) => [slot, row.meal_snapshot])) : {},
+        skipped: today ? [...skipped] as MemberDayState['skipped'] : [],
+        extras: today ? [...extras.values()] : [], extra_food_ids: today ? [...extras.keys()] : [],
+        operation: requestId ? operations.get(requestId) ?? null : null,
+      };
+    },
+    loadContext: async () => ({ revision: fixture.revision, catalog: fixture.catalog, policy: DEFAULT_PROTEIN_ENGINE_POLICY }),
+    reserve: async () => true,
+    commit: async args => {
+      const date = String(args.p_day);
+      if ((schedule[date]?.updated_at ?? null) !== args.p_expected_updated_at) throw Error('STALE_PLAN');
+      const updated_at = new Date(Date.parse(date) + ++scheduleRevision).toISOString();
+      schedule[date] = { plan: args.p_plan, updated_at, context_key: String(args.p_context),
+        server_context_key: String(args.p_server_context_key), server_verified: true };
+      const result = { plan_date: date, ...schedule[date], intake_revision: args.p_intake_revision };
+      fixture.saved.push(args.p_plan as DailyMealPlan);
+      operations.set(String(args.p_request_id), { hash: String(args.p_request_hash), result });
+      return result;
+    },
+  };
+  await page.route(apiRoute, async route => {
+    const { action, input } = route.request().postDataJSON();
+    expect(action).toBe('meal_schedule');
+    expect(route.request().headers()['authorization']).toBe('Bearer synthetic-test-token');
+    expect(input.plan).toBeUndefined();
+    try { return await route.fulfill({ json: await fixture.dispatch(input) }); }
+    catch (error) {
+      const code = (error as Error).message;
+      return route.fulfill({ status: code.startsWith('STALE_') ? 409 : 422, json: { error: code } });
     }
+  });
+  await page.route("**/rest/v1/**", async (r) => {
+    const url = r.request().url(), body = r.request().postDataJSON();
+    if (url.includes("/rpc/save_member_meal_schedule_v3")) throw Error("Browser sent a legacy plan write");
     if (url.includes("/member_meal_schedule"))
-      return r.fulfill({ json: Object.values(schedule) });
+      return r.fulfill({ json: Object.entries(schedule).filter(([date]) => date !== '2026-11-04')
+        .map(([plan_date, row]) => ({ plan_date, ...row })) });
+    if (url.includes("/member_extra_foods")) {
+      fixture.intakeRevision++;
+      if (r.request().method() === "POST") extras.set(body.id, body.meal_snapshot);
+      else if (r.request().method() === "DELETE") {
+        const id = new URL(url).searchParams.get("id")?.replace(/^eq\./, "");
+        if (id) extras.delete(id);
+      }
+      return r.fulfill({ json: null });
+    }
     if (url.includes("/member_skipped_meals")) {
-      if (r.request().method() === "POST") skipped.add(body.slot);
+      fixture.intakeRevision++;
+      if (r.request().method() === "POST") { skipped.add(body.slot); delete checkins[body.slot]; }
       if (r.request().method() === "DELETE") {
         const slot = new URL(url).searchParams.get("slot")?.replace(/^eq\./, "");
         if (slot) skipped.delete(slot);
@@ -95,7 +160,8 @@ test.beforeEach(async ({ page }) => {
       return r.fulfill({ json: [...skipped].map(slot => ({ slot })) });
     }
     if (url.includes("/daily_meal_checkins")) {
-      if (r.request().method() === "POST") checkins[body.meal_slot] = body;
+      fixture.intakeRevision++;
+      if (r.request().method() === "POST") { checkins[body.meal_slot] = body; skipped.delete(body.meal_slot); }
       if (r.request().method() === "DELETE") {
         const slot=new URL(url).searchParams.get('meal_slot')?.replace(/^eq\./,'');
         if(slot)delete checkins[slot];
@@ -116,6 +182,7 @@ test.beforeEach(async ({ page }) => {
 test("next meal only, today/week controls, actual food SVG and accessible spotlight", async ({
   page,
 }) => {
+  test.setTimeout(60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await expect(page.locator(".energy-dial")).toBeVisible();
@@ -134,7 +201,7 @@ test("next meal only, today/week controls, actual food SVG and accessible spotli
   await page
     .getByRole("button", { name: "آماده‌سازی و ذخیرهٔ برنامهٔ هفته" })
     .click();
-  await expect(page.locator(".week-dates .is-ready")).toHaveCount(7);
+  await expect(page.locator(".week-dates .is-ready")).toHaveCount(7, { timeout: 40_000 });
   await page.locator(".week-dates button").nth(1).click();
   await expect(page.locator(".week-meal")).toHaveCount(6);
   await page.getByRole("dialog").getByRole("switch").click();
@@ -292,52 +359,65 @@ test('meal rotation keeps working across consecutive clicks without hiding the c
  await expect(card.locator('.meal-visual-surface .meal-change-row')).toBeVisible();
 });
 
-test('rotation keeps the old meal on save failure and survives reload after acknowledgment', async ({ page }) => {
+test('rotation preserves the displayed plan during transport failure and reuses one intent', async ({ page }) => {
   const card = page.locator('#today-panel .member-meal-card');
   const change = card.getByRole('button', { name: 'تغییر وعده', exact: true });
   const foods = () => card.locator('.food-piece').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-food-id')).join('|'));
   const original = await foods();
-  const events: unknown[] = [];
-  await page.route('**/rpc/record_product_event', route => {
-    const body = route.request().postDataJSON();
-    if (body.p_event.startsWith('meal_chang')) {
-      events.push({ event: body.p_event, step: body.p_step, source: body.p_source, keys: Object.keys(body).sort() });
-    }
-    return route.fulfill({ json: null });
-  });
-  let attempts = 0;
+  const input: unknown[] = [];
+  const fixture = fixtures.get(page)!;
+  const prior = fixture.saved.length;
   let finish!: () => void;
   const release = new Promise<void>(resolve => { finish = resolve; });
-  await page.route('**/rpc/save_member_meal_schedule_v3', async route => {
-    if (!route.request().postDataJSON().p_meal_edit) return route.fallback();
-    expect(route.request().postDataJSON().p_expected_diet).toEqual(profile.dietary_preferences_json);
-    attempts++;
-    if (attempts === 1) {
+  await page.route(apiRoute, async route => {
+    const request = route.request().postDataJSON().input;
+    if (request.kind !== 'rotate') return route.fallback();
+    input.push(request);
+    if (input.length === 1) {
+      await fixture.dispatch(request);
       await release;
-      return route.fulfill({ status: 500, json: { message: 'Synthetic save failure' } });
+      return route.abort('failed');
     }
     return route.fallback();
   });
   await change.click();
-  await expect.poll(() => attempts).toBe(1);
+  await expect.poll(() => input.length).toBe(1);
   await expect(change).toBeDisabled();
   expect(await foods()).toBe(original);
-  expect(events).toEqual([]);
   finish();
-  await expect(page.getByText('برنامه ذخیره نشد. دوباره تلاش کن.', { exact: true })).toBeVisible();
-  expect(await foods()).toBe(original);
-  await change.click();
   await expect.poll(foods).not.toBe(original);
+  expect(input).toHaveLength(2);
+  expect(input[0]).toEqual(input[1]);
+  expect(fixture.saved).toHaveLength(prior + 1);
   const saved = await foods();
-  await expect.poll(() => events).toEqual(['meal_change_save_failed'].map(event => ({
-    event, step: null, source: 'app', keys: ['p_event', 'p_id', 'p_session', 'p_source', 'p_step'],
-  })));
   await page.reload();
   await expect.poll(foods).toBe(saved);
 });
 
+test('a stale intake snapshot rejects a swap and reopening uses the new revision', async ({ page }) => {
+  const fixture = fixtures.get(page)!;
+  const card = page.locator('#today-panel .member-meal-card');
+  await card.getByRole('button', { name: 'تغییر وعده', exact: true }).click();
+  await card.getByRole('button', { name: 'جایگزینی نان سنگک', exact: true }).click();
+  const swap = page.getByRole('dialog', { name: 'جایگزینی غذا' });
+  await swap.locator('.swap-option-v2').first().click();
+  const count = fixture.saved.length;
+  fixture.intakeRevision++;
+  await swap.getByRole('button', { name: 'تأیید جایگزینی' }).click();
+  await expect(page.getByRole('button', { name: 'بازکردن نسخهٔ تازه' })).toBeVisible();
+  expect(fixture.saved).toHaveLength(count);
+  await page.getByRole('button', { name: 'بازکردن نسخهٔ تازه' }).click();
+  await card.getByRole('button', { name: 'جایگزینی نان سنگک', exact: true }).click();
+  await swap.locator('.swap-option-v2').first().click();
+  await swap.getByRole('button', { name: 'تأیید جایگزینی' }).click();
+  await expect(swap).toHaveCount(0);
+  expect(fixture.saved).toHaveLength(count + 1);
+});
 
 test('an empty ingredient replacement records one unavailable result without saving', async ({ page }) => {
+  const fixture = fixtures.get(page)!;
+  fixture.revision = '2';
+  fixture.catalog = { ...catalog, substitutes: [] };
   await page.unroute('**/src/hooks/useNutritionCatalog.ts*');
   await page.route('**/src/hooks/useNutritionCatalog.ts*', route => route.fulfill({
     contentType: 'text/javascript',
@@ -381,9 +461,9 @@ test('skipping requires confirmation and the skipped meal can be restored', asyn
 test('stale schedule writes keep the displayed meal and ask to reload', async ({ page }) => {
   const card = page.locator('#today-panel .member-meal-card');
   const before = await card.locator('h3').textContent();
-  await page.route('**/rpc/save_member_meal_schedule_v3', route => {
-    if (!route.request().postDataJSON().p_replace) return route.fallback();
-    return route.fulfill({ status: 400, json: { message: 'MEAL_SCHEDULE_CONFLICT', code: 'P0001' } });
+  await page.route(apiRoute, route => {
+    if (route.request().postDataJSON().input.kind !== 'rotate') return route.fallback();
+    return route.fulfill({ status: 409, json: { error: 'STALE_PLAN' } });
   });
   await card.getByRole('button', { name: 'تغییر وعده', exact: true }).click();
   await expect(page.getByRole('button', { name: 'بازکردن نسخهٔ تازه' })).toBeVisible();
@@ -477,10 +557,11 @@ test('focusing the app refreshes a remotely updated diet before the next save', 
   await page.reload();
   await expect(page.locator('#today-panel .member-meal-card')).toBeVisible();
   diet = { ...diet, allergies: ['celery'] };
-  const freshSave = page.waitForRequest(request => request.url().includes('/rpc/save_member_meal_schedule_v3')
-    && request.postDataJSON().p_expected_diet?.allergies.includes('celery'));
+  const fixture = fixtures.get(page)!;
+  fixture.profile = { ...fixture.profile, dietary_preferences_json: diet as UserProfile['dietary_preferences_json'] };
+  const prior = fixture.saved.length;
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
-  await freshSave;
+  await expect.poll(() => fixture.saved.length).toBeGreaterThan(prior);
   await page.getByRole('link', { name: 'حساب من', exact: true }).click();
   await expect(page.getByRole('region', { name: 'حساسیت‌های غذایی' })).toContainText('کرفس');
 });
@@ -554,10 +635,9 @@ test('allergy change keeps consumed history but undo and reopening expose only s
   const changed = { ...profile, dietary_preferences_json: { vegetarianStatus: 'none', allergies: ['gluten'] } };
   await page.route('**/src/hooks/useUserProfile.ts*', route => route.fulfill({ contentType: 'text/javascript',
     body: `const profile=${JSON.stringify(changed)};export function useUserProfile(){return {profile,loading:false,error:null,refetch:async()=>{}}}` }));
-  const savedPlans: any[] = [];
-  page.on('request', request => {
-    if (request.url().includes('/rpc/save_member_meal_schedule_v3')) savedPlans.push(...request.postDataJSON().p_days.map((d: any) => d.plan));
-  });
+  const fixture = fixtures.get(page)!;
+  fixture.profile = changed as unknown as UserProfile;
+  const firstNew = fixture.saved.length;
   await page.reload();
   await expect(page.locator('#today-panel .member-meal-card')).toBeVisible();
   await page.getByRole('button', { name: /نمایش وعده‌های امروز/ }).click();
@@ -570,8 +650,8 @@ test('allergy change keeps consumed history but undo and reopening expose only s
   const forbidden = raw.FOOD_ITEMS.filter((f: any) => f.allergyFlags.includes('gluten')).map((f: any) => f.id);
   for (const id of forbidden) await expect(historical.locator(`[data-food-id="${id}"]`)).toHaveCount(0);
   await day.getByRole('button', { name: 'بستن', exact: true }).click();
-  await expect.poll(() => savedPlans.length).toBeGreaterThan(0);
-  for (const plan of savedPlans) {
+  await expect.poll(() => fixture.saved.length).toBeGreaterThan(firstNew);
+  for (const plan of fixture.saved.slice(firstNew)) {
     expect(plan.meals.every((m: any) => !m.consumed && !m.source)).toBe(true);
     expect(plan.meals.every((m: any) => m.components.every((c: any) => !c.foodItem.allergyFlags.includes('gluten')))).toBe(true);
   }

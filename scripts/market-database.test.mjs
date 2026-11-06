@@ -21,6 +21,7 @@ export async function testMarketDatabase({ db }) {
     "20261105094021_047_egg_sesame_allergen_safety.sql",
     "20261105171239_048_nutrition_context_snapshot.sql",
     "20261105172329_049_authoritative_member_meals.sql",
+    "20261105213810_050_member_meal_cutover.sql",
   ])
     await db.exec(
       await readFile(

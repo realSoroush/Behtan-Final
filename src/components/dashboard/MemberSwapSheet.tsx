@@ -8,8 +8,9 @@ import { MemberDialog } from './MemberDialog';
 
 const n = (value: number) => Math.round(value).toLocaleString('fa-IR');
 
-export function MemberSwapSheet({ isOpen, onClose, currentComponent, currentPlan, candidates, onSelect }: {
+export function MemberSwapSheet({ isOpen, onClose, currentComponent, currentPlan, candidates, onSelect, stale = false }: {
   isOpen: boolean;
+  stale?: boolean;
   onClose: () => void;
   currentComponent: MealComponent | null;
   currentPlan: DailyMealPlan | null;
@@ -36,7 +37,7 @@ export function MemberSwapSheet({ isOpen, onClose, currentComponent, currentPlan
   ) ?? [];
 
   const confirm = async () => {
-    if (!pending || saving) return;
+    if (!pending || saving || stale) return;
     setError('');
     setSaving(true);
     try {
@@ -71,10 +72,10 @@ export function MemberSwapSheet({ isOpen, onClose, currentComponent, currentPlan
         <li key={key}>{label}، {after.foodItem.name} از {componentAmount(before)} به {componentAmount(after)}</li>
       ))}</ul>
     </section>}
-    {error && <p role="alert">{error}</p>}
+    {(error || stale) && <p role="alert">{error || "ثبت‌ها یا برنامهٔ روز تغییر کرده‌اند. پنجره را ببند و دوباره انتخاب کن."}</p>}
     <div className="swap-confirm-bar">
       <p aria-live="polite">{pending ? `${pending.foodItem.name} · ${componentAmount(pending.replacementComponent)}` : 'یک جایگزین انتخاب کن'}</p>
-      <button type="button" className="member-primary" disabled={!pending || saving} onClick={() => void confirm()}>
+      <button type="button" className="member-primary" disabled={!pending || saving || stale} onClick={() => void confirm()}>
         {saving ? 'در حال ذخیره…' : 'تأیید جایگزینی'}<Check size={17} />
       </button>
     </div>

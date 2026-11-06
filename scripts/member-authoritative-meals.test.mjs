@@ -4,6 +4,7 @@ import { processMemberMealSchedule } from '../server/member/mealSchedule.ts';
 import { TEST_NUTRITION_CATALOG as catalog } from './setup-test-nutrition-catalog.mjs';
 import { DEFAULT_PROTEIN_ENGINE_POLICY as policy } from '../src/utils/proteinPolicy.ts';
 import { createMealPlanEngine } from '../src/utils/mealPlanEngine.ts';
+import { memberProfileContext } from '../src/utils/memberScheduleContext.ts';
 import { isPrescriptionPlan } from '../src/utils/mealValidation.ts';
 
 const user = randomUUID();
@@ -16,7 +17,7 @@ const state = {
     medical_conditions_json: { conditions: [], medications: '', injuries: '', pregnancyStatus: 'not_applicable',
       eatingDisorderStatus: 'none', safetyScreeningVersion: 1, safetyAnswersConfirmed: true },
   },
-  intake_revision: '0', schedule: null, previous_plan: null, checkins: {}, skipped: [], extras: [], operation: null,
+  catalog_revision: '8', extra_food_ids: [], intake_revision: '0', schedule: null, previous_plan: null, checkins: {}, skipped: [], extras: [], operation: null,
 };
 let reads = 0, writes = 0;
 const deps = {
@@ -66,6 +67,16 @@ state.schedule.server_verified = true;
 state.schedule.server_context_key = 'stale';
 await assert.rejects(() => processMemberMealSchedule(user, { ...edit, kind: 'rotate', slot: 'breakfast' }, deps), /STALE_CONTEXT/);
 state.schedule.server_context_key = original.p_server_context_key;
+const read = { kind: 'read', date };
+const snapshot = await processMemberMealSchedule(user, read, deps);
+assert.equal(snapshot.catalogRevision, '8');
+assert.equal(snapshot.profileContext, memberProfileContext(state.profile));
+assert.equal(snapshot.schedule.server_verified, true);
+assert.deepEqual(snapshot.extraFoodIds, []);
+assert(!('profile' in snapshot));
+state.catalog_revision = '9';
+assert.equal((await processMemberMealSchedule(user, read, deps)).schedule.server_verified, false);
+state.catalog_revision = '8';
 const engine = createMealPlanEngine(catalog);
 let swap;
 for (const [mealIndex, meal] of base.meals.entries()) {

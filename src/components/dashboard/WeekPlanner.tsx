@@ -2,11 +2,9 @@ import {workoutForDate} from '@/member/nutrition';
 import { useState, useRef, useEffect } from "react";
 import type {
   DailyMealPlan,
-  MacroTargets,
   UserProfile,
 } from "@/types";
-import type { MealPlanEngine } from "@/utils/mealPlanEngine";
-import { historyOfMeals } from "@/utils/mealExperience";
+import type { MealIntent } from "@/hooks/useMemberMealSchedule";
 import { addPlanDays, componentAmount, sumPlanIngredients } from "@/utils/mealPresentation";
 import { MemberDialog } from "./MemberDialog";
 import { FoodPlate } from "./visuals/FoodPlate";
@@ -14,28 +12,21 @@ type Schedule = {
   plans: Record<string, DailyMealPlan>;
   saving: boolean;
   error: string | null;
-  retry: () => void;
-  save: (
-    days: { date: string; plan: DailyMealPlan }[],
-    replace?: boolean,
-  ) => Promise<Record<string, DailyMealPlan>>;
+  submit: (date: string, intent: MealIntent) => Promise<void>;
 };
 export function WeekPlanner({
   today,
   plan,
-  targetsForDay,
   profile,
-  engine,
   schedule,
+  onRetry,
   onClose,
 }: {
   today: string;
   plan: DailyMealPlan;
-  targets: MacroTargets;
-  targetsForDay:(workout:boolean)=>MacroTargets;
   profile: UserProfile;
-  engine: MealPlanEngine;
   schedule: Schedule;
+  onRetry: () => Promise<void>;
   onClose: () => void;
 }) {
   const [selected, setSelected] = useState(today),
@@ -51,36 +42,15 @@ export function WeekPlanner({
     setError("");
     setBuilding(true);
     try {
-      if (!profile.weight || !profile.dietary_preferences_json)
-        throw Error("اطلاعات برنامه کامل نیست.");
-      let previous = plan;
-      const missing = [];
-      for (const [offset,date] of days.slice(1).entries()) {
-        if(!alive.current)return;
-        setProgress(offset+1);
-        await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
-        if(!alive.current)return;
-        if (schedule.plans[date]) {
-          previous = schedule.plans[date];
-          continue;
-        }
-        const next = engine.generateDailyMealPlan(
-          targetsForDay(workoutForDate(date,profile.workout_weekdays,profile.workout_days??0)),
-          profile.weight,
-          profile.dietary_preferences_json,
-          workoutForDate(date,profile.workout_weekdays,profile.workout_days??0),
-          date + "-v0",
-          {
-            previousDay: historyOfMeals(previous.meals),
-            proteinBudgetPreference:
-              profile.protein_budget_preference ?? "performance",
-          },
-        );
-        missing.push({ date, plan: next });
-        previous = next;
+      for (const [offset, date] of days.slice(1).entries()) {
+        if (!alive.current) return;
+        if (schedule.plans[date]) continue;
+        setProgress(offset + 1);
+        await schedule.submit(date, {
+          kind: 'generate', regenerate: false,
+          workout: workoutForDate(date, profile.workout_weekdays, profile.workout_days ?? 0),
+        });
       }
-      if (missing.length) await schedule.save(missing);
-      else setError("برنامه‌های این هفته آماده‌اند.");
     } catch (e) {
       if(alive.current)setError(e instanceof Error ? e.message : "آماده‌سازی انجام نشد.");
     } finally {
@@ -88,27 +58,10 @@ export function WeekPlanner({
     }
   };
   const changeWorkout = async () => {
-    if (
-      selected === today ||
-      !current ||
-      !profile.weight ||
-      !profile.dietary_preferences_json
-    )
-      return;
-    setError("");
+    if (selected === today || !current || schedule.error || building) return;
+    setError('');
     try {
-      const next = engine.generateDailyMealPlan(
-        targetsForDay(!current.isWorkoutDay),
-        profile.weight,
-        profile.dietary_preferences_json,
-        !current.isWorkoutDay,
-        selected + "-v0",
-        {
-          proteinBudgetPreference:
-            profile.protein_budget_preference ?? "performance",
-        },
-      );
-      await schedule.save([{ date: selected, plan: next }], true);
+      await schedule.submit(selected, { kind: 'generate', workout: !current.isWorkoutDay, regenerate: false });
     } catch (e) {
       setError(e instanceof Error ? e.message : "تغییر روز ذخیره نشد.");
     }
@@ -157,7 +110,7 @@ export function WeekPlanner({
           <button
             type="button"
             className="member-secondary"
-            onClick={schedule.retry}
+            onClick={() => void onRetry()}
           >
             تلاش دوباره
           </button>
@@ -199,7 +152,7 @@ export function WeekPlanner({
                 className="member-secondary"
                 role="switch"
                 aria-checked={current.isWorkoutDay}
-                disabled={schedule.saving || building}
+                disabled={schedule.saving || building || Boolean(schedule.error)}
                 onClick={() => void changeWorkout()}
               >
                 {current.isWorkoutDay
@@ -228,8 +181,7 @@ export function WeekPlanner({
             </article>
           ))}
           <p className="member-muted">
-            ثبت مصرف و جایگزینی مواد از برنامهٔ همان روز انجام می‌شود. روزهای
-            آینده ابتدا معمولی هستند؛ روز ورزشی هر روز را خودت مشخص کن.
+            ثبت مصرف و جایگزینی مواد از برنامهٔ همان روز انجام می‌شود. می‌توانی روز ورزشی را از همین‌جا تغییر بدهی.
           </p>
         </>
       ) : (
