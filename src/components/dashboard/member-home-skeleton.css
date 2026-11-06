@@ -1,0 +1,49 @@
+.member-home-skeleton {
+  --home-placeholder-fill: color-mix(in srgb, var(--member-ink, currentColor) 11%, transparent);
+}
+.home-placeholder {
+  display: block;
+  height: .7rem;
+  border-radius: 999px;
+  background: var(--home-placeholder-fill, color-mix(in srgb, currentColor 12%, transparent));
+  animation: home-placeholder-pulse 1.65s ease-in-out infinite alternate;
+}
+.home-placeholder-ring {
+  aspect-ratio: 1;
+  border: 7px solid var(--home-placeholder-fill);
+  border-radius: 50%;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: .45rem;
+}
+.home-placeholder-ring i:first-child { width: 45%; height: 1.1rem; }
+.home-placeholder-ring i:last-child { width: 58%; }
+.member-home-skeleton .compact-macros i:not(.member-macro-track) { width: 35%; }
+.member-home-skeleton .compact-energy-note i { width: 54%; margin: .25rem auto; }
+.home-placeholder--switch { width: 5.8rem; height: 2.25rem; }
+.home-placeholder--count { width: 4.5rem; height: 1.5rem; }
+.home-placeholder--change { width: 5rem; height: 1.9rem; }
+.home-placeholder-meal { background: var(--member-card); border: 1px solid var(--member-line); }
+.home-placeholder-meal .meal-visual-surface { background: var(--member-soft); }
+.home-placeholder-meal .meal-v3-copy { display: grid; gap: .8rem; }
+.home-placeholder-meal .meal-v3-copy i:first-child { width: 48%; }
+.home-placeholder-meal .meal-v3-copy i:nth-child(2) { width: 95%; height: 1.5rem; }
+.home-placeholder-meal .meal-v3-copy i:last-child { width: 45%; height: 1.2rem; }
+.home-placeholder--plate { aspect-ratio: 1; height: auto; width: 85%; margin-inline: auto; border-radius: 50%; }
+.home-placeholder-meal .meal-macro-chips i { width: 29%; height: 1.45rem; }
+.home-placeholder-meal .meal-card-actions i:first-child { flex: 1; height: 2.75rem; }
+.home-placeholder-meal .meal-card-actions i:last-child { width: 27%; height: 1.65rem; }
+.home-placeholder-ingredients { padding: .25rem 1rem 1rem; }
+.home-placeholder-ingredients .meal-ingredient-row { min-height: 2.75rem; }
+.home-placeholder-ingredients .meal-ingredient-row > i:first-child { width: 1.65rem; height: 1.65rem; }
+.home-placeholder-ingredients .meal-ingredient-row > i:last-child { width: 1.25rem; }
+.home-placeholder-ingredients .meal-ingredient-row > div i { width: 55%; }
+.home-placeholder-ingredients .meal-ingredient-row > div i + i { width: 37%; height: .5rem; margin-block-start: .35rem; }
+.member-home-skeleton .member-plan-actions i { width: 55%; }
+.member-companion-copy > .home-placeholder { width: 72%; margin-block-start: .4rem; }
+@keyframes home-placeholder-pulse { to { opacity: .5; } }
+@media (prefers-reduced-motion: reduce) { .home-placeholder { animation: none; } }
+.member-mascot-interactive > .app-loading__mascot { width: 92px; margin-inline: auto; }
+.meal-intake-status { display: flex; align-items: center; gap: .5rem; color: var(--member-muted); font-size: .82rem; }
+.meal-intake-status .app-loading__mascot { width: 1.5rem; }

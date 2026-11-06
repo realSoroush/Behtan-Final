@@ -21,6 +21,7 @@ const catalog = {
 const profile = {
   id: "11111111-1111-4111-8111-111111111111",
   display_name: "کاربر آزمایشی",
+  onboarding_completed: true,
   phone: "989000000001",
   birth_date: "1992-04-23",
   gender: "male",
@@ -184,6 +185,114 @@ test.beforeEach(async ({ page }) => {
   await page.goto("/tests/public/member-harness.html");
   await expect(page.locator("#today-panel .member-meal-card")).toHaveCount(1);
 });
+test('the member route renders the real home placeholders during the subscription check', async ({ page }) => {
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/functions/v1/payments*', async route => {
+    await pending;
+    return route.fulfill({ json: { mode: 'live', checkout_enabled: true,
+      active: { plan_code: 'silver', starts_at: '2026-11-01T00:00:00Z', expires_at: '2026-12-01T00:00:00Z' },
+      orders: [] } });
+  });
+  try {
+    await page.goto('/index.html#today');
+    await expect(page.getByRole('navigation', { name: 'منوی اصلی' })).toBeVisible();
+    await expect(page.locator('#today-panel .member-summary-v4[aria-busy=true]')).toBeVisible();
+    await expect(page.locator('#today-panel .home-placeholder-meal')).toBeVisible();
+    await expect(page.locator('.app-loading--page')).toHaveCount(0);
+    release();
+    await expect(page.locator('#today-panel .member-meal-card')).toBeVisible();
+  } finally { release(); }
+});
+
+test('loading keeps the home shell and reserves the energy and next-meal cards in place', async ({ page }) => {
+  let resolve!: () => void;
+  const hold = new Promise<void>(done => { resolve = done; });
+  await page.route(apiRoute, async route => {
+    if (route.request().postDataJSON().input.kind === 'read') await hold;
+    return route.fallback();
+  });
+  try {
+    await page.reload();
+    const home = page.locator('#today-panel');
+    const energy = home.locator('.member-summary-v4');
+    const next = home.locator('.member-next-section');
+    await expect(page.getByRole('navigation', { name: 'منوی اصلی' })).toBeVisible();
+    await expect(home.getByRole('complementary', { name: 'همراه به‌تن' })).toBeVisible();
+    await expect(energy).toHaveAttribute('aria-busy', 'true');
+    await expect(energy.locator('.home-placeholder-ring')).toBeVisible();
+    await expect(next.locator('.home-placeholder--plate')).toBeVisible();
+    await expect(home.locator('.food-scan-entry')).toBeDisabled();
+    const energyBefore = await energy.boundingBox();
+    const mealBefore = await next.boundingBox();
+    resolve();
+    await expect(energy.locator('.energy-dial')).toBeVisible();
+    await expect(next.locator('.member-meal-card[data-meal-slot]')).toBeVisible();
+    expect((await energy.boundingBox())?.x).toBe(energyBefore?.x);
+    expect((await next.boundingBox())?.width).toBe(mealBefore?.width);
+    await expect(home.locator('.member-home-skeleton')).toHaveCount(0);
+  } finally { resolve(); }
+});
+
+for (const action of ['record', 'skip'] as const) {
+  test(`a slow ${action} advances the card immediately and a failed write restores it`, async ({ page }) => {
+    const card = page.locator('#today-panel .member-meal-card');
+    const energy = page.locator('#today-panel .energy-dial');
+    const initialEnergy = await energy.getAttribute('aria-valuetext');
+    const slot = await card.getAttribute('data-meal-slot');
+    let release!: () => void;
+    const held = new Promise<void>(resolve => { release = resolve; });
+    let writes = 0;
+    await page.route(action === 'record' ? '**/daily_meal_checkins?*' : '**/member_skipped_meals?*', async route => {
+      if (route.request().method() !== 'POST') return route.fallback();
+      writes++;
+      await held;
+      return route.fulfill({ status: 400, json: { message: 'Synthetic write rejection' } });
+    });
+    const consume = action === 'record';
+    await card.getByRole('button', { name: consume ? 'علامت‌گذاری وعده به‌عنوان مصرف‌شده' : 'این وعده را نخوردم' }).click();
+    const confirm = page.getByRole('dialog', { name: consume ? 'تأیید ثبت وعده' : 'تأیید نخوردن وعده' });
+    try {
+      await confirm.getByRole('button', { name: consume ? 'بله، ثبت کن' : 'بله، نخوردم' }).click();
+      await expect(card).not.toHaveAttribute('data-meal-slot', slot!);
+      await expect(page.locator('.meal-intake-status')).toBeVisible();
+      await expect(card.getByRole('button', { name: 'علامت‌گذاری وعده به‌عنوان مصرف‌شده' })).toBeDisabled();
+      await expect(page.locator('.meal-receipt')).toHaveCount(0);
+      if (consume) await expect(energy).not.toHaveAttribute('aria-valuetext', initialEnergy!);
+      else await expect(energy).toHaveAttribute('aria-valuetext', initialEnergy!);
+      await expect.poll(() => writes).toBe(1);
+      release();
+      await expect(page.getByRole('alert')).toContainText('انجام نشد');
+      await expect(card).toHaveAttribute('data-meal-slot', slot!);
+      await expect(energy).toHaveAttribute('aria-valuetext', initialEnergy!);
+      await expect(page.locator('.meal-intake-status')).toHaveCount(0);
+    } finally { release(); }
+  });
+}
+
+test('record acknowledgment shows the receipt while reconciliation is still pending', async ({ page }) => {
+  const card = page.locator('#today-panel .member-meal-card');
+  const slot = await card.getAttribute('data-meal-slot');
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  await page.route(apiRoute, async route => {
+    if (route.request().postDataJSON().input.kind === 'read') await held;
+    return route.fallback();
+  });
+  try {
+    await card.getByRole('button', { name: 'علامت‌گذاری وعده به‌عنوان مصرف‌شده' }).click();
+    await page.getByRole('dialog', { name: 'تأیید ثبت وعده' }).getByRole('button', { name: 'بله، ثبت کن' }).click();
+    const receipt = page.locator('.meal-receipt');
+    await expect(receipt).toContainText('ثبت شد');
+    await expect(card).not.toHaveAttribute('data-meal-slot', slot!);
+    await expect(receipt.getByRole('button', { name: 'برگردان' })).toBeDisabled();
+    release();
+    await expect(receipt.getByRole('button', { name: 'برگردان' })).toBeEnabled();
+    await page.reload();
+    await expect(card).not.toHaveAttribute('data-meal-slot', slot!);
+  } finally { release(); }
+});
+
 test('today and normal rotation avoid schedule re-downloads; week loads on demand', async ({ page }) => {
   const fixture = fixtures.get(page)!;
   expect(fixture.weekReads).toBe(0);
@@ -330,8 +439,10 @@ test('a collapsed recorded meal can be restored from the today sheet',async({pag
  const day=page.getByRole('dialog').filter({has:page.locator('.day-meal-list')});
  const undo=day.locator('.day-meal-undo').first();
  await expect(undo).toBeVisible();
+ const restored = page.waitForResponse(response => response.ok() && response.request().method() === 'DELETE' && response.url().includes('/daily_meal_checkins'));
  await undo.click();
  await expect(day.locator('.day-meal-undo')).toHaveCount(0);
+ await restored;
  await day.getByRole('button',{name:'بستن',exact:true}).click();
  await page.reload();
  await page.getByRole('button',{name:/نمایش وعده‌های امروز/}).click();
@@ -495,8 +606,10 @@ test('skipping requires confirmation and the skipped meal can be restored', asyn
   await expect(dialog).toHaveCount(0);
   await expect(card).toHaveAttribute('data-meal-slot', original!);
   await skip.click();
+  const stored = page.waitForResponse(response => response.ok() && response.request().method() === 'POST' && response.url().includes('/member_skipped_meals'));
   await dialog.getByRole('button', { name: 'بله، نخوردم' }).click();
   await expect(card).not.toHaveAttribute('data-meal-slot', original!);
+  await stored;
   await page.reload();
   await expect(card).not.toHaveAttribute('data-meal-slot', original!);
   await page.getByRole('button', { name: /نمایش وعده‌های امروز/ }).click();
