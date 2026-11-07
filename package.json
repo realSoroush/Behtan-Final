@@ -68,6 +68,7 @@
     "test:pro:modules": "node --experimental-strip-types scripts/pro-modules.test.mjs",
     "test:public:browser": "playwright test --config playwright.public.config.ts",
     "test:security:hardening": "node scripts/security-body-limits.test.mjs",
+    "test:member:intake": "node --experimental-strip-types scripts/member-intake.test.mjs",
     "test:market": "node --experimental-strip-types scripts/market-engine.test.mjs && node --experimental-strip-types scripts/market-http.test.mjs && node --experimental-strip-types scripts/market-release.test.mjs && node scripts/member-review-regressions.test.mjs && node --experimental-strip-types scripts/extra-food-operation.test.mjs",
     "backup:full": "node scripts/backup-full.mjs",
     "backup:full:verify": "node scripts/verify-full-backup.mjs",

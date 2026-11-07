@@ -22,6 +22,7 @@ export async function testMarketDatabase({ db }) {
     "20261105171239_048_nutrition_context_snapshot.sql",
     "20261105172329_049_authoritative_member_meals.sql",
     "20261105213810_050_member_meal_cutover.sql",
+    "20261107195116_051_member_intake_transactions.sql",
   ])
     await db.exec(
       await readFile(
@@ -452,6 +453,7 @@ export async function testMarketDatabase({ db }) {
   await import('./market-regressions-database.mjs').then(m=>m.regressions({db,user,other,as,store,org}));
   await import('./market-v3-database.mjs').then(m=>m.v3Regressions({db,as,store}));
   await import('./pro-specialist-profile-database.test.mjs').then(m=>m.testSpecialistProfiles({db}));
+  await import('./member-intake-database.mjs').then(m=>m.testMemberIntake(db));
   console.log(
     "PASS market SQL: migrations, admin gates, RPC privilege boundaries, catalog/profile-bound preflight, forged prices, half-price, single-use trial, verified/idempotent settlement, dynamic upgrade with original expiry, Pro trial provisioning, analytics minimization",
   );

@@ -31,25 +31,26 @@ export function memberHandler(factory = memberService) {
         for await (const c of req) {
           const b = Buffer.from(c);
           size += b.length;
-          if (size > 12000) throw Error("TOO_LARGE");
+          if (size > 65536) throw Error("TOO_LARGE");
           chunks.push(b);
         }
         raw = Buffer.concat(chunks).toString();
       }
-      if (
-        Buffer.byteLength(typeof raw === "string" ? raw : JSON.stringify(raw)) >
-        12000
-      )
+      const bytes = Buffer.byteLength(typeof raw === "string" ? raw : JSON.stringify(raw));
+      if (bytes > 65536)
         throw Error("TOO_LARGE");
-      const body = typeof raw === "string" ? JSON.parse(raw) : raw;
+      let body;
+      try { body = typeof raw === "string" ? JSON.parse(raw) : raw; }
+      catch { throw Error(bytes > 12000 ? "TOO_LARGE" : "INVALID_REQUEST"); }
       if (
         !body ||
         typeof body !== "object" ||
         Object.keys(body).some((k) => !["action", "input"].includes(k)) ||
-        !["preflight", "training", "training_history", "meal_schedule"].includes(body.action)
+        !["preflight", "training", "training_history", "meal_schedule", "meal_intake"].includes(body.action)
       )
         throw Error("INVALID_REQUEST");
-      mealSchedule = body.action === "meal_schedule";
+      mealSchedule = ["meal_schedule", "meal_intake"].includes(body.action);
+      if (bytes > (body.action === "meal_intake" ? 65536 : 12000)) throw Error("TOO_LARGE");
       const result = await factory()(token, body.action, body.input);
       res.statusCode = 200;
       res.end(JSON.stringify(result));
@@ -57,7 +58,7 @@ export function memberHandler(factory = memberService) {
       const message = e instanceof Error ? e.message : "";
       const status: Record<string, number> = {
         AUTH_REQUIRED: 401, TOO_LARGE: 413, TRAINING_LOCKED: 403,
-        ACCESS_DENIED: 403, STALE_CONTEXT: 409, STALE_INTAKE: 409,
+        ACCESS_DENIED: 403, INTAKE_NOT_FOUND: 409, INTAKE_LIMIT: 422, STALE_CONTEXT: 409, STALE_INTAKE: 409,
         STALE_PLAN: 409, REQUEST_CONFLICT: 409, MEAL_NOT_EDITABLE: 409,
         NO_FEASIBLE_PLAN: 422, MEDICAL_REVIEW_REQUIRED: 422, INVALID_INTAKE: 422,
         RATE_LIMITED: 429, MEAL_SCHEDULE_MIGRATION_REQUIRED: 503, TIMEOUT: 504,

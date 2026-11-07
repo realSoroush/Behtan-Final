@@ -1,12 +1,12 @@
+import type { MemberIntakeIntent } from '@/member/intake';
 import {extraFoodOperation,finishExtraFoodOperation} from '@/member/extraFoodOperation';
 import {isMealSkipped} from '@/member/mealStatus';
-import {supabase} from '@/lib/supabaseClient';
 import {memberNutrition,workoutForDate} from '@/member/nutrition';
 import {track} from '@/member/analytics';
 import { MemberMealConfirmation } from './MemberMealConfirmation';
 import { isCurrentMealConfirmation, type PendingMealConfirmation } from '@/utils/memberMealConfirmation';
 import { scannedMeal, type FoodScanResult } from '@/utils/foodScan';
-import { useMemberMealSchedule, type MealIntent, type IntakePreview } from '@/hooks/useMemberMealSchedule';
+import { useMemberMealSchedule, type MealIntent } from '@/hooks/useMemberMealSchedule';
 import { MemberRequestError } from '@/member/api';
 import { isMealSnapshot } from '@/utils/mealValidation';
 import { memberProfileContext, memberScheduleContext } from '@/utils/memberScheduleContext';
@@ -335,10 +335,10 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
     void generateToday(isWorkoutDay || Boolean(consumedMealSnapshots.post_workout), Boolean(mealPlan));
   };
 
-  const changeIntake = async (task: (signal: AbortSignal) => Promise<void>, fallback: string, preview?: IntakePreview) => {
+  const changeIntake = async (intent: MemberIntakeIntent, fallback: string, requestId?: string) => {
     if (!intakeReady || !user) throw Error('ابتدا ثبت‌های روز را دریافت کن.');
     setViewError('');
-    try { await schedule.changeIntake(task, preview); }
+    try { await schedule.changeIntake(intent, requestId); }
     catch {
       if (generationRef.current === generationKey) setViewError(fallback);
       throw Error(fallback);
@@ -347,30 +347,15 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
 
   const setMealConsumed = async (meal: Meal, consumed: boolean) => {
     if (!user || (consumed && !isMealSnapshot(meal, meal.slot))) throw Error('اطلاعات وعده معتبر نیست.');
-    await changeIntake(async signal => {
-      const { error } = consumed
-        ? await supabase.from('daily_meal_checkins').upsert({ user_id: user.id, plan_date: todayKey,
-          meal_slot: meal.slot, template_id: meal.templateId, meal_snapshot: { ...meal, consumed: true },
-          consumed_at: new Date().toISOString() }, { onConflict: 'user_id,plan_date,meal_slot' }).abortSignal(signal).retry(false)
-        : await supabase.from('daily_meal_checkins').delete().eq('user_id', user.id)
-          .eq('plan_date', todayKey).eq('meal_slot', meal.slot).abortSignal(signal).retry(false);
-      if (error) throw error;
-    }, 'ثبت وضعیت این وعده انجام نشد. دوباره تلاش کن.',
-    consumed ? { kind: 'record', slot: meal.slot, meal } : { kind: 'undo-record', slot: meal.slot });
+    await changeIntake(consumed ? { kind: 'record', slot: meal.slot, meal } : { kind: 'undo-record', slot: meal.slot },
+      'ثبت وضعیت این وعده انجام نشد. دوباره تلاش کن.');
     if (user.id === activeUserId.current) track(consumed ? 'meal_recorded' : 'meal_undone');
   };
 
   const skipMeal = async (slot: Meal['slot'], undo: boolean) => {
     if (!user || !intakeReady) return;
     try {
-      await changeIntake(async signal => {
-        const { error } = undo
-          ? await supabase.from('member_skipped_meals').delete().eq('user_id', user.id)
-            .eq('plan_date', todayKey).eq('slot', slot).abortSignal(signal).retry(false)
-          : await supabase.from('member_skipped_meals').upsert({ user_id: user.id, plan_date: todayKey, slot },
-            { onConflict: 'user_id,plan_date,slot' }).abortSignal(signal).retry(false);
-        if (error) throw error;
-      }, 'ثبت وضعیت وعده انجام نشد.', { kind: undo ? 'undo-skip' : 'skip', slot });
+      await changeIntake({ kind: undo ? 'undo-skip' : 'skip', slot }, 'ثبت وضعیت وعده انجام نشد.');
       if (user.id === activeUserId.current) track('meal_skipped');
     } catch { /* The error is displayed in the day view. */ }
   };
@@ -380,13 +365,9 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
     if (!original || !user || !intakeReady) throw Error('وعده در حال ثبت است یا آماده نیست.');
     const meal = scannedMeal(result, slot, original.label);
     if (independent) {
-      await changeIntake(async signal => {
-        const operation = await extraFoodOperation([user.id, todayKey, slot, result]);
-        const { error } = await supabase.from('member_extra_foods').upsert({ id: operation.id, user_id: user.id,
-          plan_date: todayKey, meal_slot: slot, meal_snapshot: meal }, { onConflict: 'id', ignoreDuplicates: true }).abortSignal(signal).retry(false);
-        if (error) throw error;
-        finishExtraFoodOperation(operation.id);
-      }, 'ثبت غذای اضافه انجام نشد. دوباره تلاش کن.');
+      const operation = await extraFoodOperation([user.id, todayKey, slot, result]);
+      await changeIntake({ kind: 'extra-add', slot, meal }, 'ثبت غذای اضافه انجام نشد. دوباره تلاش کن.', operation.id);
+      finishExtraFoodOperation(operation.id);
       if (user.id === activeUserId.current) track('meal_recorded');
     } else await setMealConsumed(meal, true);
     if (generationRef.current !== generationKey) return;
@@ -398,11 +379,7 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
   const removeExtra = async (id: string) => {
     if (!user || !intakeReady) return;
     try {
-      await changeIntake(async signal => {
-        const { error } = await supabase.from('member_extra_foods').delete().eq('id', id)
-          .eq('user_id', user.id).eq('plan_date', todayKey).abortSignal(signal).retry(false);
-        if (error) throw error;
-      }, 'بازگرداندن غذا انجام نشد.');
+      await changeIntake({ kind: 'extra-remove', id }, 'بازگرداندن غذا انجام نشد.');
     } catch { /* The error is displayed in the day view. */ }
   };
 

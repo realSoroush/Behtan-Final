@@ -7,6 +7,7 @@ const server = createServer(
   memberHandler(() => async (token, action, input) => {
     calls++;
     assert.equal(token, "synthetic");
+    if (action === "meal_intake" && input.kind === "skip") throw Error("STALE_INTAKE");
     if (action === "training") throw Error("TRAINING_LOCKED");
     if (action === "meal_schedule" && input.kind === "rotate") throw Error("STALE_INTAKE");
     if (action === "meal_schedule" && input.kind === "swap") throw Error("TIMEOUT");
@@ -62,6 +63,10 @@ try {
   const failure = await post(JSON.stringify({ action: "meal_schedule", input: { kind: "generate" } }));
   assert.equal(failure.status, 503);
   assert.deepEqual(await failure.json(), { error: "MEAL_SCHEDULE_UNAVAILABLE" });
+  assert.equal((await post(JSON.stringify({ action: 'meal_intake', input: { kind: 'skip' } }))).status,409);
+  assert.equal((await post(JSON.stringify({ action: 'meal_intake', input: { padding: 'x'.repeat(20000) } }))).status,200);
+  assert.equal((await post(JSON.stringify({ action: 'preflight', input: { padding: 'x'.repeat(20000) } }))).status,413);
+  assert.equal((await post(JSON.stringify({ action: 'meal_intake', input: { padding: 'x'.repeat(65536) } }))).status,413);
   console.log(
     "PASS actual member HTTP server: methods, JWT gate, cross-site rejection, media type, stream limit, malformed/injected input, no-store and training denial",
   );

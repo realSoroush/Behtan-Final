@@ -16,7 +16,8 @@ const hook=readFileSync(resolve(process.cwd(),'src/hooks/useMemberMealSchedule.t
 const migration=readFileSync(resolve(process.cwd(),'supabase/migrations/20260905_011_daily_meal_checkins.sql'),'utf8');
 assert(dashboard.includes('useMemberMealSchedule')); assert(dashboard.includes('applyDailyMealSnapshots'));
 assert(dashboard.includes("schedule.displayDay?.checkins")); assert(hook.includes("kind: 'read'"));
-assert(dashboard.includes(".from('daily_meal_checkins')")); assert(dashboard.includes('.upsert(')); assert(dashboard.includes('.delete()'));
+assert(dashboard.includes('schedule.changeIntake(intent, requestId)'));
+assert(!dashboard.includes(".from('daily_meal_checkins')"), 'Intake must use the atomic service');
 assert(migration.includes('enable row level security')); assert(migration.includes('auth.uid()) = user_id')); assert(migration.includes('meal_snapshot jsonb not null'));
 console.log('✅ Behtan daily meal progress smoke test passed');
 console.log('   Refresh/reopen persistence: Supabase-backed');
