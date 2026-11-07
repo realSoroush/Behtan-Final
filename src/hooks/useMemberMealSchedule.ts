@@ -339,7 +339,7 @@ export function useMemberMealSchedule(
       }
       if (owner.signal.aborted || currentKey.current !== key) return;
       const valid = saved?.kind === 'intake' && saved.date === input.date &&
-        /^(0|[1-9]\d*)$/.test(saved.intakeRevision) && saved.expectedUpdatedAt === input.expectedUpdatedAt &&
+        /^(0|[1-9]\d*)$/.test(saved.intakeRevision) && (saved.replayed || saved.expectedUpdatedAt === input.expectedUpdatedAt) &&
         typeof saved.replayed === 'boolean';
       if (!valid) throw Error(unknownOutcome);
       pending.current = null;

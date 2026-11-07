@@ -18,7 +18,13 @@ const jwt=(claims:Record<string,unknown>)=>{
  return [...parts,createHmac('sha256',secret).update(parts.join('.')).digest('base64url')].join('.');
 };
 const endpoint='http://127.0.0.1:54321';
-const admin=createClient(endpoint,jwt({role:'service_role'}),{auth:{persistSession:false,autoRefreshToken:false}});
+// Envoy removes /rest/v1 in deployment. This direct PostgREST fixture supplies
+// only that routing adaptation, without mocking database responses.
+const options={auth:{persistSession:false,autoRefreshToken:false},global:{fetch:(input:RequestInfo|URL,init?:RequestInit)=>{
+ const url=new URL(typeof input==='string'?input:input instanceof URL?input.href:input.url);
+ url.pathname=url.pathname.replace(/^\/rest\/v1(?=\/|$)/,'');return fetch(url,init);
+}}};
+const admin=createClient(endpoint,jwt({role:'service_role'}),options);
 let server:Server,base:string,db:Client,user:string,other:string,token:string,fixture:any;
 let held: {promise:Promise<void>;release:()=>void}|null=null;
 const latch=()=>{let release!:()=>void;return{promise:new Promise<void>(r=>release=r),release};};
@@ -35,7 +41,7 @@ test.beforeAll(async()=>{
  {vegetarianStatus:'none',allergies:[]},{conditions:[],medications:'',injuries:'',pregnancyStatus:'not_applicable',eatingDisorderStatus:'none',safetyScreeningVersion:1,safetyAnswersConfirmed:true}]);
  const state=(await db.query("select member_read_meal_day($1,(now() at time zone 'Asia/Tehran')::date,null) s",[user])).rows[0].s;
  const profile=state.profile as UserProfile,day=(await db.query("select ((now() at time zone 'Asia/Tehran')::date)::text d")).rows[0].d;
- fixture={user,day,revision:state.catalog_revision,context:memberScheduleContext(profile,catalog,policy),profileContext:memberProfileContext(profile)};
+ fixture={user,day,extraId:randomUUID(),revision:state.catalog_revision,context:memberScheduleContext(profile,catalog,policy),profileContext:memberProfileContext(profile)};
  token=jwt({role:'authenticated',sub:user});
  const food=catalog.foods[0];fixture.meal={slot:'breakfast',label:'Synthetic meal',templateId:'synthetic',templateName:'Synthetic',consumed:false,
  components:[{foodItem:food,units:1,grams:food.gramsPerUnit,kcal:food.kcalPerUnit,protein:food.proteinPerUnit,carbs:food.carbsPerUnit,fat:food.fatPerUnit,fiber:food.fiberPerUnit}],
@@ -91,7 +97,7 @@ test('two browser contexts: conflict, recovery, persistence and receipt replay o
 });
 
 test('actual REST privilege boundaries reject browser writes, forged actors and legacy RPCs',async()=>{
- const client=createClient(endpoint,token,{auth:{persistSession:false,autoRefreshToken:false}});
+ const client=createClient(endpoint,token,options);
  for(const table of ['daily_meal_checkins','member_skipped_meals','member_extra_foods','member_meal_schedule']){
   const {error}=await client.from(table).delete().eq('user_id',user);expect(error?.code).toBe('42501');
  }
@@ -101,4 +107,22 @@ test('actual REST privilege boundaries reject browser writes, forged actors and 
  const day=await intakeDeps.read(user,fixture.day,randomUUID());
  const bad=await fetch(base,{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({action:'meal_intake',input:{date:fixture.day,requestId:randomUUID(),kind:'extra-remove',id:randomUUID(),catalogRevision:day.catalog_revision,profileContext:fixture.profileContext,intakeRevision:day.intake_revision,expectedUpdatedAt:day.schedule?.updated_at??null,user:other}})});
  expect(bad.status).toBe(400);
+});
+
+
+test('reopening an extra-food action after a plan change replays its old receipt and reads the latest day',async({page})=>{
+ const before=await intakeDeps.read(user,fixture.day,randomUUID());
+ await processMemberIntake(user,{date:fixture.day,requestId:fixture.extraId,kind:'extra-add',slot:'breakfast',
+  meal:{...fixture.meal,source:'manual'},profileContext:fixture.profileContext,catalogRevision:fixture.revision,
+  intakeRevision:before.intake_revision,expectedUpdatedAt:before.schedule?.updated_at??null},intakeDeps);
+ const after=await intakeDeps.read(user,fixture.day,randomUUID());
+ const plan=await processMemberMealSchedule(user,{kind:'generate',date:fixture.day,requestId:randomUUID(),
+  catalogRevision:fixture.revision,intakeRevision:after.intake_revision,expectedUpdatedAt:after.schedule?.updated_at??null,
+  workout:false,regenerate:false},planDeps) as {updated_at:string};
+ expect(plan.updated_at).not.toBe(before.schedule?.updated_at??null);
+ await open(page);await expect(page.getByTestId('extras')).toHaveText('1');
+ await page.getByRole('button',{name:'extra-add',exact:true}).click();
+ await expect(page.getByTestId('pending')).toHaveText('false');await expect(page.getByRole('alert')).toHaveText('');
+ await expect(page.getByTestId('extras')).toHaveText('1');
+ const current=await intakeDeps.read(user,fixture.day,randomUUID());expect(current.extra_food_ids).toEqual([fixture.extraId]);expect(current.schedule?.updated_at).toBe(plan.updated_at);
 });
