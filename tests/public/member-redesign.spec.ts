@@ -1,3 +1,4 @@
+import { processMemberIntake } from '../../server/member/mealIntake';
 import { expect, test, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { processMemberMealSchedule, type MemberDayState, type MealScheduleDependencies } from "../../server/member/mealSchedule";
@@ -127,53 +128,49 @@ test.beforeEach(async ({ page }) => {
       return result;
     },
   };
+  const intakeDeps = {
+    read: deps.read,
+    reserve: async () => true,
+    commit: async (args: Record<string, unknown>) => {
+      if (String(args.p_intake_revision) !== String(fixture.intakeRevision)) throw Error('STALE_INTAKE');
+      if ((schedule[String(args.p_day)]?.updated_at ?? null) !== args.p_expected_updated_at) throw Error('STALE_PLAN');
+      const slot = String(args.p_slot);
+      if (args.p_kind === 'record') { checkins[slot] = { meal_snapshot: args.p_meal }; skipped.delete(slot); }
+      else if (args.p_kind === 'undo-record') delete checkins[slot];
+      else if (args.p_kind === 'skip') { skipped.add(slot); delete checkins[slot]; }
+      else if (args.p_kind === 'undo-skip') skipped.delete(slot);
+      else if (args.p_kind === 'extra-add') extras.set(String(args.p_request_id), args.p_meal);
+      else if (args.p_kind === 'extra-remove') extras.delete(String(args.p_extra_id));
+      fixture.intakeRevision++;
+      const result = { kind: 'intake' as const, date: String(args.p_day), intakeRevision: String(fixture.intakeRevision),
+        expectedUpdatedAt: args.p_expected_updated_at as string | null,
+        replayed: false };
+      operations.set(String(args.p_request_id), { hash: String(args.p_request_hash), result });
+      return result;
+    },
+  };
   await page.route(apiRoute, async route => {
     const { action, input } = route.request().postDataJSON();
-    expect(action).toBe('meal_schedule');
+    expect(['meal_schedule', 'meal_intake']).toContain(action);
     expect(route.request().headers()['authorization']).toBe('Bearer synthetic-test-token');
     expect(input.plan).toBeUndefined();
     if (input.kind === 'read') fixture.dayReads++;
-    try { return await route.fulfill({ json: await fixture.dispatch(input) }); }
+    try { return await route.fulfill({ json: await (action === 'meal_intake' ? processMemberIntake(profile.id, input, intakeDeps) : fixture.dispatch(input)) }); }
     catch (error) {
       const code = (error as Error).message;
       return route.fulfill({ status: code.startsWith('STALE_') ? 409 : 422, json: { error: code } });
     }
   });
   await page.route("**/rest/v1/**", async (r) => {
-    const url = r.request().url(), body = r.request().postDataJSON();
+    const url = r.request().url();
     if (url.includes("/rpc/save_member_meal_schedule_v3")) throw Error("Browser sent a legacy plan write");
     if (url.includes("/member_meal_schedule")) {
       fixture.weekReads++;
       return r.fulfill({ json: Object.entries(schedule).filter(([date]) => date !== '2026-11-04')
         .map(([plan_date, row]) => ({ plan_date, ...row })) });
     }
-    if (url.includes("/member_extra_foods")) {
-      fixture.intakeRevision++;
-      if (r.request().method() === "POST") extras.set(body.id, body.meal_snapshot);
-      else if (r.request().method() === "DELETE") {
-        const id = new URL(url).searchParams.get("id")?.replace(/^eq\./, "");
-        if (id) extras.delete(id);
-      }
-      return r.fulfill({ json: null });
-    }
-    if (url.includes("/member_skipped_meals")) {
-      fixture.intakeRevision++;
-      if (r.request().method() === "POST") { skipped.add(body.slot); delete checkins[body.slot]; }
-      if (r.request().method() === "DELETE") {
-        const slot = new URL(url).searchParams.get("slot")?.replace(/^eq\./, "");
-        if (slot) skipped.delete(slot);
-      }
-      return r.fulfill({ json: [...skipped].map(slot => ({ slot })) });
-    }
-    if (url.includes("/daily_meal_checkins")) {
-      fixture.intakeRevision++;
-      if (r.request().method() === "POST") { checkins[body.meal_slot] = body; skipped.delete(body.meal_slot); }
-      if (r.request().method() === "DELETE") {
-        const slot=new URL(url).searchParams.get('meal_slot')?.replace(/^eq\./,'');
-        if(slot)delete checkins[slot];
-      }
-      return r.fulfill({ json: Object.values(checkins) });
-    }
+    if (['/member_extra_foods', '/member_skipped_meals', '/daily_meal_checkins'].some(name => url.includes(name)))
+      throw Error('Browser attempted a legacy intake write');
     if (
       url.includes("/rpc/previous_day_meals") ||
       url.includes("/rpc/member_meal_activity") ||
@@ -243,8 +240,9 @@ for (const action of ['record', 'skip'] as const) {
     let release!: () => void;
     const held = new Promise<void>(resolve => { release = resolve; });
     let writes = 0;
-    await page.route(action === 'record' ? '**/daily_meal_checkins?*' : '**/member_skipped_meals?*', async route => {
-      if (route.request().method() !== 'POST') return route.fallback();
+    await page.route(apiRoute, async route => {
+      const body = route.request().postDataJSON();
+      if (body.action !== 'meal_intake' || body.input.kind !== action) return route.fallback();
       writes++;
       await held;
       return route.fulfill({ status: 400, json: { message: 'Synthetic write rejection' } });
@@ -270,7 +268,7 @@ for (const action of ['record', 'skip'] as const) {
   });
 }
 
-test('record acknowledgment shows the receipt while reconciliation is still pending', async ({ page }) => {
+test('record acknowledgment installs the committed revision without another day read', async ({ page }) => {
   const card = page.locator('#today-panel .member-meal-card');
   const slot = await card.getAttribute('data-meal-slot');
   let release!: () => void;
@@ -285,7 +283,7 @@ test('record acknowledgment shows the receipt while reconciliation is still pend
     const receipt = page.locator('.meal-receipt');
     await expect(receipt).toContainText('ثبت شد');
     await expect(card).not.toHaveAttribute('data-meal-slot', slot!);
-    await expect(receipt.getByRole('button', { name: 'برگردان' })).toBeDisabled();
+    expect(fixtures.get(page)!.dayReads).toBe(1);
     release();
     await expect(receipt.getByRole('button', { name: 'برگردان' })).toBeEnabled();
     await page.reload();
@@ -410,7 +408,7 @@ test("today details stay inline and swapping uses one dialog",async({page})=>{
 
 test("recording requires confirmation and cancellation leaves the meal unchanged",async({page})=>{
  let writes=0;
- page.on('request',r=>{if(r.method()==='POST'&&r.url().includes('/daily_meal_checkins'))writes++;});
+ page.on('request',r=>{if(r.method()==='POST'&&r.url().includes('/api/member')&&r.postDataJSON().action==='meal_intake'&&r.postDataJSON().input.kind==='record')writes++;});
  const slot=await page.locator('#today-panel [id^="meal-"]').getAttribute('id');
  await page.getByRole('button',{name:'علامت‌گذاری وعده به‌عنوان مصرف‌شده'}).click();
  const confirmation=page.getByRole('dialog',{name:'تأیید ثبت وعده'});
@@ -439,7 +437,7 @@ test('a collapsed recorded meal can be restored from the today sheet',async({pag
  const day=page.getByRole('dialog').filter({has:page.locator('.day-meal-list')});
  const undo=day.locator('.day-meal-undo').first();
  await expect(undo).toBeVisible();
- const restored = page.waitForResponse(response => response.ok() && response.request().method() === 'DELETE' && response.url().includes('/daily_meal_checkins'));
+ const restored = page.waitForResponse(response => response.ok() && response.url().includes('/api/member') && response.request().postDataJSON().input.kind === 'undo-record');
  await undo.click();
  await expect(day.locator('.day-meal-undo')).toHaveCount(0);
  await restored;
@@ -606,7 +604,7 @@ test('skipping requires confirmation and the skipped meal can be restored', asyn
   await expect(dialog).toHaveCount(0);
   await expect(card).toHaveAttribute('data-meal-slot', original!);
   await skip.click();
-  const stored = page.waitForResponse(response => response.ok() && response.request().method() === 'POST' && response.url().includes('/member_skipped_meals'));
+  const stored = page.waitForResponse(response => response.ok() && response.url().includes('/api/member') && response.request().postDataJSON().input.kind === 'skip');
   await dialog.getByRole('button', { name: 'بله، نخوردم' }).click();
   await expect(card).not.toHaveAttribute('data-meal-slot', original!);
   await stored;
@@ -785,7 +783,7 @@ test('allergy change keeps consumed history but undo and reopening expose only s
   await expect(page.locator('#today-panel [data-food-id="sangak_bread"]').first()).toBeVisible();
   let eaten: any;
   page.on('request', request => {
-    if (request.method() === 'POST' && request.url().includes('/daily_meal_checkins')) eaten = request.postDataJSON().meal_snapshot;
+    if (request.method() === 'POST' && request.url().includes('/api/member') && request.postDataJSON().action === 'meal_intake' && request.postDataJSON().input.kind === 'record') eaten = request.postDataJSON().input.meal;
   });
   await page.getByRole('button', { name: 'علامت‌گذاری وعده به‌عنوان مصرف‌شده' }).click();
   await page.getByRole('dialog', { name: 'تأیید ثبت وعده' }).getByRole('button', { name: 'بله، ثبت کن' }).click();

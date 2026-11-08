@@ -24,6 +24,7 @@ jobs:
           node-version: "24"
           cache: npm
       - run: npm ci
+      - run: npm run test:member:intake
       - run: npm run test:engine:safety
       - run: npm run test:landing
       - run: node --experimental-strip-types scripts/member-redesign.test.mjs
@@ -41,6 +42,23 @@ jobs:
         env:
           PRO_TEST_DATABASE_URL: postgres://postgres:synthetic-ci-only@localhost:5432/behtan_pro_test
           BEHTAN_MARKET_TEST: "true"
+      - name: Start synthetic PostgREST
+        env:
+          PRO_TEST_DATABASE_URL: postgres://postgres:synthetic-ci-only@localhost:5432/behtan_pro_test
+        run: |
+          node scripts/member-postgrest-setup.mjs
+          docker run -d --name behtan-postgrest-test --network host \
+            -e PGRST_DB_URI=postgres://authenticator:synthetic-postgrest-only@127.0.0.1:5432/behtan_pro_test \
+            -e PGRST_DB_SCHEMAS=public -e PGRST_DB_ANON_ROLE=anon \
+            -e PGRST_SERVER_PORT=54321 \
+            -e PGRST_JWT_SECRET=synthetic-postgrest-test-secret-32-characters-minimum \
+            postgrest/postgrest:v14.18
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:54321/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          docker logs behtan-postgrest-test
+          exit 1
       - name: Restore and verify synthetic PostgreSQL backup
         env:
           PRO_CONTAINER: ${{ job.services.postgres.id }}
@@ -54,6 +72,10 @@ jobs:
           npm run test:pro:recovery
       - run: npm run build && npm run build:admin && VITE_PRO_SANDBOX_ENABLED=true npm run build:pro
       - run: npx playwright install --with-deps chromium
+      - name: Real PostgreSQL/PostgREST multi-context intake checks
+        env:
+          PRO_TEST_DATABASE_URL: postgres://postgres:synthetic-ci-only@localhost:5432/behtan_pro_test
+        run: npx playwright test --config playwright.member-intake.config.ts
       - name: Pro browser checks
         run: npm run test:pro:browser
       - name: Admin browser checks

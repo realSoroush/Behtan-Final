@@ -1,3 +1,4 @@
+import type { MemberIntakeIntent, MemberIntakeRequest, MemberIntakeReceipt } from '@/member/intake';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { memberRequest, MemberRequestError } from '@/member/api';
@@ -98,13 +99,11 @@ export function useMemberMealSchedule(
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const busy = useRef(false);
   const [preview, setPreview] = useState<{ key: string; change: IntakePreview; saving: boolean } | null>(null);
-  const [syncKey, setSyncKey] = useState<string | null>(null);
-  const syncing = useRef<{ key: string } | null>(null);
   const readController = useRef<AbortController | null>(null);
   const weekController = useRef<AbortController | null>(null);
   const scope = useRef<AbortController | null>(null);
   const conflictedDay = useRef<string | null>(null);
-  const pending = useRef<{ key: string; input: Mutation } | null>(null);
+  const pending = useRef<{ key: string; input: Mutation; action: 'meal_schedule' } | { key: string; input: MemberIntakeRequest; action: 'meal_intake' } | null>(null);
   const enabled = Boolean(userId && context && catalogRevision);
 
   const publish = useCallback((next: Schedule) => {
@@ -123,7 +122,7 @@ export function useMemberMealSchedule(
   }, [userId, catalogRevision, profileContext]);
 
   const refresh = useCallback(async (force = false) => {
-    if (!enabled || currentKey.current !== key || (!force && (busy.current || syncing.current?.key === key || pending.current?.key === key))) return;
+    if (!enabled || currentKey.current !== key || (!force && (busy.current || pending.current?.key === key))) return;
     if (!force && readController.current) return;
     readController.current?.abort();
     const controller = new AbortController();
@@ -199,7 +198,7 @@ export function useMemberMealSchedule(
   }, [key, refresh]);
 
   const exclusive = useCallback(async (task: () => Promise<void>) => {
-    if (busy.current || syncing.current?.key === key || currentKey.current !== key) throw Error(busyMessage);
+    if (busy.current || currentKey.current !== key) throw Error(busyMessage);
     busy.current = true;
     readController.current?.abort();
     setSavingKey(key);
@@ -228,7 +227,7 @@ export function useMemberMealSchedule(
     } catch (error) {
       if (signal.aborted || currentKey.current !== key) throw error;
       if (canRetry(error)) {
-        pending.current = { key, input };
+        pending.current = { key, input, action: 'meal_schedule' };
         publish({ ...current.current, error: unknownOutcome, conflict: false });
         throw Error(unknownOutcome);
       }
@@ -325,45 +324,81 @@ export function useMemberMealSchedule(
       catalogRevision, intakeRevision: day.intakeRevision, expectedUpdatedAt: day.schedule?.updated_at ?? null });
   }), [catalogRevision, key, today, context, readDay, exclusive, publish, send]);
 
-  const changeIntake = useCallback(async (
-    task: (signal: AbortSignal) => Promise<void>,
-    change?: IntakePreview,
-  ) => exclusive(async () => {
+  const sendIntake = useCallback(async (input: MemberIntakeRequest) => {
+    const owner = scope.current;
+    if (!owner || owner.signal.aborted || currentKey.current !== key) throw Error(busyMessage);
+    const attempt = () => memberRequest<MemberIntakeReceipt>('meal_intake', { input }, {
+      userId, signal: AbortSignal.any([owner.signal, AbortSignal.timeout(20000)]),
+    });
+    try {
+      let saved: MemberIntakeReceipt;
+      try { saved = await attempt(); }
+      catch (error) {
+        if (!canRetry(error) || owner.signal.aborted || currentKey.current !== key) throw error;
+        saved = await attempt(); // The identical key resolves a lost response.
+      }
+      if (owner.signal.aborted || currentKey.current !== key) return;
+      const valid = saved?.kind === 'intake' && saved.date === input.date &&
+        /^(0|[1-9]\d*)$/.test(saved.intakeRevision) && (saved.replayed || saved.expectedUpdatedAt === input.expectedUpdatedAt) &&
+        typeof saved.replayed === 'boolean';
+      if (!valid) throw Error(unknownOutcome);
+      pending.current = null;
+      if (saved.replayed) {
+        // A receipt proves the action committed, but a later device action may
+        // already exist. Never install the historical receipt as current state.
+        await refresh(true);
+      } else if (current.current.day) {
+        let day = current.current.day;
+        if (input.kind === 'extra-add') day = { ...day,
+          extras: [...day.extras, { ...input.meal, consumed: true }], extraFoodIds: [...day.extraFoodIds, input.requestId] };
+        else if (input.kind === 'extra-remove') {
+          const index = day.extraFoodIds.indexOf(input.id);
+          day = { ...day, extras: day.extras.filter((_, i) => i !== index), extraFoodIds: day.extraFoodIds.filter(id => id !== input.id) };
+        } else day = withIntakePreview(day, input)!;
+        publish({ ...current.current, day: { ...day, intakeRevision: saved.intakeRevision },
+          error: null, conflict: false, contextStale: false });
+      }
+    } catch (error) {
+      if (owner.signal.aborted || currentKey.current !== key) throw error;
+      if (canRetry(error)) {
+        pending.current = { key, input, action: 'meal_intake' };
+        publish({ ...current.current, error: unknownOutcome, conflict: false });
+        throw Error(unknownOutcome);
+      }
+      pending.current = null;
+      if (error instanceof MemberRequestError) {
+        const contextStale = ['STALE_CONTEXT', 'ACCESS_DENIED', 'AUTH_REQUIRED'].includes(error.code);
+        if (error.status === 409) conflictedDay.current = today;
+        if (error.status === 409 || contextStale) publish({ ...current.current,
+          error: error.message, conflict: error.status === 409, contextStale });
+      }
+      throw error;
+    }
+  }, [userId, key, today, publish, refresh]);
+
+  const changeIntake = useCallback(async (intent: MemberIntakeIntent, requestId?: string) => exclusive(async () => {
     const latest = current.current;
     const owner = scope.current;
-    if (!owner || owner.signal.aborted || latest.key !== key || !latest.day || latest.error || pending.current)
-      throw Error(busyMessage);
+    if (!owner || owner.signal.aborted || latest.key !== key || !latest.day || latest.error || pending.current ||
+        !catalogRevision || !profileContext) throw Error(busyMessage);
     if (state.key !== key || state.day?.intakeRevision !== latest.day.intakeRevision ||
         state.versions[today] !== latest.versions[today]) throw Error(conflictMessage);
-
+    const change = intent.kind === 'extra-add' || intent.kind === 'extra-remove' ? undefined : intent;
     if (change) setPreview({ key, change, saving: true });
     try {
-      await task(AbortSignal.any([owner.signal, AbortSignal.timeout(12000)]));
-      if (change && !owner.signal.aborted && currentKey.current === key) setPreview({ key, change, saving: false });
-    } catch (error) {
-      setPreview(previous => previous?.key === key ? null : previous);
-      throw error;
+      await sendIntake({ ...intent, date: today, requestId: requestId ?? crypto.randomUUID(),
+        catalogRevision, profileContext, intakeRevision: latest.day.intakeRevision,
+        expectedUpdatedAt: latest.day.schedule?.updated_at ?? null });
     } finally {
-      if (!owner.signal.aborted && currentKey.current === key) {
-        const sync = { key };
-        syncing.current = sync;
-        setSyncKey(key);
-        // Report the write outcome immediately. Revision-sensitive actions stay
-        // disabled until an authoritative read reconciles this preview.
-        void refresh(true).finally(() => {
-          if (syncing.current === sync) {
-            syncing.current = null;
-            setSyncKey(null);
-          }
-        });
-      }
+      setPreview(previous => previous?.key === key ? null : previous);
     }
-  }), [key, today, state, exclusive, refresh]);
+  }), [key, today, state, catalogRevision, profileContext, exclusive, sendIntake]);
 
   const retry = useCallback(async () => {
-    if (busy.current || syncing.current?.key === key || currentKey.current !== key) return;
+    if (busy.current || currentKey.current !== key) return;
     const operation = pending.current;
-    if (operation?.key === key) await exclusive(() => send(operation.input, true));
+    if (operation?.key === key) await exclusive(() => operation.action === 'meal_intake'
+      ? sendIntake(operation.input) : send(operation.input, true));
     else {
       const date = conflictedDay.current;
       await refresh(true);
@@ -384,13 +419,13 @@ export function useMemberMealSchedule(
         });
       }
     }
-  }, [key, today, context, exclusive, refresh, send, readDay, publish]);
+  }, [key, today, context, exclusive, refresh, send, sendIntake, readDay, publish]);
 
   const visible = state.key === key ? state : empty;
   const activePreview = preview?.key === key && !visible.contextStale ? preview : null;
   return { ...visible, loading: enabled && state.key !== key, saving: savingKey !== null,
     displayDay: withIntakePreview(visible.day, activePreview?.change),
     pendingIntake: activePreview?.saving ? activePreview.change : null,
-    syncingIntake: syncKey === key,
+    syncingIntake: false,
     submit, prepareDay, loadWeek, changeIntake, retry };
 }
