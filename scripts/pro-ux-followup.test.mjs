@@ -10,7 +10,7 @@ const compiled=await build({
   external:['react','react/jsx-runtime','react-test-renderer'],
   plugins:[{name:'synthetic-pro-transports',setup(b){
     b.onLoad({filter:/supabaseClient\.ts$/},()=>({contents:'export const supabase=globalThis.proFollowupDb;',loader:'js'}));
-    b.onLoad({filter:/training\/corrective\/api\.ts$/},()=>({contents:'export const correctiveApi=globalThis.proFollowupCorrective;export async function correctiveRpc(){throw Error("Unexpected admin request");}',loader:'js'}));
+    b.onLoad({filter:/training[\\/]corrective[\\/]api\.ts$/},()=>({contents:'export const correctiveApi=globalThis.proFollowupCorrective;export async function correctiveRpc(){throw Error("Unexpected admin request");}',loader:'js'}));
     b.onLoad({filter:/PanelSelect\.tsx$/},()=>({contents:`import {createElement} from 'react';export function PanelSelect(props){return createElement('select',props);}`,loader:'js'}));
     b.onLoad({filter:/\.css$/},()=>({contents:'',loader:'js'}));
   }}],
