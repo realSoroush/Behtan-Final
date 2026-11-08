@@ -294,6 +294,7 @@ test('overview client shortcut opens the complete directory and searches formatt
 
 test('returning to the complete directory asks before discarding unsaved case changes',async({page})=>{
  const state=await arrange(page);const weight=page.getByRole('spinbutton',{name:'وزن (کیلوگرم)',exact:true});await weight.fill('95');
+ await page.getByRole('button',{name:'اشتراک و ظرفیت',exact:true}).click();await expect(page.getByRole('heading',{name:'اشتراک و ظرفیت',exact:true})).toBeVisible();
  page.once('dialog',dialog=>dialog.dismiss());await page.getByRole('button',{name:'مراجعان',exact:true}).click();await expect(weight).toHaveValue('95');
  page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'مراجعان',exact:true}).click();await expect(page.locator('.pro-directory-list>li')).toHaveCount(1);expect(state.requests).toHaveLength(0);
 });

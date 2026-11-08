@@ -33,7 +33,7 @@ export function ProApp() {
   const unsaved=useRef(false);
   function navigate(next:ProView){
     if(next==='cases'){
-      if(unsaved.current&&!window.confirm('تغییرات ثبت‌نشده کنار گذاشته شوند و فهرست همهٔ مراجعان باز شود؟'))return;
+      if(unsaved.current&&!window.confirm('تغییرات ثبت‌نشده کنار گذاشته شوند و فهرست همهٔ مراجعان باز شود؟')){setView('cases');return;}
       unsaved.current=false;setCaseVisit(n=>n+1);
     }
     setView(next);
