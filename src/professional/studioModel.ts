@@ -28,7 +28,7 @@ export function foodTotals(f: FoodSnapshot): NutritionTotals {
   return { kcal: f.kcal * factor, protein: f.protein * factor, carbs: f.carbs * factor, fat: f.fat * factor };
 }
 export function sectionMenus(section:AuthoredSection):AuthoredMenu[] {
-  return [{id:'primary',title:section.menuTitle||'منو ۱',lines:section.lines},...(section.alternatives||[])];
+  return [{id:'primary',title:section.menuTitle??'منو ۱',lines:section.lines},...(section.alternatives||[])];
 }
 export function nutritionRange(sections:AuthoredSection[]) {
  const range={min:{kcal:0,protein:0,carbs:0,fat:0},max:{kcal:0,protein:0,carbs:0,fat:0}};

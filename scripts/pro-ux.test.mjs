@@ -22,6 +22,7 @@ for(let count=1;count<=5;count++){
  const authored=fromPrintedPlan(plan);assert.equal(validateAuthored(authored,'nutrition'),'');
  assert(authored.sections.every(s=>sectionMenus(s).length===count));
  const copy=JSON.parse(JSON.stringify(authored));assert.deepEqual(copy,authored);const range=nutritionRange(copy.sections),first=nutritionTotals(copy.sections);assert(range.min.kcal<=first.kcal+1e-6&&first.kcal<=range.max.kcal+1e-6);
+ const missingTitle=structuredClone(copy);missingTitle.sections[0].menuTitle='';assert(validateAuthored(missingTitle,'nutrition'),'An explicitly cleared menu title must not masquerade as the legacy default');
  const html=authoredHtml(copy,'Synthetic','nutrition','https://example.com');assert(html.includes('منو'));last=plan;
 }
 // Reject a real shortage rather than repeating one menu or delivering fewer.
