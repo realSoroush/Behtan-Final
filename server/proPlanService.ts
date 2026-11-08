@@ -1,5 +1,5 @@
 import type { PrintedPlan, RealIntake } from '../src/professional/menuPlan.ts';
-import { generatePrintedPlan } from '../src/professional/menuPlan.ts';
+import { generatePrintedPlan, ProMenuCountError } from '../src/professional/menuPlan.ts';
 import { createMealPlanEngine } from '../src/utils/mealPlanEngine.ts';
 import type { NutritionCatalog, ProteinEnginePolicy } from '../src/types/index.ts';
 import { proNutritionDraftAllowed } from '../src/professional/intake.ts';
@@ -34,7 +34,7 @@ export async function processPlanRequest(body: unknown, token: string, deps: Pla
     if (typeof b.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(b.date)
         || !Number.isFinite(Date.parse(b.date + 'T12:00:00Z'))
         || new Date(b.date + 'T12:00:00Z').toISOString().slice(0,10) !== b.date
-        || !Number.isInteger(b.count) || Number(b.count) < 1 || Number(b.count) > 4
+        || !Number.isInteger(b.count) || Number(b.count) < 1 || Number(b.count) > 5
         || typeof b.notes !== 'string' || b.notes.length > 2000)
       throw new ProServerError('PRO_INVALID_REQUEST');
   }
@@ -59,7 +59,8 @@ export async function processPlanRequest(body: unknown, token: string, deps: Pla
     const engine = createMealPlanEngine(catalog, revision);
     plan = generatePrintedPlan(current.answers, current.revision, request.count, policy, request.date, request.notes, engine);
     if (revision) plan.catalog_revision = revision;
-  } catch {
+  } catch (error) {
+    if(error instanceof ProMenuCountError) throw new ProServerError('PRO_MENU_COUNT_UNAVAILABLE',422);
     throw new ProServerError('PRO_GENERATION_FAILED', 422);
   }
   return deps.stage({ org:b.org, record:b.record, revision:current.revision, actor, key:b.key, request, plan });

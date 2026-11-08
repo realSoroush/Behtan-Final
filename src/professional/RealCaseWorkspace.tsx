@@ -208,7 +208,8 @@ function RealCaseDetail({
       key: string;
     } | null>(null),
     planKey = useRef(crypto.randomUUID()),
-    generationKey = useRef(crypto.randomUUID());
+    generationKey = useRef(crypto.randomUUID()),
+    studioGeneration = useRef<{ signature: string; key: string } | null>(null);
   const dirty = !saved || JSON.stringify(form) !== saved;
   useEffect(()=>{dirtyCallback.current?.(dirty||authoredDirty||trainingDirty);return()=>dirtyCallback.current?.(false);},[dirty,authoredDirty,trainingDirty]);
   useEffect(()=>{
@@ -422,10 +423,12 @@ function RealCaseDetail({
         <button className="pro-module-card" disabled={busy} onClick={()=>setTrainingOpen(true)} aria-label="برنامه تمرینی مراجع"><span className="pro-module-symbol"><Dumbbell size={22}/></span><span><strong>تمرین مراجع</strong><small>{access?.modules?.training?'جلسات، حرکات و برنامه اختصاصی':'مشاهده سوابق تمرین'}</small></span><ArrowUpLeft size={18}/></button>
         <button className="pro-module-card" disabled={busy} onClick={()=>setScanOpen(true)} aria-label="تحلیل تصویری بدن و گزارش‌ها"><span className="pro-module-symbol"><ScanLine size={22}/></span><span><strong>گزارش بدن</strong><small>عکس‌ها، ارزیابی و گزارش‌های ثبت‌شده</small></span><ArrowUpLeft size={18}/></button>
       </div>}
-      {id&&authoredOpen&&<PanelModal title="تدوین اختصاصی برنامه غذایی" busy={authoredBusy} onClose={()=>{if(!authoredDirty||window.confirm("تغییرات ثبت‌نشده برنامه غذایی کنار گذاشته شوند؟"))setAuthoredOpen(false);}}><AuthoredPlanEditor org={org} record={id} revision={revision} kind="nutrition" name={form.display_name} canWrite={Boolean(access?.can_write&&access?.modules?.nutrition)&&!archived&&!dirty&&!stale&&!connectionWarning} onBusy={setAuthoredBusy} onDirty={setAuthoredDirty} onSaved={()=>setAuthoredArchiveVersion(v=>v+1)} intake={form} seed={authoredSeed} onGenerate={async()=>{
+      {id&&authoredOpen&&<PanelModal title="تدوین اختصاصی برنامه غذایی" busy={authoredBusy} onClose={()=>{if(!authoredDirty||window.confirm("تغییرات ثبت‌نشده برنامه غذایی کنار گذاشته شوند؟"))setAuthoredOpen(false);}}><AuthoredPlanEditor org={org} record={id} revision={revision} kind="nutrition" name={form.display_name} canWrite={Boolean(access?.can_write&&access?.modules?.nutrition)&&!archived&&!dirty&&!stale&&!connectionWarning} onBusy={setAuthoredBusy} onDirty={setAuthoredDirty} onSaved={()=>setAuthoredArchiveVersion(v=>v+1)} intake={form} seed={authoredSeed} onGenerate={async(requestedCount=1)=>{
         if(!id||dirty||stale||connectionWarning||archived||!access?.can_write||!access?.modules?.nutrition)throw new Error('PRO_STALE_REVISION');
-        const result=await realCaseApi.generatePlan(org,id,revision,1,date,notes,generationKey.current);
-        generationKey.current=crypto.randomUUID();return fromPrintedPlan(result.plan);
+        const signature=JSON.stringify([org,id,revision,requestedCount,date,notes]);
+        if(studioGeneration.current?.signature!==signature)studioGeneration.current={signature,key:crypto.randomUUID()};
+        const result=await realCaseApi.generatePlan(org,id,revision,requestedCount,date,notes,studioGeneration.current.key);
+        studioGeneration.current=null;return fromPrintedPlan(result.plan);
       }}/></PanelModal>}
       {id&&!locked&&trainingOpen&&<PanelModal title="برنامه تمرینی مراجع" busy={trainingBusy} onClose={()=>{if(!trainingDirty||window.confirm("تغییرات ثبت‌نشده برنامه تمرینی کنار گذاشته شوند؟"))setTrainingOpen(false);}}><TrainingPanel org={org} record={id} revision={revision} name={form.display_name} canWrite={Boolean(access?.can_write&&access?.modules?.training)&&!archived&&!dirty&&!stale&&!connectionWarning} onBusy={setTrainingBusy} onDirty={setTrainingDirty} onSaved={()=>setAuthoredArchiveVersion(v=>v+1)}/></PanelModal>}
       {id&&scanOpen&&<PanelModal title="تحلیل تصویری بدن" busy={scanBusy} onClose={()=>setScanOpen(false)}><BodyScanPanel org={org} record={id} revision={revision} canWrite={Boolean(access?.can_write)&&!archived&&!dirty&&!stale&&!connectionWarning} onBusy={setScanBusy}/></PanelModal>}
@@ -581,7 +584,7 @@ function RealCaseDetail({
                       disabled={busy}
                       onChange={(e) => { setCount(Number(e.target.value)); invalidatePreview(); }}
                     >
-                      {[1, 2, 3, 4].map((n) => (
+                      {[1, 2, 3, 4, 5].map((n) => (
                         <option key={n} value={n}>
                           {n.toLocaleString("fa-IR")}
                         </option>
@@ -628,7 +631,7 @@ function RealCaseDetail({
                 )}
                 {plan && previewOpen && (
                   <>
-                    <PanelModal title="برنامه غذایی مراجع" busy={busy} onClose={()=>setPreviewOpen(false)}>{error&&<p role="alert" className="pro-error">{error}</p>}{notice&&<p role="status" className="pro-success">{notice}</p>}{busy&&<AppLoading label="در حال انجام…" variant="inline" />}<PlanPreview plan={plan} /><button disabled={busy||!access?.can_write||!access?.modules?.nutrition||dirty||stale} onClick={()=>{setAuthoredSeed(fromPrintedPlan(plan));setPreviewOpen(false);setAuthoredOpen(true);}}>تدوین منوی اول هر وعده در استودیوی تغذیه</button>{planId&&id&&<ReportAttachment org={org} record={id} plan={planId} revision={plan.intake_revision} canWrite={Boolean(access?.can_write)&&!archived}/>}
+                    <PanelModal title="برنامه غذایی مراجع" busy={busy} onClose={()=>setPreviewOpen(false)}>{error&&<p role="alert" className="pro-error">{error}</p>}{notice&&<p role="status" className="pro-success">{notice}</p>}{busy&&<AppLoading label="در حال انجام…" variant="inline" />}<PlanPreview plan={plan} /><button disabled={busy||!access?.can_write||!access?.modules?.nutrition||dirty||stale} onClick={()=>{setAuthoredSeed(fromPrintedPlan(plan));setPreviewOpen(false);setAuthoredOpen(true);}}>تدوین همهٔ منوها در استودیوی تغذیه</button>{planId&&id&&<ReportAttachment org={org} record={id} plan={planId} revision={plan.intake_revision} canWrite={Boolean(access?.can_write)&&!archived}/>}
                     <div className="pro-actions">
                       <button
                         disabled={busy || archived || Boolean(planId) || dirty || stale || !access?.can_write || !access?.modules?.nutrition}

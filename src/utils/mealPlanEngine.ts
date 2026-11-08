@@ -1573,18 +1573,55 @@ export function getSlotTargets(slot: MealSlot, targets: MacroTargets): MacroVect
 function getProfessionalMealOptionsWithCatalog(engine: EngineCatalog, base: Meal, preferences: DietaryPreferencesJson, workout: boolean): Meal[] {
   const templates = engine.catalog.mealTemplates.filter(t => t.slot === base.slot && isTemplateEligible(engine, t, preferences, workout));
   const target = {kcal:base.totalKcal, protein:base.totalProtein, carbs:base.totalCarbs, fat:base.totalFat};
-  if (base.slot === 'post_workout') {
-    return templates.flatMap(template => {
-      try {
-        const resolved = resolveTemplate(engine, template, target);
-        return [buildMeal({ slot: base.slot, template, resolved })];
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('Could not resolve template')) return [];
-        throw error;
+  const resolved = templates.flatMap(template => {
+    try { return [buildMeal({slot:base.slot,template,resolved:resolveTemplate(engine,template,target)})]; }
+    catch (error) {
+      if (error instanceof Error && error.message.includes('Could not resolve template')) return [];
+      throw error;
+    }
+  });
+  const key = (meal:Meal) => meal.components.map(c=>c.foodItem.id).sort().join('|');
+  const seen = new Set<string>();
+  const options:Meal[] = [];
+  const add = (meal:Meal) => {
+    if((meal.slot!=='post_workout'&&meal.totalKcal>target.kcal*1.35)||!isPracticalMeal(meal.slot,meal.components)||mealMassGrams(meal.components)>mealMassLimitGrams(meal.slot,target.kcal)||meal.components.some(c=>!isFoodAllowed(c.foodItem,preferences)))return;
+    const k=key(meal); if (!seen.has(k)) { seen.add(k); options.push(meal); }
+  };
+  add(base); resolved.forEach(add);
+  if(!options.length&&base.slot!=='post_workout')throw new MealPlanGenerationError(base.slot,'ترکیب مجاز با اندازهٔ مناسب برای این وعده پیدا نشد.');
+  // Pro-only expansion: use existing approved food links and the same exact
+  // portion/eligibility gates. Never repeat a recipe to fill a count.
+  // Two passes also permit two independent approved ingredient substitutions.
+  for(let pass=0;pass<2 && options.length<80;pass++) {
+    const frontier=options.slice(0,40);
+    for(const meal of frontier) {
+      const template=engine.templatesById.get(meal.templateId.split('~')[0]);
+      for(const [index,component] of meal.components.entries()) {
+        if(template && fixedPortion(template,index,component.foodItem.id)!==undefined) continue;
+        for(const food of eligibleSwapFoods(engine,component.foodItem,component.foodItem.id,meal.slot,preferences)) {
+          if(meal.components.some(c=>c.foodItem.id===food.id)) continue;
+          const swap=buildSwapOption(engine,meal,index,food);
+          if(swap.isEquivalent) {
+            const next=swap.updatedMeal;
+            add({...next,templateId:meal.templateId.split('~')[0]+'~'+key(next),templateName:next.components.map(c=>c.foodItem.name).join(' و ')});
+          }
+          // A whole alternative is solved again, never treated as an
+          // equivalent component swap without checking its entire day envelope.
+          if(template)try {
+            const variant={...template,id:template.id+'~'+food.id+'-'+index,
+              slots:template.slots.map((fill,j)=>({...fill,primaryFoodItemId:j===index?food.id:meal.components[j].foodItem.id}))};
+            const next=buildMeal({slot:base.slot,template:variant,resolved:resolveTemplate(engine,variant,target)});
+            add({...next,templateId:template.id+'~'+key(next),templateName:next.components.map(c=>c.foodItem.name).join(' و ')});
+          }catch(error){if(!(error instanceof Error && error.message.includes('Could not resolve template')))throw error;}
+          if(options.length>=80) break;
+        }
+        if(options.length>=80) break;
       }
-    });
+      if(options.length>=80) break;
+    }
   }
-  return getResolvedOptions(engine, base.slot, templates, target).map(buildMeal);
+  return options.sort((a,b)=>scoreTotals({kcal:a.totalKcal,protein:a.totalProtein,carbs:a.totalCarbs,fat:a.totalFat},target)-
+    scoreTotals({kcal:b.totalKcal,protein:b.totalProtein,carbs:b.totalCarbs,fat:b.totalFat},target));
 }
 
 // A runtime engine owns an immutable snapshot and private indexes. No caller

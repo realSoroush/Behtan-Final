@@ -24,6 +24,7 @@ jobs:
           node-version: "24"
           cache: npm
       - run: npm ci
+      - run: npm run test:pro:ux
       - run: npm run test:member:intake
       - run: npm run test:engine:safety
       - run: npm run test:landing
@@ -82,6 +83,14 @@ jobs:
         run: npm run test:pro:admin:browser
       - name: Public browser checks
         run: npm run test:public:browser
+      - name: Preserve browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-screenshots
+          path: test-results/**/*.png
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Preserve failed browser diagnostics
         if: failure()
         uses: actions/upload-artifact@v4

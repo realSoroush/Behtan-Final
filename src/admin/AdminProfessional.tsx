@@ -1,3 +1,5 @@
+import {AdminProMetrics} from './AdminProMetrics';
+import {AdminCorrectiveBank} from '@/professional/training/corrective/CorrectiveEditor';
 import { AppLoading } from '@/components/ui/AppLoading';
 import {AdminMarketing} from "./AdminMarketing";
 import {AdminProCatalog,AdminProModules} from './AdminProCatalog';
@@ -33,6 +35,8 @@ export function AdminProfessional(){
  {error&&<p role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}
  <form className="admin-tools" onSubmit={e=>{e.preventDefault();setPage(0);setQuery(search.trim().replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/^\+/,''));}}><input aria-label="جستجوی پنل Pro" placeholder="نام فضای کاری، شماره یا شناسه" value={search} onChange={e=>setSearch(e.target.value)} maxLength={100}/><button disabled={busy}>جستجو</button><button type="button" disabled={busy} onClick={()=>setTick(t=>t+1)}>دریافت مجدد</button><button type="button" disabled={busy} onClick={()=>void cleanup()}>پاک‌سازی داده‌های موقت</button></form>
  <button className="pro-primary" disabled={busy} onClick={()=>setCreating(v=>!v)}>ساخت حساب Pro</button>{creating&&<PanelModal title="ساخت حساب Pro" busy={modalBusy} onClose={()=>setCreating(false)}><NewWorkspace onBusy={setModalBusy} onSaved={()=>{setCreating(false);setTick(t=>t+1);}}/></PanelModal>}
+ <AdminProMetrics/>
+ <AdminCorrectiveBank/>
  <AdminProCatalog/>
  <AdminMarketing/>
  {renewals.length>0&&<section className="admin-renewal-list"><h3>درخواست‌های تمدید</h3>{renewals.map(r=><div className="admin-sub" key={r.id}><strong>{r.name}</strong><span>{date(r.created_at)}</span><button disabled={busy} onClick={()=>{const o=data.rows.find(x=>x.id===r.organization_id);if(o)setSelected(o);else{setSearch(r.organization_id);setQuery(r.organization_id);setPage(0);}}}>بررسی فضای کاری</button><button disabled={busy} onClick={async()=>{if(!window.confirm('بررسی این درخواست تمام شده است؟ این اقدام به‌تنهایی اعتبار را تمدید نمی‌کند.'))return;setBusy(true);try{await rpc('admin_pro_resolve_renewal',{p_id:r.id});setTick(t=>t+1);}catch(e){setError(explain(e));}finally{setBusy(false);}}}>پایان بررسی درخواست</button></div>)}</section>}

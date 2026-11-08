@@ -1,9 +1,9 @@
-import type { AuthoredContent, AuthoredLine, AuthoredSection } from './authoredPlan.ts';
+import type { AuthoredContent, AuthoredLine, AuthoredSection, AuthoredMenu } from './authoredPlan.ts';
 import type { FoodItem } from '../types/index.ts';
 import type { PrintedPlan } from './menuPlan.ts';
 
 export type GroupKind = 1 | 2 | 3;
-export interface TrainingPrescription { group: string; kind: GroupKind; sets: number; reps: number; rest: number }
+export interface TrainingPrescription { group: string; kind: GroupKind; sets: number; reps: number; rest: number; seconds?:number }
 export interface NutritionTotals { kcal: number; protein: number; carbs: number; fat: number }
 /** A per-unit catalog snapshot: historical plans must not change when the catalog changes. */
 export interface FoodSnapshot extends NutritionTotals { id: string; grams: number; gramsPerUnit: number; basis: string }
@@ -18,13 +18,23 @@ export function lineDescription(line: AuthoredLine): string {
   }
   if (line.training) {
     const t = line.training;
-    return `${groupLabel(t.kind)} · ${t.sets} ست × ${t.reps} تکرار · ${t.rest} ثانیه استراحت${line.details ? '\n' + line.details : ''}`;
+    const n=(value:number)=>Number.isFinite(value)?String(value):'—';
+    return `${groupLabel(t.kind)} · ${n(t.sets)} ست × ${t.seconds===undefined?n(t.reps)+' تکرار':n(t.seconds)+' ثانیه'} · ${n(t.rest)} ثانیه استراحت${line.details ? '\n' + line.details : ''}`;
   }
   return line.details;
 }
 export function foodTotals(f: FoodSnapshot): NutritionTotals {
   const factor = f.grams / f.gramsPerUnit;
   return { kcal: f.kcal * factor, protein: f.protein * factor, carbs: f.carbs * factor, fat: f.fat * factor };
+}
+export function sectionMenus(section:AuthoredSection):AuthoredMenu[] {
+  return [{id:'primary',title:section.menuTitle??'منو ۱',lines:section.lines},...(section.alternatives||[])];
+}
+export function nutritionRange(sections:AuthoredSection[]) {
+ const range={min:{kcal:0,protein:0,carbs:0,fat:0},max:{kcal:0,protein:0,carbs:0,fat:0}};
+ for(const section of sections){const totals=sectionMenus(section).map(m=>nutritionTotals([{...section,lines:m.lines}]));
+  for(const key of ['kcal','protein','carbs','fat'] as const){range.min[key]+=Math.min(...totals.map(t=>t[key]));range.max[key]+=Math.max(...totals.map(t=>t[key]));}}
+ return range;
 }
 export function nutritionTotals(sections: AuthoredSection[]): NutritionTotals {
   return sections.flatMap(s => s.lines).reduce((total, line) => {
@@ -43,11 +53,11 @@ export function fromPrintedPlan(plan: PrintedPlan): AuthoredContent {
   const targets: Record<string, NutritionTotals> = {};
   return { version: 1, title: 'برنامه غذایی اختصاصی', notes: plan.notes, reviewed: false,
     nutritionTargets: targets,
-    // Each slot contains alternatives; import ONE menu, never sum alternatives as food to eat together.
+    // Preserve every alternative. Daily totals deliberately use one menu per slot.
     sections: plan.days.flatMap(day => {
       const key = day.workout ? 'workout' : 'rest';
       targets[key] = { kcal: day.targets.targetCalories, protein: day.targets.proteinGrams, carbs: day.targets.carbGrams, fat: day.targets.fatGrams };
-      return day.slots.map(slot => ({ title: slot.label, nutritionDay: key, lines: (slot.options[0]?.components || []).map(c => foodLine(c.foodItem, c.grams)) }));
+      return day.slots.map(slot => ({ title: slot.label, nutritionDay: key, lines: (slot.options[0]?.components || []).map(c => foodLine(c.foodItem, c.grams)), alternatives:slot.options.slice(1).map((meal,i)=>({id:crypto.randomUUID(),title:'منو '+fa(i+2),lines:meal.components.map(c=>foodLine(c.foodItem,c.grams))})) }));
     }),
   };
 }
@@ -80,11 +90,13 @@ export function validateAuthored(content: AuthoredContent, kind: 'training' | 'n
   if (!content.sections.length || content.sections.length > 28) return 'برنامه باید بین ۱ تا ۲۸ بخش داشته باشد.';
   for (const s of content.sections) {
     if (!s.title.trim() || s.title.length > 100 || !s.lines.length || s.lines.length > 30) return 'عنوان و سطرهای همه جلسات یا وعده‌ها را کامل کنید.';
-    for (const l of s.lines) {
+    const menus=kind==='nutrition'?sectionMenus(s):[{id:'primary',title:s.title,lines:s.lines}];
+    if(menus.length>5 || new Set(menus.map(m=>m.id)).size!==menus.length || menus.some(m=>!m.title.trim()||m.title.length>100||!m.lines.length||m.lines.length>30))return 'هر وعده باید بین ۱ تا ۵ منوی کامل داشته باشد.';
+    for (const l of menus.flatMap(m=>m.lines)) {
       if (!l.name.trim() || l.name.length > 300 || l.details.length > 2000) return 'نام و توضیحات همه سطرها را کامل کنید.';
       if (l.training) {
         const t = l.training;
-        if (![1, 2, 3].includes(t.kind) || !Number.isInteger(t.sets) || t.sets < 1 || t.sets > 20 || !Number.isInteger(t.reps) || t.reps < 1 || t.reps > 300 || !Number.isInteger(t.rest) || t.rest < 0 || t.rest > 1800) return 'ست، تکرار یا زمان استراحت نامعتبر است.';
+        if (![1, 2, 3].includes(t.kind) || !Number.isInteger(t.sets) || t.sets < 1 || t.sets > 20 || (t.seconds===undefined?(!Number.isInteger(t.reps)||t.reps<1||t.reps>300):(!Number.isInteger(t.seconds)||t.seconds<1||t.seconds>3600||t.reps!==0)) || !Number.isInteger(t.rest) || t.rest < 0 || t.rest > 1800) return 'ست، تکرار یا زمان استراحت نامعتبر است.';
       }
       if (l.food) {
         const f = l.food;

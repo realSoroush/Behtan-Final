@@ -10,6 +10,7 @@ async function adminSetup(page:Page,{denied=false,lose=false,stale=false}={}){
   if(path.endsWith('/admin_pro_offers')){await route.fulfill({json:[]});return;}
   if(path.endsWith('/admin_pro_modules')){await route.fulfill({json:{nutrition:true,training:true,revision:0}});return;}
   if(path.endsWith('/admin_pro_renewals')){await route.fulfill({json:[]});return;}
+  if(path.endsWith('/admin_pro_metrics')){await route.fulfill({json:{specialists:2,specialists_by_profession:[{profession:'nutritionist',count:2}],specialists_date_unknown:0,specialists_date_fallback:0,clients:4,nutrition_total:8,nutrition_automatic:5,nutrition_authored:3,training_total:6,training_automatic:4,training_authored:2,body_reports:3}});return;}
   if(path.endsWith('/admin_pro_overview')){await route.fulfill({json:{rows:[workspace],total:1}});return;}
   if(path.endsWith('/admin_pro_events')){await route.fulfill({json:{rows:b.p_kind==='failures'?[{id:'40000000-0000-4000-8000-000000000001',created_at:'2026-10-21T00:00:00Z',operation:'generate',error_code:'PRO_GENERATION_FAILED'}]:[],total:b.p_kind==='failures'?1:0}});return;}
   if(path.endsWith('/admin_pro_set_license')){
@@ -95,4 +96,12 @@ test('admin changes a workspace to training-only without altering its license',a
  const state=await adminSetup(page);let saved:any;await page.route('**/rest/v1/rpc/admin_pro_set_modules',r=>{saved=r.request().postDataJSON();return r.fulfill({json:{nutrition:saved.p_nutrition,training:saved.p_training,revision:1}});});
  await page.getByRole('button',{name:'مدیریت Pro',exact:true}).click();await page.getByRole('button',{name:'مدیریت فضای کاری',exact:true}).click();
  await page.getByRole('combobox',{name:'ماژول‌های پنل Pro'}).click();await page.getByRole('option',{name:'فقط تمرین',exact:true}).click();await page.getByRole('button',{name:'ثبت ماژول‌های پنل',exact:true}).click();await expect(page.getByRole('status')).toContainText('ماژول‌های پنل ذخیره شدند');expect(saved.p_nutrition).toBe(false);expect(saved.p_training).toBe(true);expect(state.requests).toHaveLength(0);
+});
+
+test('Pro metrics use the selected date range and reject a reversed range without a request',async({page})=>{
+ await adminSetup(page);const requests:any[]=[];
+ await page.route('**/rpc/admin_pro_metrics',async route=>{const body=route.request().postDataJSON();requests.push(body);return route.fulfill({json:{specialists:body.p_from?1:2,specialists_by_profession:[{profession:'nutritionist',count:body.p_from?1:2}],specialists_date_unknown:0,specialists_date_fallback:0,clients:4,nutrition_total:8,nutrition_automatic:5,nutrition_authored:3,training_total:6,training_automatic:4,training_authored:2,body_reports:3}});});
+ await page.getByRole('button',{name:'مدیریت Pro',exact:true}).click();const stats=page.getByRole('region',{name:'آمار فعالیت پنل پرو'});await expect(stats).toContainText('متخصصین ثبت‌شده');
+ await stats.getByLabel('آمار پرو از تاریخ').fill('2026-11-01');await stats.getByLabel('آمار پرو تا تاریخ').fill('2026-11-08');await stats.getByRole('button',{name:'اعمال بازه'}).click();await expect.poll(()=>requests.at(-1)?.p_from).toBe('2026-11-01');expect(requests.at(-1)?.p_to).toBe('2026-11-08');
+ const before=requests.length;await stats.getByLabel('آمار پرو از تاریخ').fill('2026-11-10');await stats.getByRole('button',{name:'اعمال بازه'}).click();await expect(stats.getByRole('alert')).toContainText('به ترتیب');expect(requests.length).toBe(before);
 });

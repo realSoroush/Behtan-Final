@@ -1,3 +1,4 @@
+import {CORRECTIVE_SEED} from '../../src/professional/training/corrective/seed';
 import { generatePrintedPlan } from '../../src/professional/menuPlan.ts';
 import { installTestNutritionCatalog } from '../../scripts/setup-test-nutrition-catalog.mjs';
 import { DEFAULT_PROTEIN_ENGINE_POLICY } from '../../src/utils/proteinPolicy.ts';
@@ -184,7 +185,8 @@ export async function setup(
     if (offline) { await route.abort('failed'); return; }
     const b = req.postDataJSON();
     let data: any = [];
-    if (path.endsWith('/pro_specialist_profile')) data = professional;
+    if(path.endsWith('/pro_corrective_bank'))data=CORRECTIVE_SEED;
+    else if (path.endsWith('/pro_specialist_profile')) data = professional;
     else if (path.endsWith('/pro_save_specialist_profile')) {
       profileRequests.push(b);
       professional = { completed: true, full_name: b.p_full_name.trim(), contact_phone: b.p_contact_phone, profession: b.p_profession, province: b.p_province.trim(), city: b.p_city.trim(), address: b.p_address.trim() };
@@ -318,7 +320,7 @@ export async function setup(
     if (b.action === 'generate') {
       if (!draftMap.has(b.key)) {
         installTestNutritionCatalog();
-        draftMap.set(b.key, {draft_id:crypto.randomUUID(),plan:generatePrintedPlan(cases[0].answers,cases[0].revision,b.count,DEFAULT_PROTEIN_ENGINE_POLICY,b.date,b.notes)});
+        try{draftMap.set(b.key, {draft_id:crypto.randomUUID(),plan:generatePrintedPlan(cases[0].answers,cases[0].revision,b.count,DEFAULT_PROTEIN_ENGINE_POLICY,b.date,b.notes)});}catch(e){return route.fulfill({status:422,json:{error:(e as Error).message}});}
       }
       if (failGeneration) { failGeneration=false; await route.abort('failed'); return; }
       await route.fulfill({json:draftMap.get(b.key)});

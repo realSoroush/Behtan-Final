@@ -6,6 +6,7 @@ import {
   emptyRealIntake,
   generatePrintedPlan,
   menuCombinationsFeasible,
+  ProMenuCountError,
 } from "../src/professional/menuPlan.ts";
 import { printedPlanHtml } from "../src/professional/printPlan.ts";
 installTestNutritionCatalog();
@@ -33,12 +34,15 @@ for (const variant of [
   { vegetarian_status: "vegan" },
 ]) {
   const a = { ...intake, ...variant };
-  const p = generatePrintedPlan(a, 1, 4, policy, "2026-10-21");
+  let p;
+  try {p=generatePrintedPlan(a,1,4,policy,'2026-10-21');}
+  catch(error){assert(error instanceof ProMenuCountError);p=generatePrintedPlan(a,1,1,policy,'2026-10-21');}
+
   assert.equal(p.days.length, a.workout_days ? 2 : 1);
   for (const day of p.days) {
     assert(menuCombinationsFeasible(day.slots, day.targets));
     for (const slot of day.slots) {
-      assert(slot.options.length >= 1 && slot.options.length <= 4);
+      assert(slot.options.length === p.requested_menus);
       assert.equal(
         new Set(slot.options.map((m) => m.templateId)).size,
         slot.options.length,
@@ -98,14 +102,14 @@ for (const patch of [
   assert.throws(() =>
     generatePrintedPlan({ ...intake, ...patch }, 1, 4, policy, "2026-10-21"),
   );
-for (const count of [0, 5, 1.5])
+for (const count of [0, 6, 1.5])
   assert.throws(() =>
     generatePrintedPlan(intake, 1, count, policy, "2026-10-21"),
   );
 const sample = generatePrintedPlan(
   { ...intake, workout_days: 3, training_type: "resistance" },
   1,
-  4,
+  1,
   policy,
   "2026-10-21",
   "از هر وعده فقط یک منو انتخاب شود.",

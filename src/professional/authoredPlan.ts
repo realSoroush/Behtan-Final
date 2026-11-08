@@ -1,13 +1,18 @@
+import type {CorrectiveExercise} from './training/corrective/types.ts';
 import { showPrintLoading } from '../utils/printLoading.ts';
-import { lineDescription, nutritionTotals, dayLabel, trainingGroups, groupLabel, fa, type FoodSnapshot, type TrainingPrescription, type NutritionTotals } from './studioModel.ts';
+import { lineDescription, nutritionTotals, dayLabel, trainingGroups, groupLabel, fa, sectionMenus, type FoodSnapshot, type TrainingPrescription, type NutritionTotals } from './studioModel.ts';
 import { specialistHtml, type SpecialistIdentity } from './specialistProfile.ts';
 export interface AuthoredLine {
   name: string;
   details: string;
   training?: TrainingPrescription;
+  exercise?:CorrectiveExercise;
   food?: FoodSnapshot;
 }
+export interface AuthoredMenu { id: string; title: string; lines: AuthoredLine[] }
 export interface AuthoredSection {
+  menuTitle?: string;
+  alternatives?: AuthoredMenu[];
   title: string;
   lines: AuthoredLine[];
   nutritionDay?: string;
@@ -46,13 +51,13 @@ export function authoredHtml(content: AuthoredContent, name: string, kind: strin
           const label = section.lines[group.indices[0]]?.training ? `<tr><th colspan="2">${esc(groupLabel(group.kind))} ${i + 1}</th></tr>` : '';
           return label + group.indices.map(j => row(section.lines[j])).join('');
         }).join('')
-      : section.lines.map(row).join('');
-    return `<section><h2>${esc(heading)}</h2><table><thead><tr><th>${kind === 'training' ? 'حرکت' : 'مواد غذایی'}</th><th>${kind === 'training' ? 'ست، تکرار و توضیحات' : 'مقدار و توضیحات'}</th></tr></thead><tbody>${rows}</tbody></table></section>`;
+      : sectionMenus(section).map((menu,i)=>`<tr><td>منو ${fa(i+1)} · ${esc(menu.title)}</td><td>${menu.lines.map(l=>`${esc(l.name)}: ${esc(lineDescription(l))}`).join('<br>')}<br>${fa(nutritionTotals([{...section,lines:menu.lines}]).kcal)} کالری</td></tr>`).join('');
+    return `<section><h2>${esc(heading)}</h2><table><thead><tr><th>${kind === 'training' ? 'حرکت' : 'منو'}</th><th>${kind === 'training' ? 'ست، تکرار و توضیحات' : 'مواد، مقدار و توضیحات'}</th></tr></thead><tbody>${rows}</tbody></table></section>`;
   }).join('');
   const totals = kind === 'nutrition' ? [...new Set(content.sections.map(s => s.nutritionDay || 'daily'))].map(key => {
     const daily = content.sections.filter(s => (s.nutritionDay || 'daily') === key), total = nutritionTotals(daily);
     if (!daily.some(s => s.lines.some(l => l.food))) return '';
-    return `<p class="totals">${esc(dayLabel(key))} · ${fa(total.kcal)} کالری · پروتئین ${fa(total.protein)} · کربوهیدرات ${fa(total.carbs)} · چربی ${fa(total.fat)} گرم${daily.some(s => s.lines.some(l => !l.food)) ? ' · سطرهای متنی در جمع محاسبه نشده‌اند' : ''}</p>`;
+    return `<p class="totals">${esc(dayLabel(key))} · ${fa(total.kcal)} کالری (جمع منوهای اول) · پروتئین ${fa(total.protein)} · کربوهیدرات ${fa(total.carbs)} · چربی ${fa(total.fat)} گرم${daily.some(s => s.lines.some(l => !l.food)) ? ' · سطرهای متنی در جمع محاسبه نشده‌اند' : ''}</p>`;
   }).join('') : '';
   return `<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><title>${esc(content.title)}</title><style>
     @font-face{font-display:swap;font-family:Behtan;src:url("${esc(origin)}/fonts/IRANSansX-Regular.woff")}
