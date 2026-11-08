@@ -1,5 +1,8 @@
 # Engine safety rollout — 2026-11-05
 
+> این سند سابقهٔ همان مرحله است. برای وضعیت امروز، شواهد CI، مراحل اعمال‌شده و کار بعدی، [وضعیت جاری موتور](engine-status.md) را بخوانید.
+
+
 Audit and implementation base: `1f75c5b08aaa512d74e0faf4cd46adb8d3705505` (origin/main fetched before work). No newer commits existed. Separate branches are based on this commit; no production writes or merges are authorized by this document.
 
 ## Initial reconciliation of the 18 tasks
