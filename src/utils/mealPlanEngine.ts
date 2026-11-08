@@ -1585,6 +1585,7 @@ function getProfessionalMealOptionsWithCatalog(engine: EngineCatalog, base: Meal
   const options:Meal[] = [];
   const add = (meal:Meal) => { if(!isPracticalMeal(meal.slot,meal.components)||mealMassGrams(meal.components)>mealMassLimitGrams(meal.slot,target.kcal)||meal.components.some(c=>!isFoodAllowed(c.foodItem,preferences)))return; const k=key(meal); if (!seen.has(k)) { seen.add(k); options.push(meal); } };
   add(base); resolved.forEach(add);
+  if(!options.length&&base.slot!=='post_workout')throw new MealPlanGenerationError(base.slot,'ترکیب مجاز با اندازهٔ مناسب برای این وعده پیدا نشد.');
   // Pro-only expansion: use existing approved food links and the same exact
   // portion/eligibility gates. Never repeat a recipe to fill a count.
   // Two passes also permit two independent approved ingredient substitutions.
