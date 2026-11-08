@@ -1,6 +1,6 @@
 import type {CorrectiveExercise} from './training/corrective/types.ts';
 import { showPrintLoading } from '../utils/printLoading.ts';
-import { lineDescription, nutritionTotals, dayLabel, trainingGroups, groupLabel, fa, sectionMenus, type FoodSnapshot, type TrainingPrescription, type NutritionTotals } from './studioModel.ts';
+import { lineDescription, nutritionTotals, nutritionMenuSummary, dayLabel, trainingGroups, groupLabel, fa, sectionMenus, type FoodSnapshot, type TrainingPrescription, type NutritionTotals } from './studioModel.ts';
 import { specialistHtml, type SpecialistIdentity } from './specialistProfile.ts';
 export interface AuthoredLine {
   name: string;
@@ -51,7 +51,7 @@ export function authoredHtml(content: AuthoredContent, name: string, kind: strin
           const label = section.lines[group.indices[0]]?.training ? `<tr><th colspan="2">${esc(groupLabel(group.kind))} ${i + 1}</th></tr>` : '';
           return label + group.indices.map(j => row(section.lines[j])).join('');
         }).join('')
-      : sectionMenus(section).map((menu,i)=>`<tr><td>منو ${fa(i+1)} · ${esc(menu.title)}</td><td>${menu.lines.map(l=>`${esc(l.name)}: ${esc(lineDescription(l))}`).join('<br>')}<br>${fa(nutritionTotals([{...section,lines:menu.lines}]).kcal)} کالری</td></tr>`).join('');
+      : sectionMenus(section).map((menu,i)=>`<tr><td>منو ${fa(i+1)} · ${esc(menu.title)}</td><td>${menu.lines.map(l=>`${esc(l.name)}: ${esc(lineDescription(l))}`).join('<br>')}<br>${esc(nutritionMenuSummary(menu.lines))}</td></tr>`).join('');
     return `<section><h2>${esc(heading)}</h2><table><thead><tr><th>${kind === 'training' ? 'حرکت' : 'منو'}</th><th>${kind === 'training' ? 'ست، تکرار و توضیحات' : 'مواد، مقدار و توضیحات'}</th></tr></thead><tbody>${rows}</tbody></table></section>`;
   }).join('');
   const totals = kind === 'nutrition' ? [...new Set(content.sections.map(s => s.nutritionDay || 'daily'))].map(key => {

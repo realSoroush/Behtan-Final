@@ -30,7 +30,7 @@ export function CorrectiveBank({org,onAdd}:{org:string;onAdd:(exercise:Correctiv
  <p>بازبین: {view.reviewer||'هنوز تعیین نشده'}{view.reviewerQualification?' · '+view.reviewerQualification:''}{view.reviewedAt?' · '+view.reviewedAt:''}</p>{view.sourceUrls.filter(s=>s.startsWith('https://')).map(url=><a key={url}href={url}target="_blank"rel="noopener noreferrer">منبع حرکت</a>)}
  <label><input type="checkbox"checked={ack}onChange={e=>setAck(e.target.checked)}/>تناسب این حرکت را بررسی می‌کنم و دوز را برای مراجع تعیین می‌کنم.</label>
  <button type="button"disabled={!ack||view.status==='archived'}onClick={()=>onAdd(view)}>افزودن حرکت اصلاحی به برنامه</button>
- {view.ownerOrg&&<CorrectiveEditor initial={view}org={org}onSaved={()=>{setView(null);setAttempt(n=>n+1);}}/>}
+ {view.ownerOrg&&<CorrectiveEditor key={view.id+':'+view.revision}initial={view}org={org}onSaved={()=>{setView(null);setAttempt(n=>n+1);}}/>}
  </section>}
  <button type="button"onClick={()=>setCustom(v=>!v)}>+ حرکت اصلاحی اختصاصی</button>{custom&&<CorrectiveEditor org={org}onSaved={()=>{setCustom(false);setAttempt(n=>n+1);}}/>}
  </div>;
