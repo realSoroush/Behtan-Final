@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { setup, org, record, base, specialist } from './real-fixture';
 import type { AuthoredSnapshot } from '../../src/professional/authoredPlan';
 import { foodTotals, nutritionTotals } from '../../src/professional/studioModel';
+import { CORRECTIVE_SEED } from '../../src/professional/training/corrective/seed';
 async function arrange(page: Page, lostResponse = false, workout = false) {
   const fixture = await setup(page, { existing: true });
   if(workout){fixture.cases[0].answers.workout_days=3;fixture.cases[0].answers.training_type='resistance';}
@@ -215,7 +216,10 @@ test('specialist nutrition retains several menus per meal through save, reopen a
  await page.getByRole('checkbox',{name:'تأیید برنامه اختصاصی متخصص'}).check();await page.getByRole('button',{name:'ثبت نسخهٔ تأییدشده',exact:true}).click();await expect(page.getByRole('button',{name:'PDF نسخه ثبت‌شده'})).toBeVisible();
  expect(state.snapshots[0].content.sections[0].alternatives).toHaveLength(1);
  expect(state.snapshots[0].content.sections[0].alternatives![0].lines[0].food?.grams).toBe(150);
- await page.getByRole('button',{name:'بستن پنجره',exact:true}).click();await page.getByRole('button',{name:'تدوین اختصاصی تغذیه و سوابق',exact:true}).click();await page.getByRole('button',{name:'مشاهده نسخه',exact:true}).click();
+ await page.getByRole('button',{name:'بستن پنجره',exact:true}).click();
+ const archive=page.getByRole('region',{name:'آرشیو برنامه‌های اختصاصی',exact:true});await archive.getByRole('button',{name:'مشاهده برنامه اختصاصی',exact:true}).click();
+ const archived=archive.getByRole('region',{name:'مشاهده برنامه اختصاصی ذخیره‌شده',exact:true});await expect(archived.locator('.studio-menu-table tbody tr')).toHaveCount(2);await expect(archived).toContainText('۱۵۰ گرم');
+ await page.getByRole('button',{name:'تدوین اختصاصی تغذیه و سوابق',exact:true}).click();await page.getByRole('button',{name:'مشاهده نسخه',exact:true}).click();
  await expect(page.getByRole('region',{name:'نسخه ذخیره‌شده'}).locator('.studio-menu-table tbody tr')).toHaveCount(2);
  const popup=page.waitForEvent('popup');await page.getByRole('button',{name:'PDF',exact:true}).click();const print=await popup;await expect(print.locator('tbody tr')).toHaveCount(2);await expect(print.locator('body')).toContainText('۱۵۰ گرم');await print.close();
 });
@@ -241,4 +245,20 @@ test('studio generation retries the same request but changes identity when menu 
  await generate.click();await expect(editor.getByRole('status')).toContainText('پیش‌نویس موتور');
  expect(sent).toHaveLength(3);expect(sent[2].key).not.toBe(sent[0].key);expect(sent[2].count).toBe(2);
  await expect(editor.locator('.studio-editor .studio-menu-table tbody tr')).toHaveCount(2);
+});
+
+test('switching private corrective exercises resets the editor to the selected identity before saving',async({page})=>{
+ await arrange(page);const rows=[
+  {...structuredClone(CORRECTIVE_SEED[0]),id:'custom-10000000-0000-4000-8000-000000000001',nameFa:'حرکت اختصاصی الف',ownerOrg:org,revision:1},
+  {...structuredClone(CORRECTIVE_SEED[1]),id:'custom-10000000-0000-4000-8000-000000000002',nameFa:'حرکت اختصاصی ب',ownerOrg:org,revision:3},
+ ];const writes:any[]=[];
+ await page.route('**/rest/v1/rpc/pro_corrective_bank',route=>route.fulfill({json:rows}));
+ await page.route('**/rest/v1/rpc/pro_save_corrective_exercise',route=>{const body=route.request().postDataJSON();writes.push(body);return route.fulfill({json:{...body.p_exercise,revision:body.p_expected+1}});});
+ await training(page);await page.getByRole('button',{name:'حرکات اصلاحی',exact:true}).click();
+ const bank=page.locator('.corrective-bank .studio-bank-list');await bank.getByRole('button',{name:/حرکت اختصاصی الف/}).click();
+ await expect(page.getByRole('textbox',{name:'نام فارسی',exact:true})).toHaveValue('حرکت اختصاصی الف');
+ await bank.getByRole('button',{name:/حرکت اختصاصی ب/}).click();
+ const name=page.getByRole('textbox',{name:'نام فارسی',exact:true});await expect(name).toHaveValue('حرکت اختصاصی ب');await name.fill('ویرایش حرکت ب');
+ await page.getByRole('button',{name:'ذخیره اطلاعات حرکت',exact:true}).click();await expect.poll(()=>writes.length).toBe(1);
+ expect(writes[0].p_exercise.id).toBe(rows[1].id);expect(writes[0].p_expected).toBe(3);expect(writes[0].p_exercise.nameFa).toBe('ویرایش حرکت ب');
 });

@@ -4,6 +4,7 @@ import { FileDown, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { printAuthored, type AuthoredSnapshot } from './authoredPlan';
 import { lineDescription } from './studioModel';
+import { AuthoredNutritionPreview } from './NutritionStudio';
 
 export function AuthoredPlanArchive({ org, record, name }: { org: string; record: string; name: string }) {
   const [rows, setRows] = useState<AuthoredSnapshot[]>([]);
@@ -50,8 +51,8 @@ export function AuthoredPlanArchive({ org, record, name }: { org: string; record
     </article>)}
     {viewing && <section className="studio-snapshot" aria-label="مشاهده برنامه اختصاصی ذخیره‌شده">
       <div className="studio-row"><h4>{viewing.content.title}</h4><button type="button" onClick={() => setViewing(null)}>بستن مشاهده برنامه اختصاصی</button></div>
-      {viewing.content.sections.map((s, i) => <section key={i}><h4>{s.title}</h4>{s.lines.map((l, j) => <p key={j}><strong>{l.name}</strong><span>{lineDescription(l)}</span></p>)}</section>)}
-      <p>{viewing.content.notes}</p>
+      {viewing.kind === 'nutrition' ? <AuthoredNutritionPreview content={viewing.content} showTitle={false} /> : viewing.content.sections.map((s, i) => <section key={i}><h4>{s.title}</h4>{s.lines.map((l, j) => <p key={j}><strong>{l.name}</strong><span>{lineDescription(l)}</span></p>)}</section>)}
+      {viewing.kind === 'training' && <p>{viewing.content.notes}</p>}
     </section>}
     <div className="pro-actions">
       <button type="button" disabled={busy || page === 0} onClick={() => setPage(p => p - 1)}>اختصاصی‌های جدیدتر</button>
