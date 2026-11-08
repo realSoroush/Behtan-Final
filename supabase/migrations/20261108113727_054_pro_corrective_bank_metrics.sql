@@ -58,6 +58,9 @@ begin
  if p_org is null then if not public.admin_allowed() then raise exception 'ADMIN_REQUIRED' using errcode='42501';end if;
  elsif not pro_private.can_write_workspace(p_org) then raise exception 'PRO_ACCESS_DENIED' using errcode='42501';end if;
  if not pro_private.valid_corrective_exercise(p_exercise) or p_expected is null or p_expected<0 then raise exception 'PRO_INVALID_EXERCISE';end if;
+ -- Private authors cannot reserve future public catalog IDs.
+ if (p_org is not null and p_exercise->>'id' !~ '^custom-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+  or (p_org is null and p_exercise->>'id' !~ '^(ce-[0-9]{3,}|public-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$') then raise exception 'PRO_INVALID_EXERCISE';end if;
  perform pg_advisory_xact_lock(hashtextextended(p_exercise->>'id',54054));
  select * into prior from public.pro_corrective_exercises where id=p_exercise->>'id' for update;
  if found then
