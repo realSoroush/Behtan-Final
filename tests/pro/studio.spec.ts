@@ -39,9 +39,9 @@ async function training(page: Page) {
   await expect(page.locator('.pro-authored-editor')).toBeVisible();
 }
 async function chooseKind(page: Page, kind: string) {
-  await page.getByRole('combobox', { name: 'نوع گروه جدید', exact: true }).click();
+  await page.getByRole('combobox', { name: 'نوع حرکت بعدی', exact: true }).click();
   await page.getByRole('option', { name: kind, exact: true }).click();
-  await page.getByRole('button', { name: 'گروه جدید', exact: true }).click();
+  await page.getByRole('button', { name: 'حرکت بعدی', exact: true }).click();
 }
 async function addExercise(page: Page, name: string) { await page.locator('.studio-bank').getByRole('button', { name, exact: true }).first().click(); }
 async function noOverflow(page: Page) {
@@ -194,7 +194,7 @@ test('all studio navigation pages use actual organization state on desktop and m
 
 test('corrective category searches both languages and saves an individualized timed dose with stable identity',async({page})=>{
  const state=await arrange(page);await training(page);
- await page.getByRole('button',{name:'حرکات اصلاحی',exact:true}).click();
+ await page.getByRole('button',{name:'بانک حرکات اصلاحی',exact:true}).click();
  await page.getByRole('searchbox',{name:'جستجوی حرکت اصلاحی'}).fill('Knee to Wall');
  await page.locator('.corrective-bank .studio-bank-list button').first().click();
  const detail=page.getByRole('region',{name:'اطلاعات حرکت اصلاحی'});await expect(detail).toContainText('پیش‌نویس');
@@ -257,11 +257,43 @@ test('switching private corrective exercises resets the editor to the selected i
  ];const writes:any[]=[];
  await page.route('**/rest/v1/rpc/pro_corrective_bank',route=>route.fulfill({json:rows}));
  await page.route('**/rest/v1/rpc/pro_save_corrective_exercise',route=>{const body=route.request().postDataJSON();writes.push(body);return route.fulfill({json:{...body.p_exercise,revision:body.p_expected+1}});});
- await training(page);await page.getByRole('button',{name:'حرکات اصلاحی',exact:true}).click();
+ await training(page);await page.getByRole('button',{name:'بانک حرکات اصلاحی',exact:true}).click();
  const bank=page.locator('.corrective-bank .studio-bank-list');await bank.getByRole('button',{name:/حرکت اختصاصی الف/}).click();
  await expect(page.getByRole('textbox',{name:'نام فارسی',exact:true})).toHaveValue('حرکت اختصاصی الف');
  await bank.getByRole('button',{name:/حرکت اختصاصی ب/}).click();
  const name=page.getByRole('textbox',{name:'نام فارسی',exact:true});await expect(name).toHaveValue('حرکت اختصاصی ب');await name.fill('ویرایش حرکت ب');
  await page.getByRole('button',{name:'ذخیره اطلاعات حرکت',exact:true}).click();await expect.poll(()=>writes.length).toBe(1);
  expect(writes[0].p_exercise.id).toBe(rows[1].id);expect(writes[0].p_expected).toBe(3);expect(writes[0].p_exercise.nameFa).toBe('ویرایش حرکت ب');
+});
+
+test('home exercise banks, Persian start date and next-day flow persist a separated two-day program and PDF',async({page})=>{
+ const state=await arrange(page);await training(page);
+ for(const [label,option]of[['سال تاریخ شروع تمرین','۱۴۰۵'],['ماه تاریخ شروع تمرین','آبان'],['روز تاریخ شروع تمرین','۲۰']]){await page.getByRole('combobox',{name:label,exact:true}).click();await page.getByRole('option',{name:option,exact:true}).click();}
+ await page.getByRole('button',{name:'بانک حرکات در منزل',exact:true}).click();
+ const search=page.getByRole('searchbox',{name:'جستجوی حرکت',exact:true});await search.fill('پرس سینه دمبل روی زمین');await addExercise(page,'پرس سینه دمبل روی زمین');
+ await page.getByRole('button',{name:'حرکت بعدی',exact:true}).click();await search.fill('پشت بازو با کش از بالا');await addExercise(page,'پشت بازو با کش از بالا');
+ await page.getByRole('button',{name:'حرکات روز دوم',exact:true}).click();await search.fill('اسکوات وزن بدن');await addExercise(page,'اسکوات وزن بدن');
+ await expect(page.getByRole('combobox',{name:'تعداد روزهای برنامه',exact:true})).toContainText('۲ روز');
+ const days=page.getByRole('navigation',{name:'جلسات تمرین'});await days.getByRole('button',{name:'روز اول',exact:true}).click();
+ await expect(page.getByRole('textbox',{name:'نام حرکت 1',exact:true})).toHaveValue('پرس سینه دمبل روی زمین');await expect(page.getByRole('textbox',{name:'نام حرکت 2',exact:true})).toHaveValue('پشت بازو با کش از بالا');
+ await days.getByRole('button',{name:'روز دوم',exact:true}).click();await expect(page.getByRole('textbox',{name:'نام حرکت 1',exact:true})).toHaveValue('اسکوات وزن بدن');
+ await noOverflow(page);await page.screenshot({path:test.info().outputPath('home-training-days.png'),animations:'disabled'});
+ await page.getByRole('checkbox',{name:'تأیید برنامه اختصاصی متخصص'}).check();await page.getByRole('button',{name:'ثبت نسخهٔ تأییدشده',exact:true}).click();await expect(page.getByRole('button',{name:'PDF نسخه ثبت‌شده'})).toBeVisible();
+ expect(state.snapshots[0].content.startDate).toBe('2026-11-11');expect(state.snapshots[0].content.sections).toHaveLength(2);expect(state.snapshots[0].content.sections[0].lines).toHaveLength(2);
+ const popup=page.waitForEvent('popup');await page.getByRole('button',{name:'PDF نسخه ثبت‌شده'}).click();const print=await popup;await expect(print.locator('body')).toContainText('تاریخ شروع: ۱۴۰۵');await expect(print.locator('body')).toContainText('روز دوم');await expect(print.locator('body')).toContainText('اسکوات وزن بدن');await print.close();
+});
+
+test('overview client shortcut opens the complete directory and searches formatted Persian mobile numbers',async({page})=>{
+ const state=await setup(page,{existing:true});state.cases.push({...structuredClone(state.cases[0]),id:'30000000-0000-4000-8000-000000000002',display_name:'شاگرد دوم',phone:'989111234568'});
+ await page.goto('/');await expect(page.locator('.pro-directory-list>li')).toHaveCount(2);await page.getByRole('button',{name:'بازکردن پرونده',exact:true}).first().click();
+ await expect(page.getByText('آخرین تغییرات ذخیره شده‌اند',{exact:true})).toBeVisible();await page.getByRole('button',{name:'نمای کلی',exact:true}).click();
+ await page.locator('.studio-shortcuts').getByRole('button',{name:/مراجعان/}).click();await expect(page.locator('.pro-directory-list>li')).toHaveCount(2);await expect(page.getByText('آخرین تغییرات ذخیره شده‌اند',{exact:true})).toHaveCount(0);
+ await page.getByRole('searchbox',{name:'جست‌وجوی پرونده',exact:true}).fill('۰۹۱۱ ۱۲۳ ۴۵۶۸');await page.getByRole('button',{name:'جستجو',exact:true}).click();await expect(page.locator('.pro-directory-list>li')).toHaveCount(1);await expect(page.locator('.pro-directory-list')).toContainText('شاگرد دوم');
+ await page.getByRole('button',{name:'نمایش همه مراجعان',exact:true}).click();await expect(page.locator('.pro-directory-list>li')).toHaveCount(2);
+});
+
+test('returning to the complete directory asks before discarding unsaved case changes',async({page})=>{
+ const state=await arrange(page);const weight=page.getByRole('spinbutton',{name:'وزن (کیلوگرم)',exact:true});await weight.fill('95');
+ page.once('dialog',dialog=>dialog.dismiss());await page.getByRole('button',{name:'مراجعان',exact:true}).click();await expect(weight).toHaveValue('95');
+ page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'مراجعان',exact:true}).click();await expect(page.locator('.pro-directory-list>li')).toHaveCount(1);expect(state.requests).toHaveLength(0);
 });

@@ -1,6 +1,7 @@
 import type { AuthoredContent, AuthoredLine, AuthoredSection, AuthoredMenu } from './authoredPlan.ts';
 import type { FoodItem } from '../types/index.ts';
 import type { PrintedPlan } from './menuPlan.ts';
+import {validTrainingDate} from './training/trainingDate.ts';
 
 export type GroupKind = 1 | 2 | 3;
 export interface TrainingPrescription { group: string; kind: GroupKind; sets: number; reps: number; rest: number; seconds?:number }
@@ -93,6 +94,7 @@ export function trainingGroups(section: AuthoredSection) {
   return groups;
 }
 export function validateAuthored(content: AuthoredContent, kind: 'training' | 'nutrition'): string {
+  if(content.startDate!==undefined&&(kind!=='training'||!validTrainingDate(content.startDate)))return 'تاریخ شروع تمرین را به‌صورت معتبر انتخاب کنید.';
   if (!content.title.trim() || content.title.length > 160 || content.notes.length > 4000) return 'عنوان و توضیحات برنامه را بررسی کنید.';
   if (!content.sections.length || content.sections.length > 28) return 'برنامه باید بین ۱ تا ۲۸ بخش داشته باشد.';
   for (const s of content.sections) {

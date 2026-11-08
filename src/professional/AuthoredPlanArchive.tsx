@@ -1,3 +1,4 @@
+import {trainingStartLabel} from './training/trainingDate';
 import { AppLoading } from '@/components/ui/AppLoading';
 import { useEffect, useState } from 'react';
 import { FileDown, RefreshCw } from 'lucide-react';
@@ -51,7 +52,7 @@ export function AuthoredPlanArchive({ org, record, name }: { org: string; record
     </article>)}
     {viewing && <section className="studio-snapshot" aria-label="مشاهده برنامه اختصاصی ذخیره‌شده">
       <div className="studio-row"><h4>{viewing.content.title}</h4><button type="button" onClick={() => setViewing(null)}>بستن مشاهده برنامه اختصاصی</button></div>
-      {viewing.kind === 'nutrition' ? <AuthoredNutritionPreview content={viewing.content} showTitle={false} /> : viewing.content.sections.map((s, i) => <section key={i}><h4>{s.title}</h4>{s.lines.map((l, j) => <p key={j}><strong>{l.name}</strong><span>{lineDescription(l)}</span></p>)}</section>)}
+      {viewing.kind==='training'&&viewing.content.startDate&&<p>تاریخ شروع: {trainingStartLabel(viewing.content.startDate)}</p>}{viewing.kind === 'nutrition' ? <AuthoredNutritionPreview content={viewing.content} showTitle={false} /> : viewing.content.sections.map((s, i) => <section key={i}><h4>{s.title}</h4>{s.lines.map((l, j) => <p key={j}><strong>{l.name}</strong><span>{lineDescription(l)}</span></p>)}</section>)}
       {viewing.kind === 'training' && <p>{viewing.content.notes}</p>}
     </section>}
     <div className="pro-actions">

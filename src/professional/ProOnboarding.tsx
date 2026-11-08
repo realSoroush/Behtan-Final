@@ -99,7 +99,7 @@ export function ProOnboarding({
                   checked={code === "trial"}
                   onChange={() => setCode("trial")}
                 />
-                آزمایشی · رایگان · ساخت ۳ پرونده در مجموع
+                آزمایشی · رایگان · یک ماه · ساخت ۳ پرونده در مجموع
               </label>
             )}
             {offers.map((o) => (

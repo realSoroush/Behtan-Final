@@ -1,3 +1,4 @@
+import {normalizeCaseSearch} from './caseSearch';
 import { AppLoading } from '@/components/ui/AppLoading';
 import {fromPrintedPlan} from './studioModel';
 import {AuthoredPlanEditor} from './AuthoredPlanEditor';
@@ -131,9 +132,9 @@ export function RealCaseWorkspace({
       </div>}
       {access && !access.can_write && <p className="pro-muted">ساخت و ویرایش فعلاً غیرفعال است؛ همه سوابق و PDFها در دسترس‌اند. برای ادامه، از «اشتراک و ظرفیت» درخواست تمدید ثبت کنید.</p>}
       <div className="pro-directory-filter"><button aria-pressed={!archivedOnly} onClick={()=>{setArchivedOnly(false);setPage(0);}}>پرونده‌های فعال</button><button aria-pressed={archivedOnly} onClick={()=>{setArchivedOnly(true);setPage(0);}}><Archive size={16}/>بایگانی</button></div>
-      <form className="pro-search-bar" onSubmit={e=>{e.preventDefault();setPage(0);setQuery(search.trim().replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/^\+/, '').replace(/^0(?=9\d{9}$)/,'98'));}}>
+      <form className="pro-search-bar" onSubmit={e=>{e.preventDefault();setPage(0);setQuery(normalizeCaseSearch(search));}}>
         <label><span className="sr-only">جست‌وجوی نام یا شماره</span><Search size={19} aria-hidden="true" /><input placeholder="نام یا شماره تماس مراجع…" aria-label="جست‌وجوی پرونده" type="search" value={search} onChange={e=>setSearch(e.target.value)} maxLength={100}/></label>
-        <button disabled={busy}>جستجو</button><span className="pro-result-count">{total.toLocaleString("fa-IR")} نتیجه</span>
+        <button disabled={busy}>جستجو</button>{(query||search)&&<button type="button"disabled={busy}onClick={()=>{setSearch('');setQuery('');setPage(0);}}>نمایش همه مراجعان</button>}<span className="pro-result-count">{total.toLocaleString("fa-IR")} نتیجه</span>
       </form>
       {error && (
         <p role="alert" className="pro-error">
@@ -142,7 +143,7 @@ export function RealCaseWorkspace({
       )}
       {busy && <AppLoading label="در حال دریافت پرونده‌ها…" />}
       {!busy && !error && !rows.length && (
-        <div className="pro-empty pro-directory-empty"><span className="pro-empty-icon"><FolderHeart size={30} /></span><h3>{query ? 'پرونده‌ای پیدا نشد' : 'اولین همراهی از اینجا شروع می‌شود.'}</h3><p>{query ? 'نام یا شماره را دوباره بررسی کنید.' : 'برای شروع، اولین مراجع را با «پرونده جدید» ثبت کنید.'}</p>{query && <button onClick={()=>{setSearch('');setQuery('');setPage(0);}}>نمایش همه مراجعان</button>}</div>
+        <div className="pro-empty pro-directory-empty"><span className="pro-empty-icon"><FolderHeart size={30} /></span><h3>{query ? 'پرونده‌ای پیدا نشد' : 'اولین همراهی از اینجا شروع می‌شود.'}</h3><p>{query ? 'نام یا شماره را دوباره بررسی کنید.' : 'برای شروع، اولین مراجع را با «پرونده جدید» ثبت کنید.'}</p></div>
       )}
       <div className="pro-list-caption"><span>مراجع / شماره تماس</span><span>آخرین ویرایش</span><span>پرونده</span></div>
       <ul className="pro-cases pro-directory-list">
