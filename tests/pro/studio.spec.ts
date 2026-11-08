@@ -208,11 +208,13 @@ test('corrective category searches both languages and saves an individualized ti
 test('specialist nutrition retains several menus per meal through save, reopen and PDF',async({page})=>{
  const state=await arrange(page);await page.getByRole('button',{name:'تدوین اختصاصی تغذیه و سوابق',exact:true}).click();
  const bank=page.locator('.studio-bank-list button').first();await bank.click();
- await page.getByRole('button',{name:'منوی جدید',exact:true}).click();await bank.click();await page.getByRole('spinbutton',{name:/وزن/}).first().fill('150');
+ await page.getByRole('button',{name:'منوی جدید',exact:true}).click();await bank.click();const grams=page.locator('.studio-editor .studio-food input[type=number]').first();await grams.fill('150');await expect(grams).toHaveValue('150');
  await expect(page.locator('.studio-editor .studio-menu-table tbody tr')).toHaveCount(2);
+ await page.locator('.studio-editor .studio-menu-table').scrollIntoViewIfNeeded();await noOverflow(page);
  await page.screenshot({path:test.info().outputPath('nutrition-multiple-menus.png'),animations:'disabled'});
  await page.getByRole('checkbox',{name:'تأیید برنامه اختصاصی متخصص'}).check();await page.getByRole('button',{name:'ثبت نسخهٔ تأییدشده',exact:true}).click();await expect(page.getByRole('button',{name:'PDF نسخه ثبت‌شده'})).toBeVisible();
  expect(state.snapshots[0].content.sections[0].alternatives).toHaveLength(1);
+ expect(state.snapshots[0].content.sections[0].alternatives![0].lines[0].food?.grams).toBe(150);
  await page.getByRole('button',{name:'بستن پنجره',exact:true}).click();await page.getByRole('button',{name:'تدوین اختصاصی تغذیه و سوابق',exact:true}).click();await page.getByRole('button',{name:'مشاهده نسخه',exact:true}).click();
  await expect(page.getByRole('region',{name:'نسخه ذخیره‌شده'}).locator('.studio-menu-table tbody tr')).toHaveCount(2);
  const popup=page.waitForEvent('popup');await page.getByRole('button',{name:'PDF',exact:true}).click();const print=await popup;await expect(print.locator('tbody tr')).toHaveCount(2);await expect(print.locator('body')).toContainText('۱۵۰ گرم');await print.close();

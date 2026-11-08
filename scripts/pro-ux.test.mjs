@@ -6,6 +6,7 @@ import{installTestNutritionCatalog}from'./setup-test-nutrition-catalog.mjs';
 import{DEFAULT_PROTEIN_ENGINE_POLICY as policy}from'../src/utils/proteinPolicy.ts';
 import{fromPrintedPlan,sectionMenus,nutritionTotals,nutritionRange,validateAuthored,trainingLine}from'../src/professional/studioModel.ts';
 import{authoredHtml}from'../src/professional/authoredPlan.ts';
+import{getProfessionalMealOptions}from'../src/utils/mealPlanEngine.ts';
 installTestNutritionCatalog();
 assert.equal(CORRECTIVE_SEED.length,117);assert.equal(new Set(CORRECTIVE_SEED.map(e=>e.id)).size,117);assert.equal(new Set(CORRECTIVE_SEED.flatMap(e=>e.categories)).size,10);
 for(const row of CORRECTIVE_SEED){assert.equal(row.status,'draft');assert(publicationError(row));assert(!row.reviewer);}
@@ -16,6 +17,7 @@ let last;
 for(let count=1;count<=5;count++){
  const plan=generatePrintedPlan(intake,1,count,policy,'2026-10-21');
  assert.equal(plan.menu_contract,'exact-v2');
+ if(count===1)for(const d of plan.days)for(const slot of d.slots){const base=slot.options[0];for(const option of getProfessionalMealOptions(base,{vegetarianStatus:'none',allergies:[]},d.workout))assert(option.totalKcal<=base.totalKcal*1.35+1e-6,'Existing per-slot calorie screening must remain in Pro alternatives');}
  for(const d of plan.days){assert(menuCombinationsFeasible(d.slots,d.targets));for(const slot of d.slots){assert.equal(slot.options.length,count);assert.equal(new Set(slot.options.map(menuIdentity)).size,count);}}
  const authored=fromPrintedPlan(plan);assert.equal(validateAuthored(authored,'nutrition'),'');
  assert(authored.sections.every(s=>sectionMenus(s).length===count));

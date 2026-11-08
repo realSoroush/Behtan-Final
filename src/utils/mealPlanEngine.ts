@@ -1583,7 +1583,10 @@ function getProfessionalMealOptionsWithCatalog(engine: EngineCatalog, base: Meal
   const key = (meal:Meal) => meal.components.map(c=>c.foodItem.id).sort().join('|');
   const seen = new Set<string>();
   const options:Meal[] = [];
-  const add = (meal:Meal) => { if(!isPracticalMeal(meal.slot,meal.components)||mealMassGrams(meal.components)>mealMassLimitGrams(meal.slot,target.kcal)||meal.components.some(c=>!isFoodAllowed(c.foodItem,preferences)))return; const k=key(meal); if (!seen.has(k)) { seen.add(k); options.push(meal); } };
+  const add = (meal:Meal) => {
+    if((meal.slot!=='post_workout'&&meal.totalKcal>target.kcal*1.35)||!isPracticalMeal(meal.slot,meal.components)||mealMassGrams(meal.components)>mealMassLimitGrams(meal.slot,target.kcal)||meal.components.some(c=>!isFoodAllowed(c.foodItem,preferences)))return;
+    const k=key(meal); if (!seen.has(k)) { seen.add(k); options.push(meal); }
+  };
   add(base); resolved.forEach(add);
   if(!options.length&&base.slot!=='post_workout')throw new MealPlanGenerationError(base.slot,'ترکیب مجاز با اندازهٔ مناسب برای این وعده پیدا نشد.');
   // Pro-only expansion: use existing approved food links and the same exact
