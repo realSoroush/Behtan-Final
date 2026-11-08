@@ -148,7 +148,7 @@ test('case archive shows both authored kinds, pages older versions and opens the
   await expect(archive.getByRole('region', { name: 'مشاهده برنامه اختصاصی ذخیره‌شده' })).toContainText('محتوای نسخه 11');
   const popup = page.waitForEvent('popup'); await archive.getByRole('button', { name: 'PDF برنامه اختصاصی', exact: true }).first().click();
   const print = await popup; await expect(print.locator('body')).toContainText('محتوای نسخه 11'); await expect(print.locator('body')).toContainText('نام هنگام ثبت'); await print.close();
-  await archive.getByRole('button', { name: 'مشاهده برنامه اختصاصی', exact: true }).nth(1).click();
+  await expect(archive.getByRole('article').first()).toContainText('تغذیه اختصاصی');
   const legacyNutrition=archive.getByRole('region',{name:'مشاهده برنامه اختصاصی ذخیره‌شده'});
   await expect(legacyNutrition).toContainText('مقادیر تغذیه‌ای ثبت نشده‌اند.');await expect(legacyNutrition).not.toContainText('۰ کالری');
   await archive.getByRole('button', { name: 'اختصاصی‌های قدیمی‌تر' }).click();
