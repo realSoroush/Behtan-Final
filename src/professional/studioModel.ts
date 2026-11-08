@@ -42,6 +42,13 @@ export function nutritionTotals(sections: AuthoredSection[]): NutritionTotals {
     return total;
   }, { kcal: 0, protein: 0, carbs: 0, fat: 0 });
 }
+/** Text-only legacy instructions carry no numeric nutrient snapshot. */
+export function nutritionMenuSummary(lines: AuthoredLine[]): string {
+  if (!lines.some(line => line.food)) return 'مقادیر تغذیه‌ای ثبت نشده‌اند.';
+  const t = nutritionTotals([{ title: '', lines }]);
+  const partial = lines.some(line => !line.food && line.name.trim());
+  return `${fa(t.kcal)} کالری · پروتئین ${fa(t.protein)} · کربوهیدرات ${fa(t.carbs)} · چربی ${fa(t.fat)} گرم${partial ? ' · فقط مواد دارای مقادیر ثبت‌شده؛ سطرهای متنی در جمع محاسبه نشده‌اند.' : ''}`;
+}
 export function foodLine(food: FoodItem, grams = 100): AuthoredLine {
   return { name: food.name, details: '', food: {
     id: food.id, grams, gramsPerUnit: food.gramsPerUnit,

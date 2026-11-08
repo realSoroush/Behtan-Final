@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
 import { realCaseApi } from './realCaseApi';
 import type { FoodItem } from '@/types';
 import type { AuthoredContent } from './authoredPlan';
-import { dayLabel, fa, foodLine, foodTotals, lineDescription, moveItem, normalizedSearch, nutritionTotals, sectionMenus, nutritionRange } from './studioModel';
+import { dayLabel, fa, foodLine, foodTotals, lineDescription, moveItem, normalizedSearch, nutritionTotals, nutritionMenuSummary, sectionMenus, nutritionRange } from './studioModel';
 import type { RealIntake } from './menuPlan';
 const roles: Record<string, string> = { protein: 'پروتئین', starch: 'غلات و کربوهیدرات', fat: 'چربی و مغزها', fruit: 'میوه', vegetable: 'سبزی', dairy: 'لبنیات', legume: 'حبوبات' };
 const basis = { raw: 'خام', cooked: 'پخته', dry: 'خشک', ready: 'آماده مصرف' };
@@ -82,7 +82,7 @@ export function NutritionStudio({ content, mutate, intake, org, record, revision
 }
 
 export function NutritionMenuRows({section,active,onSelect}:{section:AuthoredContent['sections'][number];active?:string;onSelect?:(id:string)=>void}) {
- return <table className="studio-menu-table"><thead><tr><th>منو</th><th>مواد و مقدار مصرف</th></tr></thead><tbody>{sectionMenus(section).map((menu,i)=>{const totals=nutritionTotals([{...section,lines:menu.lines}]);return <tr key={menu.id} className={active===menu.id?'is-selected':''}><td>{onSelect?<button type="button" aria-pressed={active===menu.id} onClick={()=>onSelect(menu.id)}>{menu.title}</button>:menu.title||'منو '+fa(i+1)}</td><td><p>{menu.lines.filter(l=>l.name.trim()).map(l=>l.food?`${l.name} ${fa(l.food.grams)} گرم (${l.food.basis})`:l.name+' '+l.details).join(' + ')||'مواد این منو را اضافه کنید.'}</p><small>{fa(totals.kcal)} کالری · پروتئین {fa(totals.protein)} · کربوهیدرات {fa(totals.carbs)} · چربی {fa(totals.fat)} گرم</small>{menu.lines.some(l=>l.details)&&<small>{menu.lines.filter(l=>l.details).map(l=>l.name+': '+l.details).join('؛ ')}</small>}</td></tr>})}</tbody></table>;
+ return <table className="studio-menu-table"><thead><tr><th>منو</th><th>مواد و مقدار مصرف</th></tr></thead><tbody>{sectionMenus(section).map((menu,i)=>{return <tr key={menu.id} className={active===menu.id?'is-selected':''}><td>{onSelect?<button type="button" aria-pressed={active===menu.id} onClick={()=>onSelect(menu.id)}>{menu.title}</button>:menu.title||'منو '+fa(i+1)}</td><td><p>{menu.lines.filter(l=>l.name.trim()).map(l=>l.food?`${l.name} ${fa(l.food.grams)} گرم (${l.food.basis})`:l.name+' '+l.details).join(' + ')||'مواد این منو را اضافه کنید.'}</p><small>{nutritionMenuSummary(menu.lines)}</small>{menu.lines.some(l=>l.details)&&<small>{menu.lines.filter(l=>l.details).map(l=>l.name+': '+l.details).join('؛ ')}</small>}</td></tr>})}</tbody></table>;
 }
 export function AuthoredNutritionPreview({content,showTitle=true}:{content:AuthoredContent;showTitle?:boolean}){
  return <aside className="authored-live-preview" aria-label="پیش‌نمایش زنده تغذیه"><small>از هر وعده فقط یک منو انتخاب شود.</small>{showTitle&&<h3>{content.title}</h3>}{content.sections.map((s,i)=><section key={i}><h4>{dayLabel(s.nutritionDay||'daily')} · {s.title}</h4><NutritionMenuRows section={s}/></section>)}<p>{content.notes}</p></aside>;

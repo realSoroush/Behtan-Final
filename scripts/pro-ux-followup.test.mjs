@@ -5,7 +5,7 @@ import {fileURLToPath} from 'node:url';
 
 const root=fileURLToPath(new URL('..',import.meta.url));
 const compiled=await build({
-  stdin:{contents:`export {AuthoredPlanArchive} from './src/professional/AuthoredPlanArchive';export {CorrectiveBank} from './src/professional/training/corrective/CorrectiveBank';export {CORRECTIVE_SEED} from './src/professional/training/corrective/seed';export {createElement} from 'react';export {act,create} from 'react-test-renderer';`,resolveDir:root},
+  stdin:{contents:`export {AuthoredPlanArchive} from './src/professional/AuthoredPlanArchive';export {AuthoredNutritionPreview} from './src/professional/NutritionStudio';export {authoredHtml} from './src/professional/authoredPlan';export {CorrectiveBank} from './src/professional/training/corrective/CorrectiveBank';export {CORRECTIVE_SEED} from './src/professional/training/corrective/seed';export {createElement} from 'react';export {act,create} from 'react-test-renderer';`,resolveDir:root},
   tsconfig:root+'/tsconfig.json',bundle:true,platform:'node',format:'cjs',write:false,
   external:['react','react/jsx-runtime','react-test-renderer'],
   plugins:[{name:'synthetic-pro-transports',setup(b){
@@ -23,7 +23,7 @@ globalThis.proFollowupDb={from(name){assert.equal(name,'pro_authored_plans');con
 globalThis.proFollowupCorrective={async list(){return structuredClone(bank);},async save(org,payload,expected){writes.push({org,payload:structuredClone(payload),expected});return{...payload,revision:expected+1};}};
 const module={exports:{}};
 new Function('module','exports','require',compiled.outputFiles[0].text)(module,module.exports,createRequire(import.meta.url));
-const {AuthoredPlanArchive,CorrectiveBank,CORRECTIVE_SEED,createElement,act,create}=module.exports;
+const {AuthoredPlanArchive,AuthoredNutritionPreview,authoredHtml,CorrectiveBank,CORRECTIVE_SEED,createElement,act,create}=module.exports;
 const text=n=>typeof n==='string'?n:(n?.children??[]).map(text).join('');
 const button=(tree,label)=>{const node=tree.root.findAllByType('button').find(b=>text(b)===label);assert(node,label);return node;};
 const org='20000000-0000-4000-8000-000000000001';
@@ -61,6 +61,20 @@ try{
    await act(async()=>tree.root.findByProps({'aria-label':'نام فارسی'}).props.onChange({target:{value:'نسخه تازه ب'}}));
    await act(async()=>button(tree,'ذخیره اطلاعات حرکت').props.onClick());
    assert.equal(writes.length,1);assert.equal(writes[0].payload.id,bank[1].id);assert.equal(writes[0].expected,3);assert.equal(writes[0].payload.nameFa,'نسخه تازه ب');assert.equal(bank[0].nameFa,'حرکت اختصاصی الف');
+  }finally{if(tree)await act(async()=>tree.unmount());}
+ });
+ await check('unknown legacy nutrition is not displayed as zero and partial totals are explicit in history and PDF',async()=>{
+  const legacy={version:1,title:'نسخه متنی مصنوعی',notes:'',reviewed:true,sections:[{title:'وعده',lines:[{name:'غذای متنی قدیمی',details:'مقدار به صورت متن ثبت شده'}]}]};
+  let tree;
+  try{
+   await act(async()=>{tree=create(createElement(AuthoredNutritionPreview,{content:legacy}));});
+   assert(text(tree.root).includes('مقادیر تغذیه‌ای ثبت نشده‌اند.'));assert(!text(tree.root).includes('۰ کالری'));
+   const html=authoredHtml(legacy,'مصنوعی','nutrition','https://example.com');assert(html.includes('مقادیر تغذیه‌ای ثبت نشده‌اند.'));assert(!html.includes('۰ کالری'));
+   const partial=structuredClone(legacy);partial.sections[0].lines.push({name:'ماده با مقدار معلوم',details:'',food:{id:'synthetic',grams:100,gramsPerUnit:100,basis:'آماده',kcal:100,protein:10,carbs:10,fat:2}});
+   await act(async()=>tree.update(createElement(AuthoredNutritionPreview,{content:partial})));
+   assert(text(tree.root).includes('۱۰۰ کالری'));assert(text(tree.root).includes('فقط مواد دارای مقادیر ثبت‌شده'));assert(authoredHtml(partial,'مصنوعی','nutrition','https://example.com').includes('فقط مواد دارای مقادیر ثبت‌شده'));
+   const zero=structuredClone(partial);zero.sections[0].lines.shift();zero.sections[0].lines[0].food.kcal=0;
+   await act(async()=>tree.update(createElement(AuthoredNutritionPreview,{content:zero})));assert(text(tree.root).includes('۰ کالری'));assert(!text(tree.root).includes('مقادیر تغذیه‌ای ثبت نشده‌اند.'));
   }finally{if(tree)await act(async()=>tree.unmount());}
  });
 }finally{
