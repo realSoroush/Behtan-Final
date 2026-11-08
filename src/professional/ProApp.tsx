@@ -60,7 +60,7 @@ export function ProApp() {
         <div className="pro-sidebar-section">پنل برنامه‌دهی</div>
         <nav aria-label="ناوبری اصلی">
           {navigation.map(({id,label,icon:Icon})=><button key={id} type="button" className="pro-nav-link" aria-current={view===id?'page':undefined} onClick={()=>navigate(id)}><Icon size={19}/>{label}{view===id&&<ArrowUpLeft size={15}/>}</button>)}
-          <a href="#pro-support" className="pro-nav-link"><LifeBuoy size={20} />راهنمای استفاده</a>
+          <a href="https://t.me/Behtan_Support" target="_blank" rel="noopener noreferrer" className="pro-nav-link"><LifeBuoy size={20} />راهنمای استفاده</a>
         </nav>
         <div className="pro-sidebar-note">
           <Sparkles size={22} />
@@ -73,7 +73,7 @@ export function ProApp() {
         <header className="pro-header">
           <div className="pro-brand"><span className="pro-mobile-logo"><img src="/behtan-logo.png" alt="" /></span><strong>به‌تن حرفه‌ای</strong><span className="pro-header-divider">/</span><span className="pro-header-caption">پنل برنامه‌دهی</span></div>
           <div className="pro-actions">
-            <a className="pro-help-link" href="#pro-support" aria-label="راهنمای استفاده"><LifeBuoy size={18} /></a>
+            <a className="pro-help-link" href="https://t.me/Behtan_Support" target="_blank" rel="noopener noreferrer" aria-label="راهنمای استفاده"><LifeBuoy size={18} /></a>
             <ThemeToggle className="pro-theme" />
             <button className="pro-signout" aria-label="خروج" onClick={() => {if(!unsaved.current||window.confirm("تغییرات ثبت‌نشده دارید. از حساب خارج شوید؟"))void signOut();}}><LogOut size={17} /><span>خروج</span></button>
           </div>
@@ -226,7 +226,7 @@ function Workspace({userId,phone,view,navigate,onDirty}:{userId:string;phone:str
           {view==='overview'&&<StudioOverview key={selected} org={selected} navigate={navigate}/>}
           <div hidden={!['cases','training','nutrition','history'].includes(view)}><RealCaseWorkspace key={selected} org={selected} roles={roles} view={view} onDirty={markDirty}/></div>
           {view==='subscription'&&<section className="studio-subscription"><h2>اشتراک و ظرفیت</h2><ProSubscription key={selected} org={selected}/><details><summary>انتخاب یا ارتقای اشتراک</summary><ProOnboarding existing profile={profile} onComplete={()=>void load()}/></details></section>}
-          {view==='settings'&&<section className="pro-panel studio-settings"><h2>حساب و تنظیمات</h2><dl><div><dt>فضای کاری</dt><dd>{orgs.find(o=>o.id===selected)?.name}</dd></div><div><dt>شماره حساب</dt><dd dir="ltr">{phone||'ثبت نشده'}</dd></div><div><dt>نقش شما</dt><dd>{roles.map(r=>({owner:'مالک',practitioner:'کارشناس',assistant:'دستیار'}[r])).join('، ')}</dd></div><div><dt>منطقه زمانی</dt><dd>تهران</dd></div></dl><div className="studio-row"><span>ظاهر روشن / تیره</span><ThemeToggle/></div><details><summary>ویرایش مشخصات حرفه‌ای و اطلاعات PDF</summary><SpecialistProfileForm key={JSON.stringify(profile)} initial={profile} editing onSaved={saved=>{setProfile(saved);setProfileNotice("مشخصات حرفه‌ای ذخیره شد.");}} /></details>{profileNotice&&<p role="status" className="pro-success">{profileNotice}</p>}<a className="pro-nav-link" href="#pro-support"><LifeBuoy size={18}/>راهنمای استفاده</a></section>}
+          {view==='settings'&&<section className="pro-panel studio-settings"><h2>حساب و تنظیمات</h2><dl><div><dt>فضای کاری</dt><dd>{orgs.find(o=>o.id===selected)?.name}</dd></div><div><dt>شماره حساب</dt><dd dir="ltr">{phone||'ثبت نشده'}</dd></div><div><dt>نقش شما</dt><dd>{roles.map(r=>({owner:'مالک',practitioner:'کارشناس',assistant:'دستیار'}[r])).join('، ')}</dd></div><div><dt>منطقه زمانی</dt><dd>تهران</dd></div></dl><div className="studio-row"><span>ظاهر روشن / تیره</span><ThemeToggle/></div><details><summary>ویرایش مشخصات حرفه‌ای و اطلاعات PDF</summary><SpecialistProfileForm key={JSON.stringify(profile)} initial={profile} editing onSaved={saved=>{setProfile(saved);setProfileNotice("مشخصات حرفه‌ای ذخیره شد.");}} /></details>{profileNotice&&<p role="status" className="pro-success">{profileNotice}</p>}<a className="pro-nav-link" href="https://t.me/Behtan_Support" target="_blank" rel="noopener noreferrer"><LifeBuoy size={18}/>راهنمای استفاده</a></section>}
 
         </>
       )}

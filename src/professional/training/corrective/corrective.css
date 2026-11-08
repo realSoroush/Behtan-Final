@@ -1,0 +1,4 @@
+
+.corrective-bank>p,.corrective-detail p{font-size:12px;line-height:1.9}.corrective-bank details>label{display:block;margin:8px 0}.corrective-detail{padding:12px;margin-top:12px;border:1px solid var(--pro-line,#88958b);border-radius:12px}.corrective-detail img,.corrective-detail video{max-width:100%;height:auto}.corrective-bank .studio-bank-list{max-height:380px;overflow:auto}.corrective-editor{margin-top:14px}.corrective-editor label{display:block;margin:8px 0}.corrective-editor input:not([type=checkbox]),.corrective-editor textarea{width:100%}.corrective-editor label div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px}.corrective-editor label div label{font-size:11px}.corrective-detail label{display:block;font-size:12px}
+
+.manual-library>.corrective-bank{max-height:none;overflow:visible;display:block;margin:0}.corrective-editor fieldset{min-inline-size:0}.corrective-bank small[lang=en]{overflow-wrap:anywhere}

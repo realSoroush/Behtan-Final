@@ -1,3 +1,5 @@
+import {CorrectiveBank} from './corrective/CorrectiveBank';
+import type{CorrectiveExercise}from './corrective/types';
 import { useRef, useState } from 'react';
 import { ArrowUp, ArrowDown, GripVertical, Plus, Trash2 } from 'lucide-react';
 import { PanelSelect } from '@/components/ui/PanelSelect';
@@ -7,19 +9,20 @@ import { EXERCISE_GROUPS, MANUAL_EXERCISES } from './exerciseLibrary';
 import './manual-training.css';
 export { MANUAL_EXERCISES };
 type Drag = { section: number; line: number } | { name: string };
-export function ManualTrainingBuilder({ content, mutate }: { content: AuthoredContent; mutate: (fn: (d: AuthoredContent) => void) => void }) {
+export function ManualTrainingBuilder({ content, mutate,org }: {org?:string; content: AuthoredContent; mutate: (fn: (d: AuthoredContent) => void) => void }) {
   const [day, setDay] = useState(0), [search, setSearch] = useState(''), [category, setCategory] = useState('همه'), [subcategory, setSubcategory] = useState('همه');
   const [target, setTarget] = useState(''), [newKind, setNewKind] = useState<GroupKind>(1), [notice, setNotice] = useState('');
   const drag = useRef<Drag | null>(null);
   const current = Math.min(day, content.sections.length - 1), session = content.sections[current];
   const groups = trainingGroups(session), selected = groups.find(g => g.id === target) || groups[groups.length - 1];
-  const parents = ['همه', ...new Set(EXERCISE_GROUPS.map(g => g.parent))];
+  const parents = ['حرکات اصلاحی','همه', ...new Set(EXERCISE_GROUPS.map(g => g.parent))];
   const visible = EXERCISE_GROUPS.filter(g => (category === 'همه' || g.parent === category) && (subcategory === 'همه' || subcategory === g.name)).map(g => ({ ...g, exercises: g.exercises.filter(n => normalizedSearch(n).includes(normalizedSearch(search))) })).filter(g => g.exercises.length);
-  function add(name: string, group = selected) {
-    if (!group) { mutate(d => d.sections[current].lines.push(trainingLine(name))); return; }
+  function add(name: string, group = selected,exercise?:CorrectiveExercise) {
+    const line=()=>{const l=trainingLine(name,group?.kind||1,group?.id);if(exercise){l.exercise=structuredClone(exercise);l.training={...l.training!,sets:NaN,reps:NaN,rest:NaN};l.details=exercise.steps.join('\n');}return l;};
+    if (!group) { mutate(d => d.sections[current].lines.push(line())); return; }
     const free = group.indices.find(i => !session.lines[i].name.trim());
     if (free === undefined) { setNotice('گروه انتخاب‌شده کامل است؛ یک گروه جدید بسازید یا گروه دیگری را انتخاب کنید.'); return; }
-    mutate(d => { d.sections[current].lines[free].name = name; }); setNotice('');
+    mutate(d => { if(exercise)d.sections[current].lines[free]=line();else {d.sections[current].lines[free].name = name;delete d.sections[current].lines[free].exercise;} }); setNotice('');
   }
   function addGroup() {
     if (session.lines.length + newKind > 30) return;
@@ -57,11 +60,11 @@ export function ManualTrainingBuilder({ content, mutate }: { content: AuthoredCo
     {notice && <p role="status" className="studio-notice">{notice}</p>}
     <div className="studio-columns">
       <aside className="studio-bank manual-library"><h4>بانک حرکات</h4><small>{fa(MANUAL_EXERCISES.length)} نام یکتا · دسته‌بندی عضلات</small>
-        <input type="search" aria-label="جستجوی حرکت" placeholder="نام حرکت…" value={search} onChange={e => setSearch(e.target.value)} />
+        {category!=='حرکات اصلاحی'&&<input type="search" aria-label="جستجوی حرکت" placeholder="نام حرکت…" value={search} onChange={e => setSearch(e.target.value)} />}
         <div className="studio-categories" aria-label="عضله">{parents.map(c => <button type="button" key={c} aria-pressed={category === c} onClick={() => { setCategory(c); setSubcategory('همه'); }}>{c}</button>)}</div>
-        {category !== 'همه' && <label>زیرگروه عضلانی<PanelSelect aria-label="زیرگروه عضلانی" value={subcategory} onChange={e => setSubcategory(e.target.value)}><option>همه</option>{EXERCISE_GROUPS.filter(g => g.parent === category).map(g => <option key={g.name}>{g.name}</option>)}</PanelSelect></label>}
-        <div className="studio-bank-list">{visible.map(g => <section key={g.parent + g.name}><h5>{g.parent} / {g.name}</h5>{g.exercises.map(n => <button type="button" key={n} draggable onDragStart={e => { drag.current = { name: n }; e.dataTransfer.setData('text/plain', n); }} onDragEnd={() => { drag.current = null; }} onClick={() => add(n)}><span>{n}</span><Plus size={16} /></button>)}</section>)}{!visible.length && <p className="studio-empty">حرکتی پیدا نشد.</p>}</div>
-        <button type="button" onClick={() => add('حرکت اختصاصی مربی')}>+ حرکت اختصاصی</button>
+        {category !== 'همه' && category!=='حرکات اصلاحی' && <label>زیرگروه عضلانی<PanelSelect aria-label="زیرگروه عضلانی" value={subcategory} onChange={e => setSubcategory(e.target.value)}><option>همه</option>{EXERCISE_GROUPS.filter(g => g.parent === category).map(g => <option key={g.name}>{g.name}</option>)}</PanelSelect></label>}
+        {category==='حرکات اصلاحی'?(org?<CorrectiveBank org={org} onAdd={e=>add(e.nameFa,selected,e)}/>:<p>فضای کاری را انتخاب کنید.</p>):<><div className="studio-bank-list">{visible.map(g => <section key={g.parent + g.name}><h5>{g.parent} / {g.name}</h5>{g.exercises.map(n => <button type="button" key={n} draggable onDragStart={e => { drag.current = { name: n }; e.dataTransfer.setData('text/plain', n); }} onDragEnd={() => { drag.current = null; }} onClick={() => add(n)}><span>{n}</span><Plus size={16} /></button>)}</section>)}{!visible.length && <p className="studio-empty">حرکتی پیدا نشد.</p>}</div>
+        <button type="button" onClick={() => add('حرکت اختصاصی مربی')}>+ حرکت اختصاصی</button></>}
       </aside>
       <section className="studio-editor manual-session"><div className="studio-row"><h4>جلسه {fa(current + 1)}</h4><span className="studio-pill">{fa(session.lines.filter(l => l.name.trim()).length)} حرکت</span></div>
         <label>نام جلسه<input aria-label="نام جلسه تمرین" maxLength={100} value={session.title} onChange={e => mutate(d => { d.sections[current].title = e.target.value; })} /></label>
@@ -77,7 +80,8 @@ export function ManualTrainingBuilder({ content, mutate }: { content: AuthoredCo
           }}>{[1, 2, 3].map(k => <option key={k} value={k}>{groupLabel(k)}</option>)}</PanelSelect></label>
           {g.indices.map((j, position) => { const line = session.lines[j], dose = line.training!; return <article className="manual-exercise" key={position} data-line-index={j} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); e.stopPropagation(); drop(j); }}>
             <header><span className="manual-grip" title="برای جابه‌جایی بکش" draggable onDragStart={e => { drag.current = { section: current, line: j }; e.dataTransfer.setData('text/plain', String(j)); }} onDragEnd={() => { drag.current = null; }}><GripVertical size={17} /></span><input aria-label={`نام حرکت ${j + 1}`} maxLength={300} value={line.name} placeholder="حرکت را از بانک اضافه کن" onChange={e => mutate(d => { d.sections[current].lines[j].name = e.target.value; })} /></header>
-            <div className="manual-dose">{([['sets', 'ست', 1, 20], ['reps', 'تکرار', 1, 300], ['rest', 'استراحت (ثانیه)', 0, 1800]] as const).map(([k, label, min, max]) => <label key={k}>{label}<input aria-label={`${label} حرکت ${j + 1}`} type="number" min={min} max={max} step={1} value={Number.isNaN(dose[k]) ? '' : dose[k]} onChange={e => mutate(d => { d.sections[current].lines[j].training![k] = e.target.value === '' ? NaN : Number(e.target.value); })} /></label>)}</div>
+            <label>نوع دوز<PanelSelect aria-label={'نوع دوز حرکت '+(j+1)} value={dose.seconds===undefined?'reps':'time'} onChange={e=>mutate(d=>{const t=d.sections[current].lines[j].training!;if(e.target.value==='time'){t.seconds=NaN;t.reps=0;}else{delete t.seconds;t.reps=NaN;}})}><option value="reps">تکرار</option><option value="time">زمان نگه‌داری</option></PanelSelect></label>
+            <div className="manual-dose">{([['sets', 'ست', 1, 20], [dose.seconds===undefined?'reps':'seconds',dose.seconds===undefined?'تکرار':'زمان (ثانیه)',1,dose.seconds===undefined?300:3600], ['rest', 'استراحت (ثانیه)', 0, 1800]] as const).map(([k, label, min, max]) => <label key={k}>{label}<input aria-label={`${label} حرکت ${j + 1}`} type="number" min={min} max={max} step={1} value={dose[k]===undefined||Number.isNaN(dose[k]) ? '' : dose[k]} onChange={e => mutate(d => { d.sections[current].lines[j].training![k] = e.target.value === '' ? NaN : Number(e.target.value); })} /></label>)}</div>
             <label>دستور مربی<textarea aria-label={`دستور حرکت ${j + 1}`} maxLength={2000} rows={2} value={line.details} onChange={e => mutate(d => { d.sections[current].lines[j].details = e.target.value; })} /></label>
             <footer><small>{g.kind > 1 ? 'مرتبط با حرکت‌های همین گروه' : 'اجرای مستقل'}</small><button type="button" aria-label={`بالا بردن حرکت ${j + 1}`} disabled={position === 0} onClick={() => { drag.current = { section: current, line: j }; drop(g.indices[position - 1]); }}><ArrowUp size={16} /></button><button type="button" aria-label={`پایین بردن حرکت ${j + 1}`} disabled={position === g.indices.length - 1} onClick={() => { drag.current = { section: current, line: j }; drop(g.indices[position + 1]); }}><ArrowDown size={16} /></button><button type="button" aria-label={`حذف حرکت ${j + 1}`} onClick={() => mutate(d => { d.sections[current].lines[j] = trainingLine('', g.kind, g.id); })}><Trash2 size={16} /></button></footer>
           </article>; })}

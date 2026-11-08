@@ -26,7 +26,7 @@ const deps={
 };
 await reject(()=>processPlanRequest(body,'',deps),'PRO_AUTH_REQUIRED');
 await reject(()=>processPlanRequest(body,'forged-token',deps),'PRO_AUTH_REQUIRED');
-for(const change of [{plan:{days:[]}},{answers:{weight_kg:1}},{targetCalories:1},{actor:randomUUID()},{revision:0},{revision:1.5},{org:'x'},{count:5},{count:1.5},{date:'2026-02-31'},{date:'bad'},{notes:'x'.repeat(2001)}])
+for(const change of [{plan:{days:[]}},{answers:{weight_kg:1}},{targetCalories:1},{actor:randomUUID()},{revision:0},{revision:1.5},{org:'x'},{count:6},{count:1.5},{date:'2026-02-31'},{date:'bad'},{notes:'x'.repeat(2001)}])
  await reject(()=>processPlanRequest({...body,...change},'valid-token',deps),'PRO_INVALID_REQUEST');
 await reject(()=>processPlanRequest({...body,revision:2},'valid-token',deps),'PRO_STALE_REVISION');
 deny=true;await reject(()=>processPlanRequest(body,'valid-token',deps),'PRO_ACCESS_DENIED');deny=false;

@@ -187,3 +187,56 @@ test('all studio navigation pages use actual organization state on desktop and m
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
   await page.screenshot({ path: test.info().outputPath('overview-dark.png'), fullPage: true, animations: 'disabled' });
 });
+
+test('corrective category searches both languages and saves an individualized timed dose with stable identity',async({page})=>{
+ const state=await arrange(page);await training(page);
+ await page.getByRole('button',{name:'حرکات اصلاحی',exact:true}).click();
+ await page.getByRole('searchbox',{name:'جستجوی حرکت اصلاحی'}).fill('Knee to Wall');
+ await page.locator('.corrective-bank .studio-bank-list button').first().click();
+ const detail=page.getByRole('region',{name:'اطلاعات حرکت اصلاحی'});await expect(detail).toContainText('پیش‌نویس');
+ await detail.getByRole('checkbox').check();await detail.getByRole('button',{name:'افزودن حرکت اصلاحی به برنامه'}).click();
+ await expect(page.getByRole('spinbutton',{name:'ست حرکت 1',exact:true})).toHaveValue('');
+ await page.getByRole('spinbutton',{name:'ست حرکت 1',exact:true}).fill('2');
+ await page.getByRole('combobox',{name:'نوع دوز حرکت 1'}).click();await page.getByRole('option',{name:'زمان نگه‌داری',exact:true}).click();
+ await page.getByRole('spinbutton',{name:'زمان (ثانیه) حرکت 1',exact:true}).fill('20');await page.getByRole('spinbutton',{name:'استراحت (ثانیه) حرکت 1',exact:true}).fill('30');
+ await page.screenshot({path:test.info().outputPath('corrective-studio.png'),animations:'disabled'});
+ await page.getByRole('checkbox',{name:'تأیید برنامه اختصاصی متخصص'}).check();await page.getByRole('button',{name:'ثبت نسخهٔ تأییدشده',exact:true}).click();
+ await expect(page.getByRole('button',{name:'PDF نسخه ثبت‌شده'})).toBeVisible();const line=state.snapshots[0].content.sections[0].lines[0];expect(line.exercise?.id).toMatch(/^ce-/);expect(line.training?.seconds).toBe(20);expect(line.training?.reps).toBe(0);
+ const popup=page.waitForEvent('popup');await page.getByRole('button',{name:'PDF نسخه ثبت‌شده'}).click();const print=await popup;await expect(print.locator('body')).toContainText('20 ثانیه');await print.close();await noOverflow(page);
+});
+
+test('specialist nutrition retains several menus per meal through save, reopen and PDF',async({page})=>{
+ const state=await arrange(page);await page.getByRole('button',{name:'تدوین اختصاصی تغذیه و سوابق',exact:true}).click();
+ const bank=page.locator('.studio-bank-list button').first();await bank.click();
+ await page.getByRole('button',{name:'منوی جدید',exact:true}).click();await bank.click();await page.getByRole('spinbutton',{name:/وزن/}).first().fill('150');
+ await expect(page.locator('.studio-editor .studio-menu-table tbody tr')).toHaveCount(2);
+ await page.screenshot({path:test.info().outputPath('nutrition-multiple-menus.png'),animations:'disabled'});
+ await page.getByRole('checkbox',{name:'تأیید برنامه اختصاصی متخصص'}).check();await page.getByRole('button',{name:'ثبت نسخهٔ تأییدشده',exact:true}).click();await expect(page.getByRole('button',{name:'PDF نسخه ثبت‌شده'})).toBeVisible();
+ expect(state.snapshots[0].content.sections[0].alternatives).toHaveLength(1);
+ await page.getByRole('button',{name:'بستن پنجره',exact:true}).click();await page.getByRole('button',{name:'تدوین اختصاصی تغذیه و سوابق',exact:true}).click();await page.getByRole('button',{name:'مشاهده نسخه',exact:true}).click();
+ await expect(page.getByRole('region',{name:'نسخه ذخیره‌شده'}).locator('.studio-menu-table tbody tr')).toHaveCount(2);
+ const popup=page.waitForEvent('popup');await page.getByRole('button',{name:'PDF',exact:true}).click();const print=await popup;await expect(print.locator('tbody tr')).toHaveCount(2);await expect(print.locator('body')).toContainText('۱۵۰ گرم');await print.close();
+});
+
+test('automatic Pro menu count accepts five and returns exactly five distinct choices in each slot',async({page})=>{
+ const state=await setup(page,{existing:true});Object.assign(state.cases[0].answers,{weight_kg:85,height_cm:180,gender:'male',pregnancy_status:'not_applicable',activity_level:'moderate'});
+ await page.goto('/');await page.getByRole('button',{name:'بازکردن پرونده',exact:true}).click();await page.getByRole('combobox',{name:'تعداد منو',exact:true}).click();await page.getByRole('option',{name:'۵',exact:true}).click();
+ await page.getByRole('button',{name:'تولید و پیش‌نمایش برنامه',exact:true}).click();
+ const preview=page.locator('.pro-plan-preview');await expect(preview).toBeVisible();await expect(preview.locator('ol')).toHaveCount(6);for(const list of await preview.locator('ol').all())await expect(list.locator('li')).toHaveCount(5);
+ await expect(page.locator('a.pro-help-link')).toHaveAttribute('href','https://t.me/Behtan_Support');
+});
+
+test('studio generation retries the same request but changes identity when menu count changes after a lost response',async({page})=>{
+ const state=await arrange(page), sent:{key:string;count:number}[]=[];
+ page.on('request',request=>{if(request.url().endsWith('/api/pro-plan')&&request.method()==='POST'){const body=request.postDataJSON();if(body.action==='generate')sent.push(body);}});
+ await page.getByRole('button',{name:'تدوین اختصاصی تغذیه و سوابق',exact:true}).click();
+ const editor=page.locator('.pro-authored-editor'), generate=editor.getByRole('button',{name:'ساخت برنامه توسط به‌تن',exact:true});
+ for(let attempt=0;attempt<2;attempt++){
+  state.fixture.failGenerationNext();await generate.click();await expect(editor.getByRole('alert')).toBeVisible();await expect(generate).toBeEnabled();
+ }
+ expect(sent).toHaveLength(2);expect(sent[0].key).toBe(sent[1].key);
+ await editor.getByRole('combobox',{name:'تعداد منوی ساخت در استودیو',exact:true}).click();await page.getByRole('option',{name:'۲',exact:true}).click();
+ await generate.click();await expect(editor.getByRole('status')).toContainText('پیش‌نویس موتور');
+ expect(sent).toHaveLength(3);expect(sent[2].key).not.toBe(sent[0].key);expect(sent[2].count).toBe(2);
+ await expect(editor.locator('.studio-editor .studio-menu-table tbody tr')).toHaveCount(2);
+});

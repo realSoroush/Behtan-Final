@@ -1,6 +1,7 @@
+import {PanelSelect} from '@/components/ui/PanelSelect';
 import { AppLoading } from '@/components/ui/AppLoading';
 import { ManualTrainingBuilder } from './training/ManualTrainingBuilder';
-import { NutritionStudio } from './NutritionStudio';
+import { NutritionStudio, AuthoredNutritionPreview } from './NutritionStudio';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FileDown, Copy, Save, Sparkles, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
@@ -17,6 +18,7 @@ const message = (e: unknown) => {
     const s = e instanceof Error ? e.message : '';
     return s.includes('PRO_SERVER_CREDENTIAL_INVALID') ? 'کلید سروری Supabase نامعتبر یا بدون مجوز است؛ SUPABASE_SERVICE_ROLE_KEY را در محیط سرور بررسی کنید.'
       : s.includes('PRO_SERVER_NOT_CONFIGURED') ? 'تنظیمات سرور ساخت برنامه کامل نیست؛ PRO_SERVER_PLANS_ENABLED و کلیدهای سروری را بررسی کنید.'
+      : s.includes('PRO_MENU_COUNT_UNAVAILABLE') ? 'به تعداد انتخاب‌شده برای همهٔ وعده‌ها منوی معتبر پیدا نشد؛ تعداد منو را کاهش دهید یا محدودیت‌ها را بررسی کنید.'
       : s.includes('PRO_CATALOG_UNAVAILABLE') ? 'کاتالوگ یا سیاست محاسبات تغذیه در دسترس نیست؛ بررسی سرویس را اجرا کنید.'
       : s.includes('PRO_STALE_REVISION') ? 'نسخه پرونده تغییر کرده است؛ اطلاعات را دوباره دریافت کنید.'
       : s.includes('PRO_MODULE_DISABLED') ? 'ساخت در این ماژول فعال نیست؛ سوابق همچنان در دسترس‌اند.'
@@ -30,9 +32,10 @@ const message = (e: unknown) => {
 export function AuthoredPlanEditor({ org, record, revision, kind, name, canWrite, onBusy, seed, onDirty, onGenerate, intake, onSaved }: {
   org: string; record: string; revision: number; kind: 'nutrition' | 'training'; name: string; canWrite: boolean;
   onBusy: (b: boolean) => void; seed?: AuthoredContent; onDirty?: (b: boolean) => void;
-  onGenerate?: () => Promise<AuthoredContent>; intake?: RealIntake; onSaved?: () => void;
+  onGenerate?: (menuCount?:number) => Promise<AuthoredContent>; intake?: RealIntake; onSaved?: () => void;
 }) {
   const [content, setContent] = useState<AuthoredContent>(() => prepareContent(seed ? { ...seed, reviewed: false } : empty(kind), kind));
+  const [generatedCount,setGeneratedCount]=useState(1);
   const [rows, setRows] = useState<AuthoredSnapshot[]>([]), [page, setPage] = useState(0), [hasNext, setHasNext] = useState(false);
   const [busy, setBusy] = useState(false), [historyBusy, setHistoryBusy] = useState(false), [error, setError] = useState(''), [historyError, setHistoryError] = useState(''), [notice, setNotice] = useState('');
   const [saved, setSaved] = useState<AuthoredSnapshot | null>(null), [viewing, setViewing] = useState<AuthoredSnapshot | null>(null), [loaded, setLoaded] = useState(false);
@@ -87,7 +90,7 @@ export function AuthoredPlanEditor({ org, record, revision, kind, name, canWrite
     if (pending.current || !canWrite || !onGenerate || request.current) return;
     if (dirty && !window.confirm('پیش‌نویس فعلی با خروجی موتور جایگزین شود؟ نسخه‌های ثبت‌شده حفظ می‌شوند.')) return;
     pending.current = true; setBusy(true); notify.current(true); setError('');
-    try { const next = await onGenerate(); if (alive.current) { setContent(prepareContent(next, kind)); setSaved(null); setNotice('پیش‌نویس موتور بر اساس پرونده آماده شد. مقدارها را بازبینی کنید؛ هنوز ثبت نشده است.'); } }
+    try { const next = await onGenerate(generatedCount); if (alive.current) { setContent(prepareContent(next, kind)); setSaved(null); setNotice('پیش‌نویس موتور بر اساس پرونده آماده شد. مقدارها را بازبینی کنید؛ هنوز ثبت نشده است.'); } }
     catch (e) { if (alive.current) setError(message(e)); }
     finally { pending.current = false; if (alive.current) { setBusy(false); notify.current(false); } }
   }
@@ -97,8 +100,8 @@ export function AuthoredPlanEditor({ org, record, revision, kind, name, canWrite
     {error && <p role="alert" className="pro-error">{error}</p>}{notice && <p role="status" className="pro-success">{notice}</p>}
     {!canWrite && <p role="status" className="pro-muted">مشاهده و دانلود سوابق فعال است؛ ساخت نسخهٔ جدید فعلاً بسته است.</p>}
     {canWrite && <>
-      <fieldset disabled={busy || Boolean(request.current)}><div className="studio-title-row"><label>عنوان برنامه<input aria-label="عنوان برنامه اختصاصی" value={content.title} maxLength={160} onChange={e => mutate(d => { d.title = e.target.value; })} /></label>{onGenerate && <button type="button" onClick={() => void generate()}><Sparkles size={17} />ساخت برنامه توسط به‌تن</button>}</div>
-        {kind === 'training' ? <ManualTrainingBuilder content={content} mutate={mutate} /> : <NutritionStudio org={org} record={record} revision={revision} content={content} mutate={mutate} intake={intake} />}
+      <fieldset disabled={busy || Boolean(request.current)}><div className="studio-title-row"><label>عنوان برنامه<input aria-label="عنوان برنامه اختصاصی" value={content.title} maxLength={160} onChange={e => mutate(d => { d.title = e.target.value; })} /></label>{onGenerate&&kind==='nutrition'&&<label>تعداد منوی ساخت خودکار<PanelSelect aria-label="تعداد منوی ساخت در استودیو" value={generatedCount}onChange={e=>setGeneratedCount(Number(e.target.value))}>{[1,2,3,4,5].map(n=><option key={n}value={n}>{n.toLocaleString('fa-IR')}</option>)}</PanelSelect></label>}{onGenerate && <button type="button" onClick={() => void generate()}><Sparkles size={17} />ساخت برنامه توسط به‌تن</button>}</div>
+        {kind === 'training' ? <ManualTrainingBuilder org={org} content={content} mutate={mutate} /> : <NutritionStudio org={org} record={record} revision={revision} content={content} mutate={mutate} intake={intake} />}
         <label className="pro-authored-notes">یادداشت متخصص<textarea aria-label="یادداشت متخصص" value={content.notes} maxLength={4000} rows={3} onChange={e => mutate(d => { d.notes = e.target.value; })} /></label>
         <label className="pro-authored-review"><input type="checkbox" aria-label="تأیید برنامه اختصاصی متخصص" checked={content.reviewed} onChange={e => setContent({ ...content, reviewed: e.target.checked })} />این نسخه و تناسب آن با شرایط مراجع را بازبینی و تأیید کردم.</label>
       </fieldset>
@@ -113,7 +116,7 @@ export function AuthoredPlanEditor({ org, record, revision, kind, name, canWrite
         {canWrite && <button disabled={busy || Boolean(request.current)} onClick={() => { if (dirty && !window.confirm('تغییرات ثبت‌نشده کنار گذاشته شوند؟')) return; setContent(prepareContent({ ...p.content, reviewed: false }, kind)); setSaved(null); setNotice('نسخهٔ جدید برای ویرایش آماده است؛ نسخهٔ قبلی تغییر نمی‌کند.'); }}><Copy size={16} />ساخت نسخه جدید</button>}
         <button onClick={() => void printAuthored(p, name, org).catch(e => setError(message(e)))}><FileDown size={16} />PDF</button>
       </div></article>)}
-      {viewing && <section className="studio-snapshot" aria-label="نسخه ذخیره‌شده"><div className="studio-row"><h4>{viewing.content.title}</h4><button onClick={() => setViewing(null)}>بستن مشاهده نسخه</button></div>{viewing.content.sections.map((s, i) => <section key={i}><h4>{s.title}</h4>{s.lines.map((l, j) => <p key={j}><strong>{l.name}</strong><span>{lineDescription(l)}</span></p>)}</section>)}<p>{viewing.content.notes}</p></section>}
+      {viewing && <section className="studio-snapshot" aria-label="نسخه ذخیره‌شده"><div className="studio-row"><h4>{viewing.content.title}</h4><button onClick={() => setViewing(null)}>بستن مشاهده نسخه</button></div>{kind==='nutrition'?<AuthoredNutritionPreview content={viewing.content}/>:viewing.content.sections.map((s, i) => <section key={i}><h4>{s.title}</h4>{s.lines.map((l, j) => <p key={j}><strong>{l.name}</strong><span>{lineDescription(l)}</span></p>)}</section>)}<p>{viewing.content.notes}</p></section>}
       <div className="pro-actions"><button disabled={page === 0 || historyBusy || busy} onClick={() => setPage(p => p - 1)}>جدیدتر</button><span>صفحه {(page + 1).toLocaleString('fa-IR')}</span><button disabled={!hasNext || historyBusy || busy} onClick={() => setPage(p => p + 1)}>قدیمی‌تر</button></div>
     </section>
   </section>;
