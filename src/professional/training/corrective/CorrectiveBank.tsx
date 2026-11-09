@@ -27,7 +27,7 @@ export function CorrectiveBank({org,onAdd}:{org:string;onAdd:(exercise:Correctiv
  <p>احتیاط: {view.precautions.join('؛ ')||'موارد اختصاصی هنوز ثبت نشده‌اند؛ پیش از انتخاب بررسی کنید.'}</p><p>خطاهای رایج: {view.mistakes.join('؛ ')||'ثبت نشده'}</p>{view.breathing&&<p>تنفس: {view.breathing}</p>}
  <p className="studio-help">درد شدید یا افزایشی، بی‌حسی، ضعف پیشرونده، آسیب حاد یا جراحی اخیر نیازمند ارزیابی تخصصی است. مراحل Inhibit / Lengthen / Activate / Integrate توالی اجباری نیستند.</p>
  {view.imageUrl&&safeMedia(view.imageUrl)&&<img src={view.imageUrl}alt={view.nameFa}loading="lazy"/>}{view.videoUrl&&safeMedia(view.videoUrl)&&<video src={view.videoUrl}controls preload="none"/>}
- <p>بازبین: {view.reviewer||'هنوز تعیین نشده'}{view.reviewerQualification?' · '+view.reviewerQualification:''}{view.reviewedAt?' · '+view.reviewedAt:''}</p>{view.sourceUrls.filter(s=>s.startsWith('https://')).map(url=><a key={url}href={url}target="_blank"rel="noopener noreferrer">منبع حرکت</a>)}
+ <p>بازبین: {view.reviewer||'هنوز تعیین نشده'}{view.reviewerQualification?' · '+view.reviewerQualification:''}{view.reviewedAt?' · '+new Date(view.reviewedAt+'T12:00:00').toLocaleDateString('fa-IR'):''}</p>{view.sourceUrls.filter(s=>s.startsWith('https://')).map(url=><a key={url}href={url}target="_blank"rel="noopener noreferrer">منبع حرکت</a>)}
  <label><input type="checkbox"checked={ack}onChange={e=>setAck(e.target.checked)}/>تناسب این حرکت را بررسی می‌کنم و دوز را برای مراجع تعیین می‌کنم.</label>
  <button type="button"disabled={!ack||view.status==='archived'}onClick={()=>onAdd(view)}>افزودن حرکت اصلاحی به برنامه</button>
  {view.ownerOrg&&<CorrectiveEditor key={view.id+':'+view.revision}initial={view}org={org}onSaved={()=>{setView(null);setAttempt(n=>n+1);}}/>}

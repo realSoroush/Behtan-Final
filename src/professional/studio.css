@@ -16,12 +16,12 @@
 .studio-jump-nav{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0;padding:10px;border:1px solid var(--pro-line);border-radius:14px;background:var(--pro-surface,#fff)}
 .studio-jump-nav button{flex:1;min-height:44px;justify-content:center}
 .studio-destination{padding:10px;border-radius:10px;background:var(--pro-tint,#edf4ed);font-size:12px;line-height:1.8;overflow-wrap:anywhere}
-.studio-navigation-root :is(.studio-editor,.studio-bank,.authored-live-preview){scroll-margin-top:130px;min-width:0}
+.studio-navigation-root :is(.studio-editor,.studio-bank,.authored-live-preview){scroll-margin-top:170px;min-width:0}
 .pro-allergy-notes{display:grid;gap:8px;margin-top:20px;line-height:1.9}
 .pro-allergy-notes small{color:var(--pro-soft,#62746a)}
 .pro-intake [role=tabpanel]{scroll-margin-top:90px}
 @media(max-width:760px){
- .studio-jump-nav{position:sticky;top:62px;z-index:2;flex-wrap:nowrap;padding:6px;gap:4px;box-shadow:0 3px 10px #0000000a}
+ .studio-jump-nav{position:sticky;top:92px;z-index:2;flex-wrap:nowrap;padding:6px;gap:4px;box-shadow:0 3px 10px #0000000a}
  .studio-jump-nav button{font-size:11px!important;padding:8px 5px!important;white-space:normal}
  .studio :is(button,.panel-select-trigger){min-height:44px}
  .studio-group-order button,.manual-exercise footer button{min-width:44px;min-height:44px}
