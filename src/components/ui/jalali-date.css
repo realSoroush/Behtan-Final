@@ -1,0 +1,6 @@
+.pro-jalali-date{border:0;padding:0;margin:0;min-inline-size:0;max-width:100%}
+.pro-jalali-date>div{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.pro-jalali-date label{display:grid;gap:6px;min-width:0;font-size:12px}
+.pro-jalali-date legend{font-size:12px;margin-bottom:8px}
+.pro-jalali-date .panel-select{min-width:0;width:100%}
+.admin-tools>.pro-jalali-date{flex:1 1 240px}

@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {randomUUID} from 'node:crypto';
+import {emptyRealIntake} from '../src/professional/menuPlan.ts';
+export async function testProAllergyNotes(db) {
+ await db.exec('reset role');
+ const sql=await readFile(new URL('../supabase/migrations/20261109194909_056_pro_record_allergy_notes.sql',import.meta.url),'utf8');
+ const before=(await db.query('select id,answers from pro_real_cases order by id')).rows;
+ await db.exec(sql);await db.exec(sql);
+ assert.deepEqual((await db.query('select id,answers from pro_real_cases order by id')).rows,before,'Migration never rewrites existing records');
+ const base={...emptyRealIntake(),display_name:'آزمایشی',birth_date:'1992-04-23',height_cm:165,weight_kg:75,safety_confirmed:true};
+ const valid=async a=>(await db.query('select pro_private.valid_real_intake($1::jsonb) valid',[JSON.stringify(a)])).rows[0].valid;
+ assert.equal(await valid(base),true);
+ for(const notes of ['', 'کیوی؛ توضیح متخصص', 'ا'.repeat(1000)])assert.equal(await valid({...base,custom_allergy_notes:notes}),true);
+ for(const notes of [null,[],{},true,12,'ا'.repeat(1001)])assert.equal(await valid({...base,custom_allergy_notes:notes}),false);
+ assert.equal(await valid({...base,unexpected:'field'}),false);
+ assert.equal(await valid({...base,allergies:['kiwi'],custom_allergy_notes:'کیوی'}),false);
+ const actor=randomUUID();await db.query("insert into auth.users(id,phone,phone_confirmed_at)values($1,'989100000088',now())",[actor]);
+ await db.query("select set_config('request.jwt.claim.sub',$1,false)",[actor]);await db.exec('set role authenticated');
+ const rpc=async(name,args)=>(await db.query(`select public.${name}(${args.map((_,i)=>'$'+(i+1)).join(',')}) result`,args)).rows[0].result;
+ const org=await rpc('pro_register',['یادداشت حساسیت مصنوعی','nutrition',true]);
+ const key=randomUUID(),answers={...base,custom_allergy_notes:'کیوی'};
+ const saved=await rpc('pro_save_real_case',[org,null,0,answers,key]);
+ assert.deepEqual(await rpc('pro_save_real_case',[org,null,0,answers,key]),saved);
+ assert.deepEqual((await db.query('select answers from pro_real_cases where id=$1',[saved.id])).rows[0].answers,answers);
+ const updated={...answers,custom_allergy_notes:'کیوی و انبه'};
+ await rpc('pro_save_real_case',[org,saved.id,1,updated,randomUUID()]);
+ const history=(await db.query('select answers from pro_real_intake_versions where record_id=$1 order by revision',[saved.id])).rows;
+ assert.equal(history[0].answers.custom_allergy_notes,'کیوی');assert.equal(history[1].answers.custom_allergy_notes,'کیوی و انبه');
+ await assert.rejects(()=>rpc('pro_save_real_case',[org,saved.id,2,{...updated,custom_allergy_notes:null},randomUUID()]),/PRO_INVALID_INTAKE/);
+ await db.exec('reset role');
+ console.log('PASS Pro allergy notes: legacy compatibility, bounds/types, unknown keys, immutable revisions, save/reload, replay and no historical rewrite');
+}

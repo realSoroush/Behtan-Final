@@ -38,6 +38,8 @@ for (const variant of [
   try {p=generatePrintedPlan(a,1,4,policy,'2026-10-21');}
   catch(error){assert(error instanceof ProMenuCountError);p=generatePrintedPlan(a,1,1,policy,'2026-10-21');}
 
+  const withNotes=generatePrintedPlan({...a,custom_allergy_notes:'حساسیت ثبت‌شدهٔ دستی'},1,p.requested_menus,policy,'2026-10-21');
+  assert.deepEqual(withNotes.days,p.days,'Record-only notes must not change engine food selection or targets');
   assert.equal(p.days.length, a.workout_days ? 2 : 1);
   for (const day of p.days) {
     assert(menuCombinationsFeasible(day.slots, day.targets));

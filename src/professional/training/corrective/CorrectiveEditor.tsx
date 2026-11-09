@@ -1,3 +1,4 @@
+import {JalaliDateInput} from '@/components/ui/JalaliDateInput';
 import './corrective.css';
 import{useState}from'react';
 import{PanelSelect}from'@/components/ui/PanelSelect';
@@ -15,7 +16,8 @@ export function CorrectiveEditor({initial,org,onSaved}:{initial?:CorrectiveExerc
  <label>تجهیزات<div>{EQUIPMENT.map(([id,name])=><label key={id}><input type="checkbox"checked={row.equipment.includes(id)}onChange={e=>update('equipment',e.target.checked?[...row.equipment,id]:row.equipment.filter(c=>c!==id))}/>{name}</label>)}</div></label>
  {arrays.map(([key,title])=><label key={key}>{title} · هر مورد یک سطر<textarea aria-label={title}rows={3}maxLength={6000}value={row[key].join('\n')}onChange={e=>update(key,e.target.value.split('\n'))}/></label>)}
  <label>مرحله اصلاحی<PanelSelect aria-label="مرحله اصلاحی حرکت"value={row.stages[0]||''}onChange={e=>update('stages',e.target.value?[e.target.value]:[])}><option value="">تعیین نشده</option>{['Inhibit','Lengthen','Activate','Integrate'].map(s=><option key={s}>{s}</option>)}</PanelSelect></label>
- {org===null&&<>{([['reviewer','نام بازبین علمی'],['reviewerQualification','صلاحیت بازبین'],['reviewedAt','تاریخ بازبینی']]as const).map(([key,title])=><label key={key}>{title}<input type={key==='reviewedAt'?'date':'text'}aria-label={title}maxLength={200}value={row[key]}onChange={e=>update(key,e.target.value)}/></label>)}</>}
+ {org===null&&<>{([['reviewer','نام بازبین علمی'],['reviewerQualification','صلاحیت بازبین']]as const).map(([key,title])=><label key={key}>{title}<input type="text"aria-label={title}maxLength={200}value={row[key]}onChange={e=>update(key,e.target.value)}/></label>)}</>}
+ {org===null&&<JalaliDateInput label="تاریخ بازبینی" value={row.reviewedAt} onChange={value=>update('reviewedAt',value)}/>}
  <label>وضعیت حرکت<PanelSelect aria-label="وضعیت حرکت"value={row.status}onChange={e=>update('status',e.target.value)}>{(org===null?['draft','reviewed','published','archived']:['draft','archived']).map(s=><option key={s}value={s}>{STATUS_LABELS[s as keyof typeof STATUS_LABELS]}</option>)}</PanelSelect></label>
  <button type="button"onClick={()=>void save()}>ذخیره اطلاعات حرکت</button></fieldset>{error&&<p role="alert">{error}</p>}</section>;
 }

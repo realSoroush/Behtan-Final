@@ -30,11 +30,15 @@ export function CaseIntakeForm({
   onChange,
   disabled = false,
   identity,
+  allergyNotes,
+  onAllergyNotesChange,
 }: {
   value: CaseIntake;
   onChange: (a: CaseIntake) => void;
   disabled?: boolean;
   identity?: React.ReactNode;
+  allergyNotes?: string;
+  onAllergyNotesChange?: (notes: string) => void;
 }) {
   const [step, setStep] = useState(0);
   const instance = useId();
@@ -44,6 +48,11 @@ export function CaseIntakeForm({
   const patch = (p: Partial<CaseIntake>) =>
     onChange({ ...a, ...p, safety_confirmed: p.safety_confirmed ?? false });
   const result = intakeEligibility(a);
+  const panel = useRef<HTMLFieldSetElement>(null);
+  function navigate(next: number) {
+    setStep(next);
+    requestAnimationFrame(() => { panel.current?.focus({preventScroll:true}); panel.current?.scrollIntoView({block:'start',behavior:'instant'}); });
+  }
   return (
     <div className="pro-intake">
       <div className="pro-intake-title"><div><span className="pro-section-kicker">اطلاعات مراجع</span><h3>{sections[step]}</h3><p>{hints[step]}</p></div><span className="pro-step-count">{(step + 1).toLocaleString('fa-IR')} / ۴</span></div>
@@ -66,7 +75,7 @@ export function CaseIntakeForm({
                 const next = e.key === 'ArrowLeft' ? (i + 1) % 4 : e.key === 'ArrowRight' ? (i + 3) % 4 : e.key === 'Home' ? 0 : e.key === 'End' ? 3 : null;
                 if (next !== null) { e.preventDefault(); setStep(next); (tabs.current?.children[next] as HTMLButtonElement)?.focus(); }
               }}
-              onClick={() => setStep(i)}
+              onClick={() => navigate(i)}
               type="button"
             >
               <span className="pro-step-number" aria-hidden="true">{(i + 1).toLocaleString('fa-IR')}</span>{x}
@@ -74,7 +83,7 @@ export function CaseIntakeForm({
           ),
         )}
       </div>
-      <fieldset disabled={disabled} id={`${instance}-panel`} role="tabpanel" aria-labelledby={`${instance}-tab-${step}`} tabIndex={0}>
+      <fieldset ref={panel} disabled={disabled} id={`${instance}-panel`} role="tabpanel" aria-labelledby={`${instance}-tab-${step}`} tabIndex={0}>
         {step === 0 && (
           <div className="pro-form-grid">
             {identity}
@@ -215,7 +224,7 @@ export function CaseIntakeForm({
           <>
             <div className="pro-form-grid">
               <label>
-                ترجیح منابع پروتئین
+                میزان بودجه موردنظر
                 <PanelSelect
                   value={a.protein_budget}
                   onChange={(e) =>
@@ -227,7 +236,7 @@ export function CaseIntakeForm({
                 >
                   <option value="economic">اقتصادی</option>
                   <option value="balanced">متعادل</option>
-                  <option value="performance">عملکردی</option>
+                  <option value="performance">بدون محدودیت مالی</option>
                 </PanelSelect>
               </label>
               <label>
@@ -241,7 +250,7 @@ export function CaseIntakeForm({
                     })
                   }
                 >
-                  <option value="none">بدون محدودیت گیاه‌خواری</option>
+                  <option value="none">بدون محدودیت</option>
                   <option value="vegan">وگان</option>
                   <option value="lacto_ovo">
                     گیاه‌خواری با لبنیات و تخم‌مرغ
@@ -252,6 +261,7 @@ export function CaseIntakeForm({
               </label>
             </div>
             <h4>حساسیت غذایی</h4>
+            <p className="studio-help">گزینه‌های زیر در انتخاب خودکار غذا اعمال می‌شوند.</p>
             {(a.allergies.includes('egg') || a.allergies.includes('sesame')) && <p role="status">{NEW_ALLERGEN_NOTICE}</p>}
             <div className="pro-check-grid">
               {allergies.map(([id, label]) => (
@@ -271,6 +281,10 @@ export function CaseIntakeForm({
                 </label>
               ))}
             </div>
+            {onAllergyNotesChange && <label className="pro-allergy-notes">حساسیت‌های دیگر (ثبت دستی متخصص)
+              <textarea aria-label="حساسیت‌های دیگر" rows={3} maxLength={1000} value={allergyNotes || ''} onChange={e => onAllergyNotesChange(e.target.value)} aria-describedby={`${instance}-allergy-help`} placeholder="نام ماده و توضیح حساسیت را وارد کنید…" />
+              <small id={`${instance}-allergy-help`}>صرفاً ثبت در پرونده؛ این متن در تولید خودکار برنامه اعمال نمی‌شود. تطبیق برنامه با این موارد بر عهدهٔ متخصص است.</small>
+            </label>}
           </>
         )}
         {step === 3 && (
@@ -383,7 +397,7 @@ export function CaseIntakeForm({
           </>
         )}
       </fieldset>
-      <div className="pro-intake-navigation"><button type="button" disabled={step === 0} onClick={() => setStep(s => s - 1)}><ArrowRight size={16} />بخش قبل</button><span>{sections[step]}</span>{step < 3 ? <button type="button" onClick={() => setStep(s => s + 1)}>بخش بعد<ArrowLeft size={16} /></button> : <span className="pro-last-step">آمادهٔ بررسی و ذخیره</span>}</div>
+      <div className="pro-intake-navigation"><button type="button" disabled={step === 0} onClick={() => navigate(step - 1)}><ArrowRight size={16} />بخش قبل</button><span>{sections[step]}</span>{step < 3 ? <button type="button" onClick={() => navigate(step + 1)}>بخش بعد<ArrowLeft size={16} /></button> : <span className="pro-last-step">آمادهٔ بررسی و ذخیره</span>}</div>
     </div>
   );
 }

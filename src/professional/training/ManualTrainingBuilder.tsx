@@ -1,3 +1,4 @@
+import {StudioNavigation} from '../StudioNavigation';
 import {CorrectiveBank} from './corrective/CorrectiveBank';
 import type{CorrectiveExercise}from './corrective/types';
 import { useRef, useState } from 'react';
@@ -27,7 +28,7 @@ export function ManualTrainingBuilder({ content, mutate,org }: {org?:string; con
     if (!group) { mutate(d => d.sections[current].lines.push(line())); return; }
     const free = group.indices.find(i => !session.lines[i].name.trim());
     if (free === undefined) { setNotice('حرکت انتخاب‌شده کامل است؛ «حرکت بعدی» را بزنید یا جایگاه دیگری را انتخاب کنید.'); return; }
-    mutate(d => { if(exercise)d.sections[current].lines[free]=line();else {d.sections[current].lines[free].name = name;delete d.sections[current].lines[free].exercise;} }); setNotice('');
+    mutate(d => { if(exercise)d.sections[current].lines[free]=line();else {d.sections[current].lines[free].name = name;delete d.sections[current].lines[free].exercise;} }); setNotice(name + ' به ' + trainingDayTitle(current) + ' اضافه شد.');
   }
   function addGroup() {
     if (session.lines.length + newKind > 30) return;
@@ -68,8 +69,8 @@ export function ManualTrainingBuilder({ content, mutate,org }: {org?:string; con
     }}>{Array.from({ length: Math.max(7, content.sections.length) }, (_, i) => i + 1).map(n => <option key={n} value={n}>{fa(n)} روز</option>)}</PanelSelect></label><JalaliDateInput value={content.startDate||''}onChange={value=>mutate(d=>{d.startDate=value;})}/><p>حرکت‌های هر روز را بچینید؛ سپس به روز بعد بروید و در پایان نسخهٔ کامل را ثبت کنید.</p></div>
     <nav className="manual-days" aria-label="جلسات تمرین">{content.sections.map((s, i) => <button type="button" key={i} aria-pressed={current === i} onClick={() => { setDay(i); setTarget(''); }}>{s.title || `جلسه ${fa(i + 1)}`}</button>)}</nav>
     {notice && <p role="status" className="studio-notice">{notice}</p>}
-    <div className="studio-columns">
-      <aside className="studio-bank manual-library"><h4>بانک حرکات</h4>
+    <StudioNavigation><div className="studio-columns">
+      <aside className="studio-bank manual-library"><h4>بانک حرکات</h4><p className="studio-destination">افزودن به {trainingDayTitle(current)} · {selected ? groupLabel(selected.kind) : 'حرکت مستقل'}</p>
         <div className="manual-bank-tabs"role="group"aria-label="انتخاب بانک حرکات">{([['gym','بانک حرکات در باشگاه'],['corrective','بانک حرکات اصلاحی'],['home','بانک حرکات در منزل']]as const).map(([id,label])=><button type="button"key={id}aria-pressed={bank===id}onClick={()=>{setBank(id);setSearch('');setCategory('همه');setSubcategory('همه');}}>{label}</button>)}</div>
         {bank!=='corrective'&&<><small>{fa(bank==='home'?HOME_EXERCISES.length:MANUAL_EXERCISES.length)} نام یکتا · دسته‌بندی عضلات</small><input type="search" aria-label="جستجوی حرکت" placeholder="نام حرکت…" value={search} onChange={e => setSearch(e.target.value)} />
         <div className="studio-categories" aria-label="عضله">{parents.map(c => <button type="button" key={c} aria-pressed={category === c} onClick={() => { setCategory(c); setSubcategory('همه'); }}>{c}</button>)}</div>
@@ -80,7 +81,7 @@ export function ManualTrainingBuilder({ content, mutate,org }: {org?:string; con
       <section className="studio-editor manual-session"><div className="studio-row"><h4>{trainingDayTitle(current)}</h4><span className="studio-pill">{fa(session.lines.filter(l => l.name.trim()).length)} حرکت</span></div>
         <label>نام جلسه<input aria-label="نام جلسه تمرین" maxLength={100} value={session.title} onChange={e => mutate(d => { d.sections[current].title = e.target.value; })} /></label>
         <div className="studio-row studio-group-actions"><label>نوع حرکت بعدی<PanelSelect aria-label="نوع حرکت بعدی" value={newKind} onChange={e => setNewKind(Number(e.target.value) as GroupKind)}>{[1, 2, 3].map(k => <option key={k} value={k}>{groupLabel(k)}</option>)}</PanelSelect></label><button type="button" disabled={session.lines.length + newKind > 30} onClick={addGroup}><Plus size={16} />حرکت بعدی</button></div>
-        <p className="studio-help">گروه مقصد را انتخاب کنید؛ سپس حرکت اضافه کنید. کشیدن بین دو جایگاه، حرکت‌ها را جابه‌جا می‌کند.</p>
+        <p className="studio-help">جایگاه حرکت را انتخاب کنید و از بانک به آن حرکت اضافه کنید. برای سوپرست یا تری‌ست، نوع حرکت را تغییر دهید.</p>
         {groups.map((g, gi) => <section key={g.id} className={'studio-training-group' + (selected?.id === g.id ? ' is-selected' : '')} aria-label={`گروه تمرینی ${gi + 1}`} onClick={() => setTarget(g.id)}>
           <div className="studio-row"><button type="button" aria-pressed={selected?.id === g.id} onClick={() => setTarget(g.id)}>{groupLabel(g.kind)} {fa(gi + 1)}</button><span className="studio-group-order"><button type="button" aria-label={`بالا بردن گروه ${gi + 1}`} disabled={gi === 0} onClick={() => moveGroup(gi, gi - 1)}><ArrowUp size={15} /></button><button type="button" aria-label={`پایین بردن گروه ${gi + 1}`} disabled={gi === groups.length - 1} onClick={() => moveGroup(gi, gi + 1)}><ArrowDown size={15} /></button><button type="button" aria-label={`حذف گروه ${gi + 1}`} onClick={() => { if (g.indices.some(i => session.lines[i].name) && !window.confirm('گروه و همه حرکت‌های آن حذف شوند؟')) return; mutate(d => { d.sections[current].lines = d.sections[current].lines.filter((_, i) => !g.indices.includes(i)); }); }}><Trash2 size={15} /></button></span></div>
           <label className="studio-group-kind">نوع گروه<PanelSelect aria-label={`نوع گروه ${gi + 1}`} value={g.kind} onChange={e => {
@@ -101,7 +102,7 @@ export function ManualTrainingBuilder({ content, mutate,org }: {org?:string; con
         <button className="manual-next-day"type="button"disabled={current+1>=Math.max(7,content.sections.length)}onClick={nextDay}>{current+1>=Math.max(7,content.sections.length)?'پایان چیدمان روزها':'حرکات '+trainingDayTitle(current+1)}</button>
       </section>
       <AuthoredLivePreview content={{ ...content, sections: [session] }} />
-    </div>
+    </div></StudioNavigation>
   </div>;
 }
 export function AuthoredLivePreview({ content, name, saved = false }: { content: AuthoredContent; name?: string; saved?: boolean }) {
