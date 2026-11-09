@@ -105,6 +105,16 @@ export function TrainingPanel({
       notify.current(false);
     };
   }, []);
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => {
+      if (mode === 'engine' && (engineDirty || pending.current)) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [mode, engineDirty]);
   async function load(p = page) {
     const result = await trainingApi.history(org, record, p);
     if (alive.current) {

@@ -99,7 +99,6 @@ async function arrange(
     .getByRole("button", { name: "برنامه تمرینی مراجع", exact: true })
     .click();
   // Manual editing remains the default; enter the engine through its explicit action.
-  page.once("dialog", (dialog: any) => dialog.accept());
   await page.getByRole("button", { name: "تمرین‌دهی خودکار", exact: true }).click();
   return { fixture, rows, keys };
 }
@@ -109,6 +108,28 @@ async function fill(page: any) {
   await page.getByLabel("یک جفت دمبل قابل‌کنترل", { exact: true }).check();
   await page.getByLabel("تأیید بررسی آمادگی تمرین", { exact: true }).check();
 }
+test('unsaved automatic training settings warn before unloading, and persisted drafts release the warning', async ({ page }) => {
+  const { rows } = await arrange(page);
+  const unloadBlocked = () => page.evaluate(() => {
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  expect(await unloadBlocked()).toBe(false);
+  await fill(page);
+  expect(await unloadBlocked()).toBe(true);
+  await page.getByRole('button', { name: 'ساخت پیش‌نویس تمرین', exact: true }).click();
+  await expect(page.getByText('پیش‌نویس آماده است؛ حرکات و مقدار تمرین را قبل از تأیید بررسی کن.', { exact: true })).toBeVisible();
+  expect(rows).toHaveLength(1);
+  expect(await unloadBlocked()).toBe(false);
+  await page.getByText('تنظیم برنامه جدید', { exact: true }).click();
+  await page.getByLabel('تمرین شنبه', { exact: true }).uncheck();
+  expect(await unloadBlocked()).toBe(true);
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'بستن پنجره', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(await unloadBlocked()).toBe(false);
+});
 test('automatic training edits the start in the Persian calendar and sends only the ISO day',async({page})=>{
  const {rows}=await arrange(page);
  for(const[label,option]of[['سال تاریخ شروع تمرین','۱۴۰۵'],['ماه تاریخ شروع تمرین','آبان'],['روز تاریخ شروع تمرین','۲۰']]){await page.getByRole('combobox',{name:label,exact:true}).click();await page.getByRole('option',{name:option,exact:true}).click();}
