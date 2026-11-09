@@ -10,3 +10,29 @@
 @media(prefers-reduced-motion:reduce){.studio *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 
 .studio-menu-table{width:100%;border-collapse:collapse;margin:12px 0;font-size:12px;table-layout:fixed}.studio-menu-table th,.studio-menu-table td{padding:10px;border:1px solid var(--pro-line);text-align:right;overflow-wrap:anywhere;vertical-align:top}.studio-menu-table th:first-child{width:24%}.studio-menu-table small{display:block}.studio-menu-table p{margin:0 0 5px}.studio-menu-table .is-selected{background:var(--pro-accent-soft,#edf5e8)}.studio-menu-table button{width:100%;white-space:normal}
+
+/* Reach the editor, catalog and preview without traversing the whole mobile form. */
+.studio-navigation-root{min-width:0}
+.studio-jump-nav{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0;padding:10px;border:1px solid var(--pro-line);border-radius:14px;background:var(--pro-surface,#fff)}
+.studio-jump-nav button{flex:1;min-height:44px;justify-content:center}
+.studio-destination{padding:10px;border-radius:10px;background:var(--pro-tint,#edf4ed);font-size:12px;line-height:1.8;overflow-wrap:anywhere}
+.studio-navigation-root :is(.studio-editor,.studio-bank,.authored-live-preview){scroll-margin-top:130px;min-width:0}
+.pro-allergy-notes{display:grid;gap:8px;margin-top:20px;line-height:1.9}
+.pro-allergy-notes small{color:var(--pro-soft,#62746a)}
+.pro-intake [role=tabpanel]{scroll-margin-top:90px}
+@media(max-width:760px){
+ .studio-jump-nav{position:sticky;top:62px;z-index:2;flex-wrap:nowrap;padding:6px;gap:4px;box-shadow:0 3px 10px #0000000a}
+ .studio-jump-nav button{font-size:11px!important;padding:8px 5px!important;white-space:normal}
+ .studio :is(button,.panel-select-trigger){min-height:44px}
+ .studio-group-order button,.manual-exercise footer button{min-width:44px;min-height:44px}
+ .studio-group-order{flex-wrap:wrap;justify-content:end}
+ .studio-save-bar{position:sticky;bottom:0;z-index:2;background:var(--pro-surface,#fff);padding:12px 8px max(12px,env(safe-area-inset-bottom));border-top:1px solid var(--pro-line);box-shadow:0 -4px 12px #00000008}
+ .studio-save-bar .pro-actions{flex-direction:row;flex-wrap:wrap}
+ .studio-save-bar .pro-actions button{flex:1;white-space:normal}
+ .studio-menu-table th:first-child{width:32%}
+ .manual-days{scroll-padding-inline:8px;overscroll-behavior-inline:contain}
+ .studio-row{flex-wrap:wrap;gap:10px}
+ .studio-row>label{flex:1 1 150px;min-width:0}
+ .studio .studio-training-group .studio-row>button{max-width:100%}
+ .studio input,.studio textarea,.studio .panel-select{min-width:0}
+}

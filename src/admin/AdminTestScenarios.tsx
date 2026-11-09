@@ -1,3 +1,4 @@
+import {JalaliDateInput} from '@/components/ui/JalaliDateInput';
 import { AppLoading } from '@/components/ui/AppLoading';
 import { PanelSelect } from '@/components/ui/PanelSelect';
 import { useEffect, useState } from 'react';
@@ -121,8 +122,8 @@ export function AdminTestScenarios({ adminId }: { adminId: string }) {
       {step === 3 && <>
         <h3>نوع رژیم</h3>{VEGETARIAN_OPTIONS.map(o => <OptionCard key={o.value} icon={o.icon} label={o.label} description={o.description} selected={data.vegetarianStatus === o.value} onClick={() => update({ vegetarianStatus: o.value })} />)}
         <h3>آلرژی یا عدم تحمل غذایی (اختیاری)</h3><div className="admin-test-options">{ALLERGIES.map(o => <CheckboxCard key={o.value} icon={o.icon} label={o.label} checked={data.allergies.includes(o.value)} onChange={() => update({ allergies: data.allergies.includes(o.value) ? data.allergies.filter(a => a !== o.value) : [...data.allergies, o.value] })} />)}</div>
-        <h3>اولویت هزینه برای پروتئین</h3>{PROTEIN_BUDGET_OPTIONS.map(o => <OptionCard key={o.value} icon={o.icon} label={o.label} description={o.description} selected={data.proteinBudgetPreference === o.value} onClick={() => update({ proteinBudgetPreference: o.value })} />)}
-        <div className="admin-test-options"><label>روز برنامه<input type="date" value={scenario.date} onChange={e => change({ date: e.target.value })} /></label><label>روز تمرین<PanelSelect value={scenario.isWorkoutDay ? 'yes' : 'no'} onChange={e => change({ isWorkoutDay: e.target.value === 'yes' })}><option value="no">روز بدون تمرین</option><option value="yes" disabled={!training}>روز تمرین</option></PanelSelect></label></div>
+        <h3>میزان بودجه موردنظر</h3>{PROTEIN_BUDGET_OPTIONS.map(o => <OptionCard key={o.value} icon={o.icon} label={o.label} description={o.description} selected={data.proteinBudgetPreference === o.value} onClick={() => update({ proteinBudgetPreference: o.value })} />)}
+        <div className="admin-test-options"><JalaliDateInput label="روز برنامه" value={scenario.date} onChange={date => change({ date })}/><label>روز تمرین<PanelSelect value={scenario.isWorkoutDay ? 'yes' : 'no'} onChange={e => change({ isWorkoutDay: e.target.value === 'yes' })}><option value="no">روز بدون تمرین</option><option value="yes" disabled={!training}>روز تمرین</option></PanelSelect></label></div>
       </>}
       </div>
       <div className="admin-tools"><button type="button" disabled={step === 0} onClick={() => setStep(step - 1)}>قبلی</button>{step < steps.length - 1 && <button type="button" onClick={() => setStep(step + 1)}>بعدی</button>}<button type="button" disabled={busy} onClick={() => void save()}>{busy ? 'در حال ذخیره…' : currentId ? 'ذخیره تغییرات' : 'ذخیره سناریو'}</button>{currentId && <button type="button" disabled={busy} onClick={() => void remove()}>حذف سناریو</button>}</div>

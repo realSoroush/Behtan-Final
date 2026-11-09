@@ -298,3 +298,34 @@ test('returning to the complete directory asks before discarding unsaved case ch
  page.once('dialog',dialog=>dialog.dismiss());await page.getByRole('button',{name:'مراجعان',exact:true}).click();await expect(weight).toHaveValue('95');
  page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'مراجعان',exact:true}).click();await expect(page.locator('.pro-directory-list>li')).toHaveCount(1);expect(state.requests).toHaveLength(0);
 });
+
+test('quick navigation reaches training editor, catalog and preview without losing the selected day',async({page})=>{
+ await arrange(page);await training(page);
+ const nav=page.getByRole('navigation',{name:'دسترسی سریع برنامه‌ساز'});
+ await nav.getByRole('button',{name:'ویرایش برنامه',exact:true}).click();
+ await expect(page.locator('.studio-editor')).toBeFocused();
+ await page.getByRole('button',{name:'حرکات روز دوم',exact:true}).click();
+ await nav.getByRole('button',{name:'افزودن از بانک',exact:true}).click();
+ await expect(page.locator('.studio-bank')).toBeFocused();
+ await expect(page.locator('.studio-destination')).toContainText('روز دوم');
+ await page.getByRole('searchbox',{name:'جستجوی حرکت'}).fill('اسکوات');
+ await page.locator('.studio-bank-list button').first().click();
+ await nav.getByRole('button',{name:'پیش‌نمایش',exact:true}).click();
+ await expect(page.getByLabel('پیش‌نمایش زنده برنامه')).toBeFocused();
+ await expect(page.getByLabel('پیش‌نمایش زنده برنامه')).toContainText('روز دوم');
+ await noOverflow(page);
+ await page.screenshot({path:test.info().outputPath('training-quick-navigation.png')});
+});
+
+test('nutrition catalog has a clear destination and no-match state',async({page})=>{
+ await arrange(page);await page.getByRole('button',{name:'تدوین اختصاصی تغذیه و سوابق',exact:true}).click();
+ await expect(page.locator('.studio-bank-list button').first()).toBeVisible();
+ await page.getByRole('searchbox',{name:'جستجوی ماده غذایی'}).fill('نامی که وجود ندارد');
+ await expect(page.getByText('ماده‌ای با این جستجو پیدا نشد؛ نام یا دسته را تغییر دهید.')).toBeVisible();
+ await page.getByRole('searchbox',{name:'جستجوی ماده غذایی'}).fill('');
+ await page.locator('.studio-bank-list button').first().click();
+ await expect(page.locator('.nutrition-studio>.studio-notice')).toContainText('اضافه شد');
+ await page.getByRole('navigation',{name:'دسترسی سریع برنامه‌ساز'}).getByRole('button',{name:'ویرایش برنامه'}).click();
+ await expect(page.locator('.studio-editor')).toBeFocused();await noOverflow(page);
+ await page.screenshot({path:test.info().outputPath('nutrition-quick-navigation.png')});
+});

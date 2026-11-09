@@ -1,3 +1,4 @@
+import {setJalaliDate} from '../set-jalali-date';
 import {test,expect,type Page} from '@playwright/test';
 import {setup,org,user} from '../pro/real-fixture';
 async function adminSetup(page:Page,{denied=false,lose=false,stale=false}={}){
@@ -102,6 +103,6 @@ test('Pro metrics use the selected date range and reject a reversed range withou
  await adminSetup(page);const requests:any[]=[];
  await page.route('**/rpc/admin_pro_metrics',async route=>{const body=route.request().postDataJSON();requests.push(body);return route.fulfill({json:{specialists:body.p_from?1:2,specialists_by_profession:[{profession:'nutritionist',count:body.p_from?1:2}],specialists_date_unknown:0,specialists_date_fallback:0,clients:4,nutrition_total:8,nutrition_automatic:5,nutrition_authored:3,training_total:6,training_automatic:4,training_authored:2,body_reports:3}});});
  await page.getByRole('button',{name:'مدیریت Pro',exact:true}).click();const stats=page.getByRole('region',{name:'آمار فعالیت پنل پرو'});await expect(stats).toContainText('متخصصین ثبت‌شده');
- await stats.getByLabel('آمار پرو از تاریخ').fill('2026-11-01');await stats.getByLabel('آمار پرو تا تاریخ').fill('2026-11-08');await stats.getByRole('button',{name:'اعمال بازه'}).click();await expect.poll(()=>requests.at(-1)?.p_from).toBe('2026-11-01');expect(requests.at(-1)?.p_to).toBe('2026-11-08');
- const before=requests.length;await stats.getByLabel('آمار پرو از تاریخ').fill('2026-11-10');await stats.getByRole('button',{name:'اعمال بازه'}).click();await expect(stats.getByRole('alert')).toContainText('به ترتیب');expect(requests.length).toBe(before);
+ await setJalaliDate(page,'آمار پرو از تاریخ','2026-11-01');await setJalaliDate(page,'آمار پرو تا تاریخ','2026-11-08');await stats.getByRole('button',{name:'اعمال بازه'}).click();await expect.poll(()=>requests.at(-1)?.p_from).toBe('2026-11-01');expect(requests.at(-1)?.p_to).toBe('2026-11-08');
+ const before=requests.length;await setJalaliDate(page,'آمار پرو از تاریخ','2026-11-10');await stats.getByRole('button',{name:'اعمال بازه'}).click();await expect(stats.getByRole('alert')).toContainText('به ترتیب');expect(requests.length).toBe(before);
 });

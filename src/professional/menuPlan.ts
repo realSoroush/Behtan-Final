@@ -17,6 +17,8 @@ import { proNutritionDraftAllowed, type CaseIntake } from "./intake.ts";
 export interface RealIntake extends CaseIntake {
   display_name: string;
   phone: string;
+  /** Specialist record only; never an engine allergen filter. */
+  custom_allergy_notes?: string;
 }
 export interface MenuDay {
   workout: boolean;

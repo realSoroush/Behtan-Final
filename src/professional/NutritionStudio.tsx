@@ -1,3 +1,4 @@
+import {StudioNavigation} from './StudioNavigation';
 import { AppLoading } from '@/components/ui/AppLoading';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
@@ -27,6 +28,8 @@ function useProFoods(org:string,record:string,revision:number) {
 export function NutritionStudio({ content, mutate, intake, org, record, revision }: { org:string;record:string;revision:number;content: AuthoredContent; mutate: (fn: (d: AuthoredContent) => void) => void; intake?: RealIntake }) {
   const { foods, busy, error, retry } = useProFoods(org,record,revision);
   const [meal, setMeal] = useState(0), [day, setDay] = useState(''), [search, setSearch] = useState(''), [category, setCategory] = useState('همه'), [menuId,setMenuId] = useState('primary');
+  const [notice, setNotice] = useState('');
+  const matchingFoods = foods.filter(f => (category === 'همه' || f.role === category) && normalizedSearch(f.name).includes(normalizedSearch(search)));
   const drag = useRef<{ type: 'meal'; index: number } | { type: 'food'; id: string } | null>(null);
   const days = [...new Set(content.sections.map(s => s.nutritionDay || 'daily'))], currentDay = days.includes(day) ? day : days[0];
   const indices = content.sections.map((s, i) => ({ s, i })).filter(({ s }) => (s.nutritionDay || 'daily') === currentDay).map(x => x.i);
@@ -38,6 +41,7 @@ export function NutritionStudio({ content, mutate, intake, org, record, revision
   const legacy = activeSections.some(s => sectionMenus(s).some(m=>m.lines.some(l => !l.food && l.name.trim())));
   function add(food: FoodItem) {
     mutate(d => { const lines = editLines(d); if (lines.length === 1 && !lines[0].name.trim()) lines.length = 0; if (lines.length < 30) lines.push(foodLine(food)); });
+    setNotice(food.name + ' به ' + section.title + ' اضافه شد.');
   }
   function moveMeal(from: number, to: number) {
     const selected = content.sections[current];
@@ -45,19 +49,21 @@ export function NutritionStudio({ content, mutate, intake, org, record, revision
     setMeal(from === current ? to : content.sections.indexOf(selected) + (from < current && to >= current ? -1 : from > current && to <= current ? 1 : 0));
   }
   return <div className="nutrition-studio">
+    {notice && <p role="status" className="studio-notice">{notice}</p>}
+    {intake?.custom_allergy_notes && <p className="studio-notice">حساسیت ثبت‌شده توسط متخصص: {intake.custom_allergy_notes} — در انتخاب خودکار غذا اعمال نمی‌شود.</p>}
     {days.length > 1 && <nav className="manual-days" aria-label="نوع روز تغذیه">{days.map(k => <button type="button" key={k} aria-pressed={currentDay === k} onClick={() => { setDay(k); setMeal(0); }}>{dayLabel(k)}</button>)}</nav>}
     <div className="studio-nutrition-total" aria-label="جمع تغذیه"><div className="studio-row"><strong>{fa(total.kcal)} کالری · جمع منوهای اول · {dayLabel(currentDay)}</strong>{target && <span>هدف {fa(target.kcal)} · اختلاف {fa(total.kcal - target.kcal)}</span>}</div><div className="studio-macros">{(['protein', 'carbs', 'fat'] as const).map((k, i) => <span key={k}>{['پروتئین', 'کربوهیدرات', 'چربی'][i]} <b>{fa(total[k])}</b>{target ? ` / ${fa(target[k])}` : ''} گرم</span>)}</div></div>
     <p className="studio-help">از هر وعده فقط یک منو انتخاب می‌شود. دامنهٔ کالری روز با انتخاب منوها: {fa(range.min.kcal)} تا {fa(range.max.kcal)}.</p>
     {legacy && <p className="studio-notice">سطرهای متنی قدیمی در جمع تغذیه محاسبه نمی‌شوند. برای محاسبه دقیق، آن‌ها را با مادهٔ کاتالوگ جایگزین کنید.</p>}
     {error && <p role="alert" className="pro-error">{error}<button type="button" onClick={retry}>دریافت دوباره بانک</button></p>}
-    <div className="studio-columns">
-      <aside className="studio-bank"><h4>بانک مواد غذایی</h4><small>مقادیر از کاتالوگ به‌تن · مبنای وزن مشخص</small><input type="search" aria-label="جستجوی ماده غذایی" value={search} placeholder="نام ماده غذایی…" onChange={e => setSearch(e.target.value)} />
+    <StudioNavigation><div className="studio-columns">
+      <aside className="studio-bank"><h4>بانک مواد غذایی</h4><p className="studio-destination">افزودن به {section.title} · {selectedMenu.title}</p><small>مقادیر از کاتالوگ به‌تن · مبنای وزن مشخص</small><input type="search" aria-label="جستجوی ماده غذایی" value={search} placeholder="نام ماده غذایی…" onChange={e => setSearch(e.target.value)} />
         <div className="studio-categories">{['همه', ...new Set(foods.map(f => f.role))].map(c => <button type="button" key={c} aria-pressed={category === c} onClick={() => setCategory(c)}>{roles[c] || c}</button>)}</div>
         {busy && <AppLoading label="در حال دریافت بانک غذایی…" />}
-        <div className="studio-bank-list">{foods.filter(f => (category === 'همه' || f.role === category) && normalizedSearch(f.name).includes(normalizedSearch(search))).map(f => {
+        <div className="studio-bank-list">{matchingFoods.map(f => {
           const conflict = intake && (f.allergyFlags.some(a => intake.allergies.includes(a)) || f.excludedForVegetarian.includes(intake.vegetarian_status));
           return <button type="button" key={f.id} aria-label={'افزودن ' + f.name} disabled={selectedMenu.lines.length >= 30} draggable onDragStart={e => { drag.current = { type: 'food', id: f.id }; e.dataTransfer.setData('text/plain', f.id); }} onDragEnd={() => { drag.current = null; }} onClick={() => add(f)}><span><strong>{f.name}</strong><small>{basis[f.preparationState || 'ready']} · {fa(f.kcalPerUnit / f.gramsPerUnit * 100)} کالری / ۱۰۰ گرم</small>{conflict && <small className="studio-allergy">با حساسیت یا ترجیح پرونده تطبیق دهید</small>}</span><Plus size={16} /></button>;
-        })}{!busy && !error && !foods.length && <p>کاتالوگ مادهٔ فعالی ندارد.</p>}</div>
+        })}{!busy && !error && !matchingFoods.length && <p role="status">{foods.length ? 'ماده‌ای با این جستجو پیدا نشد؛ نام یا دسته را تغییر دهید.' : 'کاتالوگ مادهٔ فعالی ندارد.'}</p>}</div>
       </aside>
       <section className="studio-editor"><div className="studio-row"><h4>وعده‌های برنامه</h4><button type="button" disabled={content.sections.length >= 28} onClick={() => { mutate(d => { d.sections.push({ title: 'وعده جدید', nutritionDay: currentDay, lines: [] }); }); setMeal(content.sections.length); }}><Plus size={16} />وعده</button></div>
         <nav className="manual-days" aria-label="وعده‌های تغذیه">{indices.map(i => <button type="button" key={i} draggable aria-pressed={i === current} onClick={() => setMeal(i)} onDragStart={e => { drag.current = { type: 'meal', index: i }; e.dataTransfer.setData('text/plain', 'meal:' + i); }} onDragEnd={() => { drag.current = null; }} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (drag.current?.type === 'meal' && indices.includes(drag.current.index)) moveMeal(drag.current.index, i); drag.current = null; }}>{content.sections[i].title || 'وعده'}</button>)}</nav>
@@ -77,7 +83,7 @@ export function NutritionStudio({ content, mutate, intake, org, record, revision
       </section>
       <AuthoredNutritionPreview content={{...content,sections:activeSections}}/>
 
-    </div>
+    </div></StudioNavigation>
   </div>;
 }
 

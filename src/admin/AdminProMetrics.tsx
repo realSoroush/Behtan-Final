@@ -1,3 +1,4 @@
+import {JalaliDateInput} from '@/components/ui/JalaliDateInput';
 import{useEffect,useState}from'react';
 import{AppLoading}from'@/components/ui/AppLoading';
 import{PROFESSIONS}from'@/professional/specialistProfile';
@@ -11,9 +12,9 @@ export function AdminProMetrics(){
  useEffect(()=>{let active=true;setBusy(true);setError('');setData(null);commercialRpc<Metrics>('admin_pro_metrics',{p_from:range.from||null,p_to:range.to||null}).then(value=>{if(!value||!Array.isArray(value.specialists_by_profession)||cards.some(([key])=>!Number.isFinite(value[key])||value[key]<0))throw Error('INVALID_METRICS');if(active)setData(value);}).catch(()=>{if(active)setError('دریافت آمار Pro انجام نشد؛ دسترسی مدیر، اتصال و مایگریشن آمار را بررسی کنید.');}).finally(()=>{if(active)setBusy(false);});return()=>{active=false;};},[range,tick]);
  return <section aria-label="آمار فعالیت پنل پرو"className="admin-pro-metrics"><h3>آمار فعالیت پنل پرو</h3>
  <form className="admin-tools"onSubmit={e=>{e.preventDefault();setInputError('');if(!from||!to||from>to){setInputError('ابتدا و انتهای بازه را به ترتیب وارد کنید.');return;}setRange({from,to});}}>
- <label>از تاریخ<input type="date"aria-label="آمار پرو از تاریخ"value={from}onChange={e=>setFrom(e.target.value)}/></label><label>تا تاریخ<input type="date"aria-label="آمار پرو تا تاریخ"value={to}onChange={e=>setTo(e.target.value)}/></label><button disabled={busy}>اعمال بازه</button>
+ <JalaliDateInput label="آمار پرو از تاریخ" value={from} onChange={setFrom}/><JalaliDateInput label="آمار پرو تا تاریخ" value={to} onChange={setTo}/><button disabled={busy}>اعمال بازه</button>
  <button type="button"disabled={busy}onClick={()=>{setFrom('');setTo('');setInputError('');setRange({from:'',to:''});}}>همهٔ زمان‌ها</button><button type="button"disabled={busy}onClick={()=>setTick(n=>n+1)}>تازه‌سازی آمار</button></form>
- <p className="admin-note">{range.from?`${range.from} تا ${range.to}، شامل تمام روز پایان`:'همهٔ زمان‌ها'} · ساعت تهران. برنامه‌ها نسخه‌های ثبت‌شده‌اند؛ پیش‌نمایش موقت و تولید ناموفق شمرده نمی‌شوند. از هر دو نوع روز یک سند برنامه شمرده می‌شود.</p>
+ <p className="admin-note">{range.from?`${new Date(range.from+'T12:00:00').toLocaleDateString('fa-IR')} تا ${new Date(range.to+'T12:00:00').toLocaleDateString('fa-IR')}، شامل تمام روز پایان`:'همهٔ زمان‌ها'} · ساعت تهران. برنامه‌ها نسخه‌های ثبت‌شده‌اند؛ پیش‌نمایش موقت و تولید ناموفق شمرده نمی‌شوند. از هر دو نوع روز یک سند برنامه شمرده می‌شود.</p>
  {inputError&&<p role="alert">{inputError}</p>}{error&&<p role="alert">{error}</p>}{busy&&<AppLoading label="در حال دریافت آمار پرو…"/>}
  {data&&<><div className="admin-pro-metric-grid">{cards.map(([key,title])=><article key={key}><small>{title}</small><strong>{fa(data[key])}</strong></article>)}</div>
  <h4>متخصصین به تفکیک رسته کاری</h4><table><thead><tr><th>رسته</th><th>تعداد</th></tr></thead><tbody>{PROFESSIONS.map(([key,title])=><tr key={key}><td>{title}</td><td>{fa(data.specialists_by_profession.find(row=>row.profession===key)?.count||0)}</td></tr>)}</tbody></table>

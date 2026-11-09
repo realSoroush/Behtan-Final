@@ -187,7 +187,7 @@ export function BusinessPulse() {
             {data.daily.map((d) => (
               <div
                 key={d.date}
-                title={d.date + " · " + n(d.active_users)}
+                title={new Date(d.date+'T12:00:00').toLocaleDateString('fa-IR') + ' · ' + n(d.active_users)}
                 style={{
                   height:
                     Math.max(

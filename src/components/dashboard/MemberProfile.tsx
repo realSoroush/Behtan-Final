@@ -18,7 +18,7 @@ const goals: Record<string, string> = {
 const budgets: Record<string, string> = {
   economic: "اقتصادی",
   balanced: "متعادل",
-  performance: "عملکردی",
+  performance: "بدون محدودیت مالی",
 };
 const levels: Record<string, string> = {
   sedentary: "کم‌تحرک",

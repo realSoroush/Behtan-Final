@@ -1,3 +1,4 @@
+import { JalaliDateInput } from '@/components/ui/JalaliDateInput';
 import {normalizeCaseSearch} from './caseSearch';
 import { AppLoading } from '@/components/ui/AppLoading';
 import {fromPrintedPlan} from './studioModel';
@@ -477,6 +478,8 @@ function RealCaseDetail({
         <>
           <div id="pro-intake-editor" className="pro-intake-editor">
           <CaseIntakeForm
+            allergyNotes={form.custom_allergy_notes}
+            onAllergyNotesChange={notes => setForm({ ...form, custom_allergy_notes: notes, safety_confirmed: false })}
             value={form}
             disabled={busy || archived || Boolean(saveRequest.current) || !access?.can_write}
             onChange={(a) => {
@@ -553,6 +556,8 @@ function RealCaseDetail({
                       {new Date(h.recorded_at).toLocaleString("fa-IR")}
                     </summary>
                     <CaseIntakeForm
+                      allergyNotes={h.answers.custom_allergy_notes}
+                      onAllergyNotesChange={() => {}}
                       value={h.answers}
                       disabled
                       onChange={() => {}}
@@ -572,6 +577,7 @@ function RealCaseDetail({
                 <div className="pro-generation-choice"><div><h3>ابزار تدوین شما</h3><p className="pro-muted">با پیش‌نویس موتور شروع کنید یا برنامه را از ابتدا با نظر خودتان بچینید.</p></div><button disabled={busy||dirty||stale} onClick={()=>{setAuthoredSeed(undefined);setAuthoredOpen(true);}}><PenLine size={17}/> تدوین اختصاصی تغذیه و سوابق</button></div>
                 {!access?.modules?.nutrition&&<p role="status" className="pro-muted">ماژول تغذیه در اشتراک فعلی فعال نیست؛ سوابق و PDFهای قبلی قابل مشاهده‌اند.</p>}
                 <div className="pro-block-heading"><span className="pro-block-icon"><Sparkles size={22} /></span><div><small>قدم بعدی</small><h3>ساخت برنامه غذایی</h3></div></div>
+                {form.custom_allergy_notes && <p className="studio-notice">حساسیت ثبت‌شده توسط متخصص: {form.custom_allergy_notes} — در تولید خودکار اعمال نمی‌شود؛ برنامه را پیش از تحویل تطبیق دهید.</p>}
                 <p>
                   برنامه با موتور به‌تن تولید می‌شود. در PDF از هر وعده یک منو
                   انتخاب خواهد شد.
@@ -592,17 +598,7 @@ function RealCaseDetail({
                       ))}
                     </PanelSelect>
                   </label>
-                  <label>
-                    تاریخ برنامه
-                    <input
-                      aria-label="تاریخ برنامه"
-                      dir="ltr"
-                      type="date"
-                      value={date}
-                      disabled={busy}
-                      onChange={(e) => { setDate(e.target.value); invalidatePreview(); }}
-                    />
-                  </label>
+                  <JalaliDateInput label="تاریخ برنامه" value={date} disabled={busy} onChange={value => { setDate(value); invalidatePreview(); }} />
                 </div>
                 <label>
                   توضیحات برای مراجع

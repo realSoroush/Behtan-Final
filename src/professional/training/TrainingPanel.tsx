@@ -245,9 +245,9 @@ export function TrainingPanel({
                   })
                 }
               >
-                <option value="beginner">تازه‌کار</option>
-                <option value="returning">بازگشت بعد از وقفه</option>
-                <option value="regular">تمرین منظم تفریحی</option>
+                <option value="beginner">مبتدی</option>
+                <option value="returning">آماتور</option>
+                <option value="regular">پیشرفته</option>
               </PanelSelect>
             </label>
             <label>

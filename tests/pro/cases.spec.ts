@@ -1,3 +1,4 @@
+import {setJalaliDate} from '../set-jalali-date';
 import { expect, test } from "@playwright/test";
 import { setup, fillNew, specialist } from "./real-fixture";
 test("create actual record, save, generate menus, save plan and print Persian PDF", async ({
@@ -13,6 +14,7 @@ test("create actual record, save, generate menus, save plan and print Persian PD
     page.getByText("اطلاعات پرونده ذخیره شد.", { exact: true }),
   ).toBeVisible();
   expect(state.cases).toHaveLength(1);
+  await setJalaliDate(page,'تاریخ برنامه','2026-11-09');
   await page
     .getByRole("button", { name: "تولید و پیش‌نمایش برنامه", exact: true })
     .click();
@@ -26,6 +28,7 @@ test("create actual record, save, generate menus, save plan and print Persian PD
     }),
   ).toBeVisible();
   expect(state.plans).toHaveLength(1);
+  expect(state.plans[0].plan.date).toBe('2026-11-09');
   await page.screenshot({
     path: info.outputPath("real-plan.png"),
     fullPage: true,
@@ -254,4 +257,27 @@ test('service diagnostic distinguishes missing configuration from missing API',a
  await page.route('**/api/pro-plan',r=>r.fulfill({status:404,body:'Not found'}));
  await page.getByRole('button',{name:'بررسی سرویس ساخت برنامه',exact:true}).click();
  await expect(page.getByText(/API این انتشار موجود نیست/)).toBeVisible();
+});
+
+test('manual allergy notes persist separately and the budget and diet labels match the form',async({page})=>{
+ const state=await setup(page,{existing:true});await page.goto('/');
+ await page.getByRole('button',{name:'بازکردن پرونده',exact:true}).click();
+ await page.getByRole('tab',{name:'ترجیحات غذایی'}).click();
+ await page.getByRole('combobox',{name:'میزان بودجه موردنظر',exact:true}).click();
+ await page.getByRole('option',{name:'بدون محدودیت مالی',exact:true}).click();
+ await expect(page.getByRole('combobox',{name:'الگوی غذایی',exact:true})).toContainText('بدون محدودیت');
+ await page.getByRole('textbox',{name:'حساسیت‌های دیگر',exact:true}).fill('کیوی؛ فقط ثبت در پرونده');
+ await expect(page.getByText('صرفاً ثبت در پرونده؛',{exact:false})).toBeVisible();
+ await page.getByRole('tab',{name:'ایمنی پزشکی'}).click();
+ await page.getByRole('checkbox',{name:'پاسخ‌های ثبت‌شده را با مراجع بررسی کردم.'}).check();
+ await page.getByRole('button',{name:'ذخیره اطلاعات پرونده',exact:true}).click();
+ await expect(page.getByText('اطلاعات پرونده ذخیره شد.',{exact:true})).toBeVisible();
+ expect(state.cases[0].answers.custom_allergy_notes).toBe('کیوی؛ فقط ثبت در پرونده');
+ expect(state.cases[0].answers.protein_budget).toBe('performance');
+ expect(state.cases[0].answers.allergies).toEqual([]);
+ await page.reload();await page.getByRole('button',{name:'بازکردن پرونده',exact:true}).click();
+ await page.getByRole('tab',{name:'ترجیحات غذایی'}).click();
+ await expect(page.getByRole('textbox',{name:'حساسیت‌های دیگر',exact:true})).toHaveValue('کیوی؛ فقط ثبت در پرونده');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+ await page.screenshot({path:test.info().outputPath('case-diet-mobile.png'),fullPage:true});
 });

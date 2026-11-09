@@ -6,7 +6,7 @@ import { useOnboardingStore } from '@/hooks/useOnboardingStore';
 import type { Allergy, ProteinBudgetPreference, VegetarianStatus } from '@/types';
 
 export const VEGETARIAN_OPTIONS: { value: VegetarianStatus; icon: string; label: string; description: string }[] = [
-  { value: 'none', icon: '🍖', label: 'همه‌چیزخوار', description: 'هیچ محدودیتی ندارم' },
+  { value: 'none', icon: '🍖', label: 'بدون محدودیت', description: 'هیچ محدودیتی ندارم' },
   { value: 'lacto_ovo', icon: '🥚', label: 'گیاه‌خوار (لاکتو-اوو)', description: 'لبنیات و تخم‌مرغ مجاز' },
   { value: 'pescatarian', icon: '🐟', label: 'ماهی‌خوار', description: 'ماهی و غذاهای دریایی مجاز' },
   { value: 'vegan', icon: '🌿', label: 'وگان', description: 'فقط محصولات گیاهی' },
@@ -46,7 +46,7 @@ export const PROTEIN_BUDGET_OPTIONS: {
   {
     value: 'performance',
     icon: '💪',
-    label: 'عملکردی',
+    label: 'بدون محدودیت مالی',
     description: 'اولویت بیشتر به حفظ یا ساخت عضله؛ ممکن است هزینه مواد غذایی بالاتر باشد',
   },
 ];
@@ -73,7 +73,7 @@ export function Step7Dietary() {
       />
 
       <div>
-        <p className="text-sm font-semibold text-neutral-600 dark:text-neutral-400 mb-3">نوع رژیم</p>
+        <p className="text-sm font-semibold text-neutral-600 dark:text-neutral-400 mb-3">الگوی غذایی</p>
         <div className="space-y-2">
           {VEGETARIAN_OPTIONS.map((opt) => (
             <OptionCard
@@ -109,7 +109,7 @@ export function Step7Dietary() {
 
       <div>
         <p className="text-sm font-semibold text-neutral-600 dark:text-neutral-400 mb-1">
-          اولویت هزینه برای پروتئین
+          میزان بودجه موردنظر
         </p>
         <p className="mb-3 text-xs leading-5 text-neutral-400 dark:text-neutral-500">
           این انتخاب کیفیت و ایمنی رژیم را تغییر نمی‌دهد؛ فقط مشخص می‌کند هدف پروتئین شما در محدوده به‌تن چقدر به سمت حد اقتصادی یا هدف عملکردی نزدیک باشد.
