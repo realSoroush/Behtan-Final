@@ -122,6 +122,7 @@ test('unsaved automatic training settings warn before unloading, and persisted d
   await expect(page.getByText('پیش‌نویس آماده است؛ حرکات و مقدار تمرین را قبل از تأیید بررسی کن.', { exact: true })).toBeVisible();
   expect(rows).toHaveLength(1);
   expect(await unloadBlocked()).toBe(false);
+  await page.getByText('تنظیم برنامه جدید', { exact: true }).click();
   await page.getByLabel('تمرین شنبه', { exact: true }).uncheck();
   expect(await unloadBlocked()).toBe(true);
   page.once('dialog', dialog => dialog.accept());
