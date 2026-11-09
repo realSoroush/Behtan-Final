@@ -1,3 +1,4 @@
+import {trainingStartLabel} from './training/trainingDate.ts';
 import type {CorrectiveExercise} from './training/corrective/types.ts';
 import { showPrintLoading } from '../utils/printLoading.ts';
 import { lineDescription, nutritionTotals, nutritionMenuSummary, dayLabel, trainingGroups, groupLabel, fa, sectionMenus, type FoodSnapshot, type TrainingPrescription, type NutritionTotals } from './studioModel.ts';
@@ -18,6 +19,7 @@ export interface AuthoredSection {
   nutritionDay?: string;
 }
 export interface AuthoredContent {
+  startDate?: string;
   version: 1;
   title: string;
   notes: string;
@@ -66,7 +68,7 @@ export function authoredHtml(content: AuthoredContent, name: string, kind: strin
     table{width:100%;border-collapse:collapse;margin-bottom:20px}thead{display:table-header-group}td,th{border:1px solid #d7e3dc;padding:10px;text-align:right;white-space:pre-wrap;overflow-wrap:anywhere}th{background:#edf4ed}tr{break-inside:avoid}
     p{white-space:pre-wrap;overflow-wrap:anywhere}.meta{color:#64736b;font-size:10px}.notes{border-right:3px solid #227153;padding-right:12px}.totals{padding:12px;border:1px solid #d7e3dc;break-inside:avoid}
     </style></head><body><header><h1>به‌تن | ${esc(content.title)}</h1><p>${esc(name)}</p><p class="meta">${kind === 'training' ? 'برنامه تمرینی' : 'برنامه تغذیه'} · تدوین و تأیید توسط متخصص</p></header>
-    ${specialistHtml(specialist)}${sections}${totals}${content.notes ? `<p class="notes">${esc(content.notes)}</p>` : ''}
+    ${specialistHtml(specialist)}${kind==='training'&&content.startDate?`<p>تاریخ شروع: ${esc(trainingStartLabel(content.startDate))}</p>`:''}${sections}${totals}${content.notes ? `<p class="notes">${esc(content.notes)}</p>` : ''}
     <p class="meta">نسخهٔ تأییدشدهٔ متخصص${kind === 'nutrition' ? '؛ مقادیر غذایی از نسخهٔ کاتالوگ هنگام تدوین محاسبه شده‌اند. سطرهای متنی محاسبهٔ تغذیه ندارند.' : '؛ ارتباط گروه‌ها و دستورهای تمرینی در نسخهٔ ثبت‌شده حفظ شده‌اند.'}</p></body></html>`;
 }
 export async function printAuthored(p: AuthoredSnapshot, name: string, org: string) {

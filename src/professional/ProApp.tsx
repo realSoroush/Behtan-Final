@@ -29,8 +29,15 @@ const navigation = [
 ] as const;
 export function ProApp() {
   const [view,setView]=useState<ProView>('cases');
+  const [caseVisit,setCaseVisit]=useState(0);
   const unsaved=useRef(false);
-  function navigate(next:ProView){setView(next);}
+  function navigate(next:ProView){
+    if(next==='cases'){
+      if(unsaved.current&&!window.confirm('تغییرات ثبت‌نشده کنار گذاشته شوند و فهرست همهٔ مراجعان باز شود؟')){setView('cases');return;}
+      unsaved.current=false;setCaseVisit(n=>n+1);
+    }
+    setView(next);
+  }
   const markDirty=useCallback((dirty:boolean)=>{unsaved.current=dirty;},[]);
   const { user, loading, signOut } = useAuth();
   const authenticatedUserId = user?.id;
@@ -79,12 +86,12 @@ export function ProApp() {
           </div>
         </header>
         <nav className="studio-mobile-nav" aria-label="ناوبری پنل در موبایل">{navigation.map(({id,label,icon:Icon})=><button type="button" key={id} aria-current={view===id?'page':undefined} onClick={()=>navigate(id)}><Icon size={17}/>{label}</button>)}</nav>
-        <Workspace key={user.id} userId={user.id} phone={user.phone||''} view={view} navigate={navigate} onDirty={markDirty}/>
+        <Workspace key={user.id} userId={user.id} phone={user.phone||''} view={view} caseVisit={caseVisit} navigate={navigate} onDirty={markDirty}/>
       </div>
     </div>
   );
 }
-function Workspace({userId,phone,view,navigate,onDirty}:{userId:string;phone:string;view:ProView;navigate:(view:ProView)=>void;onDirty:(dirty:boolean)=>void}) {
+function Workspace({userId,phone,view,caseVisit,navigate,onDirty}:{userId:string;phone:string;view:ProView;caseVisit:number;navigate:(view:ProView)=>void;onDirty:(dirty:boolean)=>void}) {
   const [profile, setProfile] = useState<SpecialistProfile | null>(null);
   const [profileNotice, setProfileNotice] = useState('');
   const unsaved=useRef(false);
@@ -224,7 +231,7 @@ function Workspace({userId,phone,view,navigate,onDirty}:{userId:string;phone:str
       {orgs.length > 0 && (
         <>
           {view==='overview'&&<StudioOverview key={selected} org={selected} navigate={navigate}/>}
-          <div hidden={!['cases','training','nutrition','history'].includes(view)}><RealCaseWorkspace key={selected} org={selected} roles={roles} view={view} onDirty={markDirty}/></div>
+          <div hidden={!['cases','training','nutrition','history'].includes(view)}><RealCaseWorkspace key={selected+':'+caseVisit} org={selected} roles={roles} view={view} onDirty={markDirty}/></div>
           {view==='subscription'&&<section className="studio-subscription"><h2>اشتراک و ظرفیت</h2><ProSubscription key={selected} org={selected}/><details><summary>انتخاب یا ارتقای اشتراک</summary><ProOnboarding existing profile={profile} onComplete={()=>void load()}/></details></section>}
           {view==='settings'&&<section className="pro-panel studio-settings"><h2>حساب و تنظیمات</h2><dl><div><dt>فضای کاری</dt><dd>{orgs.find(o=>o.id===selected)?.name}</dd></div><div><dt>شماره حساب</dt><dd dir="ltr">{phone||'ثبت نشده'}</dd></div><div><dt>نقش شما</dt><dd>{roles.map(r=>({owner:'مالک',practitioner:'کارشناس',assistant:'دستیار'}[r])).join('، ')}</dd></div><div><dt>منطقه زمانی</dt><dd>تهران</dd></div></dl><div className="studio-row"><span>ظاهر روشن / تیره</span><ThemeToggle/></div><details><summary>ویرایش مشخصات حرفه‌ای و اطلاعات PDF</summary><SpecialistProfileForm key={JSON.stringify(profile)} initial={profile} editing onSaved={saved=>{setProfile(saved);setProfileNotice("مشخصات حرفه‌ای ذخیره شد.");}} /></details>{profileNotice&&<p role="status" className="pro-success">{profileNotice}</p>}<a className="pro-nav-link" href="https://t.me/Behtan_Support" target="_blank" rel="noopener noreferrer"><LifeBuoy size={18}/>راهنمای استفاده</a></section>}
 

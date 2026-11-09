@@ -1,3 +1,4 @@
+import {trainingStartLabel} from './training/trainingDate';
 import {PanelSelect} from '@/components/ui/PanelSelect';
 import { AppLoading } from '@/components/ui/AppLoading';
 import { ManualTrainingBuilder } from './training/ManualTrainingBuilder';
@@ -10,9 +11,11 @@ import { type AuthoredContent, type AuthoredSnapshot, printAuthored } from './au
 import { lineDescription, prepareContent, trainingLine, validateAuthored } from './studioModel';
 import type { RealIntake } from './menuPlan';
 import './studio.css';
+import {tehranToday} from '@/components/ui/JalaliDateInput';
 const empty = (kind: 'nutrition' | 'training'): AuthoredContent => ({ version: 1,
+  ...(kind==='training'?{startDate:tehranToday()}:{}),
   title: kind === 'nutrition' ? 'برنامه غذایی اختصاصی' : 'برنامه تمرینی اختصاصی', notes: '', reviewed: false,
-  sections: [{ title: kind === 'nutrition' ? 'صبحانه' : 'جلسه اول', lines: kind === 'training' ? [trainingLine()] : [{name:'',details:''}] }],
+  sections: [{ title: kind === 'nutrition' ? 'صبحانه' : 'روز اول', lines: kind === 'training' ? [trainingLine()] : [{name:'',details:''}] }],
 });
 const message = (e: unknown) => {
     const s = e instanceof Error ? e.message : '';
@@ -116,7 +119,7 @@ export function AuthoredPlanEditor({ org, record, revision, kind, name, canWrite
         {canWrite && <button disabled={busy || Boolean(request.current)} onClick={() => { if (dirty && !window.confirm('تغییرات ثبت‌نشده کنار گذاشته شوند؟')) return; setContent(prepareContent({ ...p.content, reviewed: false }, kind)); setSaved(null); setNotice('نسخهٔ جدید برای ویرایش آماده است؛ نسخهٔ قبلی تغییر نمی‌کند.'); }}><Copy size={16} />ساخت نسخه جدید</button>}
         <button onClick={() => void printAuthored(p, name, org).catch(e => setError(message(e)))}><FileDown size={16} />PDF</button>
       </div></article>)}
-      {viewing && <section className="studio-snapshot" aria-label="نسخه ذخیره‌شده"><div className="studio-row"><h4>{viewing.content.title}</h4><button onClick={() => setViewing(null)}>بستن مشاهده نسخه</button></div>{kind==='nutrition'?<AuthoredNutritionPreview content={viewing.content} showTitle={false}/>:viewing.content.sections.map((s, i) => <section key={i}><h4>{s.title}</h4>{s.lines.map((l, j) => <p key={j}><strong>{l.name}</strong><span>{lineDescription(l)}</span></p>)}</section>)}{kind==='training'&&<p>{viewing.content.notes}</p>}</section>}
+      {viewing && <section className="studio-snapshot" aria-label="نسخه ذخیره‌شده"><div className="studio-row"><h4>{viewing.content.title}</h4><button onClick={() => setViewing(null)}>بستن مشاهده نسخه</button></div>{kind==='training'&&viewing.content.startDate&&<p>تاریخ شروع: {trainingStartLabel(viewing.content.startDate)}</p>}{kind==='nutrition'?<AuthoredNutritionPreview content={viewing.content} showTitle={false}/>:viewing.content.sections.map((s, i) => <section key={i}><h4>{s.title}</h4>{s.lines.map((l, j) => <p key={j}><strong>{l.name}</strong><span>{lineDescription(l)}</span></p>)}</section>)}{kind==='training'&&<p>{viewing.content.notes}</p>}</section>}
       <div className="pro-actions"><button disabled={page === 0 || historyBusy || busy} onClick={() => setPage(p => p - 1)}>جدیدتر</button><span>صفحه {(page + 1).toLocaleString('fa-IR')}</span><button disabled={!hasNext || historyBusy || busy} onClick={() => setPage(p => p + 1)}>قدیمی‌تر</button></div>
     </section>
   </section>;

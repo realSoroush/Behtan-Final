@@ -13,6 +13,7 @@ import {
   WandSparkles,
   SlidersHorizontal,
 } from "lucide-react";
+import {JalaliDateInput} from '@/components/ui/JalaliDateInput';
 import { PanelSelect } from "@/components/ui/PanelSelect";
 import { EQUIPMENT, WEEKDAYS } from "../../training/engine";
 import type {
@@ -264,16 +265,7 @@ export function TrainingPanel({
                 {[30,45,60,75,90,120].map(n=><option key={n} value={n}>{n.toLocaleString('fa-IR')} دقیقه</option>)}
               </PanelSelect>
             </label>
-            <label>
-              تاریخ شروع
-              <input
-                aria-label="تاریخ شروع تمرین"
-                type="date"
-                dir="ltr"
-                value={input.start_date}
-                onChange={(e) => change({ start_date: e.target.value })}
-              />
-            </label>
+            <JalaliDateInput value={input.start_date}onChange={value=>change({start_date:value})}/>
           </div>
           <h4>تجهیزاتی که واقعاً در دسترس‌اند</h4>
           <div className="training-choices">
@@ -406,7 +398,7 @@ export function TrainingPanel({
       </details>
       {selected && (
         <section ref={previewRef} className="training-preview">
-          <button disabled={busy||!canWrite} onClick={()=>{setSeed({version:1,title:'برنامه تمرینی اختصاصی',notes:selected.plan.notes.join('\n'),reviewed:false,sections:selected.plan.weeks.flatMap(w=>w.sessions.map(s=>({title:'هفته '+w.week+' · '+s.title,lines:s.lines.map(l=>{const line=trainingLine(l.exercise.name);line.training!.sets=l.sets;line.training!.reps=l.reps[0];line.training!.rest=l.rest_seconds;line.details='بازه تکرار پیشنهادی: '+l.reps.join(' تا ');return line;})})))});setMode('authored');}}>ساخت نسخه اختصاصی از این پیش‌نویس</button><div className="training-preview-head">
+          <button disabled={busy||!canWrite} onClick={()=>{setSeed({version:1,startDate:selected.plan.input.start_date,title:'برنامه تمرینی اختصاصی',notes:selected.plan.notes.join('\n'),reviewed:false,sections:selected.plan.weeks.flatMap(w=>w.sessions.map(s=>({title:'هفته '+w.week+' · '+s.title,lines:s.lines.map(l=>{const line=trainingLine(l.exercise.name);line.training!.sets=l.sets;line.training!.reps=l.reps[0];line.training!.rest=l.rest_seconds;line.details='بازه تکرار پیشنهادی: '+l.reps.join(' تا ');return line;})})))});setMode('authored');}}>ساخت نسخه اختصاصی از این پیش‌نویس</button><div className="training-preview-head">
             <div>
               <small>
                 {selected.approved_at ? "تأییدشده" : "پیش‌نویس برای بازبینی"}

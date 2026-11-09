@@ -109,6 +109,11 @@ async function fill(page: any) {
   await page.getByLabel("یک جفت دمبل قابل‌کنترل", { exact: true }).check();
   await page.getByLabel("تأیید بررسی آمادگی تمرین", { exact: true }).check();
 }
+test('automatic training edits the start in the Persian calendar and sends only the ISO day',async({page})=>{
+ const {rows}=await arrange(page);
+ for(const[label,option]of[['سال تاریخ شروع تمرین','۱۴۰۵'],['ماه تاریخ شروع تمرین','آبان'],['روز تاریخ شروع تمرین','۲۰']]){await page.getByRole('combobox',{name:label,exact:true}).click();await page.getByRole('option',{name:option,exact:true}).click();}
+ await fill(page);await page.getByRole('button',{name:'ساخت پیش‌نویس تمرین',exact:true}).click();await expect.poll(()=>rows.length).toBe(1);expect(rows[0].plan.input.start_date).toBe('2026-11-11');
+});
 test("training draft, animation, approval and saved history are usable", async ({
   page,
 }) => {
