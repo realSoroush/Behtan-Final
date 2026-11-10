@@ -27,6 +27,10 @@ Deploying UI before 056 will reject a save containing the new field. For rollbac
 - Browser tests run on desktop and mobile: notes save/reload, budget labels, Persian nutrition date to exact ISO save, editor/catalog/preview navigation, catalog no-match feedback, overflow and existing end-to-end flows. Admin metrics tests select Persian dates and assert exact ISO range arguments.
 - Local Chromium cannot launch in this host (socket permission); browser verification is performed in GitHub Actions. Review its final result before merge.
 
+## Nutrition menu-count recovery
+
+Automatic case generation defaults to one menu per meal. A request for multiple menus still requires the exact requested count of distinct, jointly valid options in every meal; the engine never silently fills, duplicates or reduces those options. Generation errors and request IDs appear beside the generation button and receive focus. Only a menu-count shortage with a count above one offers an explicit one-menu retry, using a new request key and the same saved intake, date and notes. No database or API deployment changes are needed for this UI correction.
+
 ## Production smoke
 
 Use a test case: add a manual allergy note, reconfirm screening, save and reopen it; inspect its old revision. Generate a nutrition plan on a Persian-selected date and compare stored/printed date. On mobile build two training days, move between catalog/editor/preview, save and reopen the archive/PDF. Check the subscription expiry time remains unchanged when its date changes.

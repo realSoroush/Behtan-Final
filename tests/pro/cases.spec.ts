@@ -281,3 +281,46 @@ test('manual allergy notes persist separately and the budget and diet labels mat
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
  await page.screenshot({path:test.info().outputPath('case-diet-mobile.png'),fullPage:true});
 });
+
+test('menu shortage stays visible at generation and retries one menu only after explicit selection',async({page})=>{
+ const state=await setup(page,{existing:true});const sent:any[]=[];
+ const trace='a3f95e2b-ee11-49cf-baf9-3e4582832522';
+ await page.route('**/api/pro-plan',async route=>{
+  const body=route.request().postDataJSON();
+  if(body.action==='generate'){
+   sent.push(body);
+   if(body.count>1)return route.fulfill({status:422,headers:{'X-Request-Id':trace},json:{error:'PRO_MENU_COUNT_UNAVAILABLE'}});
+  }
+  await route.fallback();
+ });
+ await page.goto('/');await page.getByRole('button',{name:'بازکردن پرونده',exact:true}).click();
+ await expect(page.getByRole('combobox',{name:'تعداد منو',exact:true})).toContainText('۱');
+ await page.getByRole('combobox',{name:'تعداد منو',exact:true}).click();await page.getByRole('option',{name:'۴',exact:true}).click();
+ await page.getByRole('button',{name:'تولید و پیش‌نمایش برنامه',exact:true}).click();
+ const feedback=page.locator('.pro-generation-feedback');await expect(feedback.getByRole('alert')).toContainText(trace);
+ await expect(feedback).toBeFocused();await expect(feedback).toBeInViewport();
+ await expect(page.locator('.pro-plan-preview')).toHaveCount(0);expect(sent).toHaveLength(1);expect(sent[0].count).toBe(4);
+ await expect(page.getByRole('combobox',{name:'تعداد منو',exact:true})).toContainText('۴');
+ await page.screenshot({path:test.info().outputPath('menu-shortage-feedback.png')});
+ await page.getByRole('button',{name:'ساخت با ۱ منو برای هر وعده',exact:true}).click();
+ await expect(page.locator('.pro-plan-preview')).toBeVisible();expect(sent).toHaveLength(2);expect(sent[1].count).toBe(1);expect(sent[1].key).not.toBe(sent[0].key);
+ expect(sent[1].record).toBe(sent[0].record);expect(sent[1].revision).toBe(sent[0].revision);expect(sent[1].date).toBe(sent[0].date);
+ await page.getByRole('button',{name:'ذخیره این برنامه',exact:true}).click();
+ await expect(page.getByText('برنامه ذخیره شد و برای خروجی PDF آماده است.',{exact:true})).toBeVisible();
+ expect(state.plans).toHaveLength(1);expect(state.plans[0].plan.requested_menus).toBe(1);
+ for(const day of state.plans[0].plan.days)for(const slot of day.slots)expect(slot.options).toHaveLength(1);
+});
+
+test('a one-menu generation failure stays visible without suggesting an unrelated menu-count retry',async({page})=>{
+ await setup(page,{existing:true});const sent:any[]=[];
+ await page.route('**/api/pro-plan',async route=>{
+  const body=route.request().postDataJSON();if(body.action!=='generate')return route.fallback();
+  sent.push(body);return route.fulfill({status:422,json:{error:'PRO_GENERATION_FAILED'}});
+ });
+ await page.goto('/');await page.getByRole('button',{name:'بازکردن پرونده',exact:true}).click();
+ await page.getByRole('button',{name:'تولید و پیش‌نمایش برنامه',exact:true}).click();
+ await expect(page.locator('.pro-generation-feedback').getByRole('alert')).toBeVisible();
+ await expect(page.getByRole('button',{name:'ساخت با ۱ منو برای هر وعده',exact:true})).toHaveCount(0);
+ expect(sent).toHaveLength(1);expect(sent[0].count).toBe(1);
+ await expect(page.getByRole('button',{name:'تولید و پیش‌نمایش برنامه',exact:true})).toBeEnabled();
+});

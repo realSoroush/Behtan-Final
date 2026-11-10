@@ -191,7 +191,7 @@ function RealCaseDetail({
     [planId, setPlanId] = useState(""),
     [draftId, setDraftId] = useState(""),
     [connectionWarning, setConnectionWarning] = useState(false),
-    [count, setCount] = useState(4),
+    [count, setCount] = useState(1),
     [date, setDate] = useState(today),
     [notes, setNotes] = useState(""),
     [busy, setBusy] = useState(false),
@@ -202,6 +202,15 @@ function RealCaseDetail({
     [access,setAccess] = useState<WorkspaceStatus|null>(null),
     [historyPage,setHistoryPage] = useState(0),[historyTotal,setHistoryTotal] = useState(0),
     [plansPage,setPlansPage] = useState(0),[plansTotal,setPlansTotal] = useState(0);
+  const [generationFailure, setGenerationFailure] = useState(false);
+  const [menuCountUnavailable, setMenuCountUnavailable] = useState(false);
+  const generationFeedback = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (error && generationFailure && !locked) {
+      generationFeedback.current?.focus({preventScroll:true});
+      generationFeedback.current?.scrollIntoView({block:'center',behavior:'instant'});
+    }
+  }, [error,generationFailure,locked]);
   const pending = useRef(false),
     mounted = useRef(true),
     saveRequest = useRef<{
@@ -316,17 +325,21 @@ function RealCaseDetail({
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
-  async function run(fn: () => Promise<void>) {
+  async function run(fn: () => Promise<void>, generation = false) {
     if (pending.current) return;
     pending.current = true;
     setBusy(true);
     setError("");
     setNotice("");
+    setGenerationFailure(false);
+    setMenuCountUnavailable(false);
     try {
       await fn();
     } catch (e) {
       if (mounted.current) {
         setError(message(e));
+        setGenerationFailure(generation);
+        setMenuCountUnavailable(e instanceof Error && e.message.includes('PRO_MENU_COUNT_UNAVAILABLE'));
         if (
           e instanceof Error &&
           /PRO_INVALID_INTAKE|PRO_STALE_REVISION|PRO_ACCESS_DENIED/.test(
@@ -374,17 +387,17 @@ function RealCaseDetail({
       setNotice("اطلاعات پرونده ذخیره شد.");
     });
   }
-  async function generate() {
+  async function generate(requestedCount = count) {
     await run(async () => {
       if (dirty || !id || stale || connectionWarning || !access?.can_write || !access?.modules?.nutrition)
         throw new Error('ابتدا اطلاعات پرونده را ذخیره و اتصال را بررسی کنید.');
-      const result = await realCaseApi.generatePlan(org, id, revision, count, date, notes, generationKey.current);
+      const result = await realCaseApi.generatePlan(org, id, revision, requestedCount, date, notes, generationKey.current);
       setPlan(result.plan);setPreviewOpen(true);
       setDraftId(result.draft_id);
       generationKey.current = crypto.randomUUID();
       setPlanId("");
       planKey.current = crypto.randomUUID();
-    });
+    }, true);
   }
   async function savePlan() {
     await run(async () => {
@@ -402,6 +415,7 @@ function RealCaseDetail({
     });
   }
   function invalidatePreview() {
+    setError(''); setGenerationFailure(false); setMenuCountUnavailable(false);
     setPlan(null); setPlanId(''); setDraftId('');
     generationKey.current = crypto.randomUUID();
   }
@@ -439,7 +453,7 @@ function RealCaseDetail({
         {id ? <a href="#pro-plan-builder"><span>۲</span>ساخت برنامه</a> : <span className="pro-path-inactive"><span>۲</span>ساخت برنامه</span>}
         {id ? <a href="#pro-saved-programs"><span>۳</span>برنامه‌ها و خروجی</a> : <span className="pro-path-inactive"><span>۳</span>برنامه‌ها و خروجی</span>}
       </nav>
-      {error && !(previewOpen&&plan) && (
+      {error && (!generationFailure || locked) && !(previewOpen&&plan) && (
         <p role="alert" className="pro-error">
           {error}
         </p>
@@ -600,6 +614,7 @@ function RealCaseDetail({
                   </label>
                   <JalaliDateInput label="تاریخ برنامه" value={date} disabled={busy} onChange={value => { setDate(value); invalidatePreview(); }} />
                 </div>
+                <p className="pro-muted">هر منو یک انتخاب جایگزین برای همان وعده است. با ۱ منو شروع کنید؛ تعداد بیشتر به گزینه‌های معتبر موجود برای این پرونده بستگی دارد.</p>
                 <label>
                   توضیحات برای مراجع
                   <textarea
@@ -621,6 +636,12 @@ function RealCaseDetail({
                 >
                   <Sparkles size={18} /> تولید و پیش‌نمایش برنامه
                 </button>
+                {error && generationFailure && <div ref={generationFeedback} tabIndex={-1} className="pro-generation-feedback">
+                  <p role="alert" className="pro-error">{error}</p>
+                  {menuCountUnavailable && count > 1 && <button type="button" className="pro-primary" disabled={busy || archived || dirty || stale || !date || connectionWarning || !access?.can_write || !access?.modules?.nutrition} onClick={() => {
+                    setCount(1); invalidatePreview(); void generate(1);
+                  }}>ساخت با ۱ منو برای هر وعده</button>}
+                </div>}
                 {dirty && (
                   <p className="pro-muted">
                     قبل از تولید، پاسخ‌های ویرایش‌شده را ذخیره کنید.
