@@ -281,3 +281,56 @@ test('manual allergy notes persist separately and the budget and diet labels mat
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
  await page.screenshot({path:test.info().outputPath('case-diet-mobile.png'),fullPage:true});
 });
+
+test('a genuine catalog shortage stays visible and preserves the requested count',async({page})=>{
+ await setup(page,{existing:true});const sent:any[]=[];
+ const trace='a3f95e2b-ee11-49cf-baf9-3e4582832522';
+ await page.route('**/api/pro-plan',async route=>{
+  const body=route.request().postDataJSON();
+  if(body.action==='generate'){sent.push(body);return route.fulfill({status:422,headers:{'X-Request-Id':trace},json:{error:'PRO_MENU_COUNT_UNAVAILABLE'}});}
+  await route.fallback();
+ });
+ await page.goto('/');await page.getByRole('button',{name:'بازکردن پرونده',exact:true}).click();
+ await page.getByRole('button',{name:'تولید و پیش‌نمایش برنامه',exact:true}).click();
+ const feedback=page.locator('.pro-generation-feedback');await expect(feedback.getByRole('alert')).toContainText(trace);
+ await expect(feedback).toBeFocused();await expect(feedback).toBeInViewport();
+ await expect(page.locator('.pro-plan-preview')).toHaveCount(0);expect(sent).toHaveLength(1);expect(sent[0].count).toBe(4);
+ await expect(page.getByRole('combobox',{name:'تعداد منو',exact:true})).toContainText('۴');
+ await expect(page.getByRole('button',{name:'ساخت با ۱ منو برای هر وعده',exact:true})).toHaveCount(0);
+ await page.screenshot({path:test.info().outputPath('menu-shortage-feedback.png')});
+});
+
+test('the real engine delivers and saves the selected 2–5 distinct menus for a low-calorie case',async({page})=>{
+ const state=await setup(page,{existing:true});await page.goto('/');
+ await page.getByRole('button',{name:'بازکردن پرونده',exact:true}).click();
+ for(const count of [2,3,4,5]){
+  await page.getByRole('combobox',{name:'تعداد منو',exact:true}).click();await page.getByRole('option',{name:count.toLocaleString('fa-IR'),exact:true}).click();
+  await page.getByRole('button',{name:'تولید و پیش‌نمایش برنامه',exact:true}).click();
+  const preview=page.locator('.pro-plan-preview');await expect(preview).toBeVisible();
+  for(const list of await preview.locator('ol').all())await expect(list.locator('li')).toHaveCount(count);
+  const draft=[...state.draftMap.values()].at(-1)!;
+  expect(draft.plan.requested_menus).toBe(count);
+  for(const day of draft.plan.days)for(const slot of day.slots)expect(new Set(slot.options.map(m=>m.components.map(c=>c.foodItem.id).sort().join('|'))).size).toBe(count);
+  if(count===5){
+   await page.getByRole('button',{name:'ذخیره این برنامه',exact:true}).click();
+   await expect(page.getByText('برنامه ذخیره شد و برای خروجی PDF آماده است.',{exact:true})).toBeVisible();
+   expect(state.plans[0].plan.requested_menus).toBe(5);
+  }
+  await page.getByRole('button',{name:'بستن پنجره',exact:true}).click();
+ }
+});
+
+test('a one-menu generation failure stays visible without suggesting an unrelated menu-count retry',async({page})=>{
+ await setup(page,{existing:true});const sent:any[]=[];
+ await page.route('**/api/pro-plan',async route=>{
+  const body=route.request().postDataJSON();if(body.action!=='generate')return route.fallback();
+  sent.push(body);return route.fulfill({status:422,json:{error:'PRO_GENERATION_FAILED'}});
+ });
+ await page.goto('/');await page.getByRole('button',{name:'بازکردن پرونده',exact:true}).click();
+ await page.getByRole('combobox',{name:'تعداد منو',exact:true}).click();await page.getByRole('option',{name:'۱',exact:true}).click();
+ await page.getByRole('button',{name:'تولید و پیش‌نمایش برنامه',exact:true}).click();
+ await expect(page.locator('.pro-generation-feedback').getByRole('alert')).toBeVisible();
+ await expect(page.getByRole('button',{name:'ساخت با ۱ منو برای هر وعده',exact:true})).toHaveCount(0);
+ expect(sent).toHaveLength(1);expect(sent[0].count).toBe(1);
+ await expect(page.getByRole('button',{name:'تولید و پیش‌نمایش برنامه',exact:true})).toBeEnabled();
+});

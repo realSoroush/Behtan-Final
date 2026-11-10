@@ -1,3 +1,4 @@
+import {professionalMenusFeasible,professionalMenuViolation,professionalMenuBounds,menuTargetVector,menuNutrients,type ProfessionalMenuSlot} from './professionalMenuEnvelope.ts';
 import { foodAllowedByAllergens } from './allergens.ts';
 /**
  * mealPlanEngine.ts
@@ -1568,9 +1569,128 @@ export function getSlotTargets(slot: MealSlot, targets: MacroTargets): MacroVect
   };
 }
 
+/** Specialist gram prescriptions use 5 g resolution; household/countable
+ * portions retain the catalog step. Minimum/maximum servings never change. */
+function professionalPortionCandidates(food:FoodItem,rule:PortionRule):number[] {
+  const household=range(rule.minUnits,rule.hardMaxUnits,rule.step);
+  if(food.unitLabel.trim()!=='گرم')return household;
+  const grams=range(Math.ceil(rule.minUnits*food.gramsPerUnit/5)*5,Math.floor(rule.hardMaxUnits*food.gramsPerUnit/5)*5,5);
+  return [...new Set([...household,...grams.map(g=>g/food.gramsPerUnit)])].sort((a,b)=>a-b);
+}
+
+function professionalCalorieCeiling(base:Meal,daily?:MacroTargets,referenceDayCalories?:number):number {
+  if(base.slot==='post_workout')return Number.POSITIVE_INFINITY;
+  // A daily solver may make one meal smaller than its intended share. That
+  // incidental serving must not cap every alternative to the same tiny meal.
+  return Math.max(Math.max(base.totalKcal,daily?getSlotTargets(base.slot,daily).kcal:0)*1.35,referenceDayCalories!==undefined&&daily?base.totalKcal+Math.max(0,daily.targetCalories*1.03-referenceDayCalories):0);
+}
+
+/** Pro alternatives are complete meals, so solve their legal portions against
+ * the reference meal using the whole day's error scale, not a single slot's
+ * protein-first score. Original fixed ingredients and serving caps stay fixed. */
+function fitProfessionalMeal(engine:EngineCatalog, meal:Meal, reference:Meal, daily:MacroTargets, limits?:{min:number[];max:number[]},ceiling=professionalCalorieCeiling(reference,daily)):Meal {
+  const template=engine.templatesById.get(meal.templateId.split('~')[0]);
+  const target=menuNutrients.map((k,i)=>limits?(limits.min[i]<=limits.max[i]?Math.max(limits.min[i],Math.min(limits.max[i],reference[k])):(limits.min[i]+limits.max[i])/2):reference[k]),scale=menuTargetVector(daily);
+  const candidates=meal.components.map((c,index)=>{
+    if(template&&fixedPortion(template,index,c.foodItem.id)!==undefined)return[c];
+    const rule=portionRuleFor(engine,c.foodItem);
+    return (limits?professionalPortionCandidates(c.foodItem,rule):range(rule.minUnits,rule.hardMaxUnits,rule.step)).map(u=>componentFromUnits(c.foodItem,u));
+  });
+  const suffix=candidates.map((_,index)=>menuNutrients.map((__,k)=>{
+    const nutrient=(['kcal','protein','carbs','fat'] as const)[k];
+    return {min:candidates.slice(index+1).reduce((n,cs)=>n+Math.min(...cs.map(c=>c[nutrient])),0),max:candidates.slice(index+1).reduce((n,cs)=>n+Math.max(...cs.map(c=>c[nutrient])),0)};
+  }));
+  type State={components:MealComponent[];totals:number[];cost:number};
+  let beam:State[]=[{components:[],totals:[0,0,0,0],cost:0}];
+  const cost=(totals:number[],remaining:{min:number;max:number}[])=>totals.reduce((sum,value,k)=>{
+    const low=value+remaining[k].min,high=value+remaining[k].max;
+    const distance=Math.max(0,low-target[k],target[k]-high)/Math.max(1,scale[k]);
+    const outside=limits?Math.max(0,low-limits.max[k],limits.min[k]-high)/Math.max(1,scale[k]):0;
+    return sum+distance*distance+100*outside;
+  },0);
+  for(let index=0;index<candidates.length;index++){
+    const expanded:State[]=[];
+    for(const state of beam)for(const c of candidates[index]){
+      const components=[...state.components,c],totals=state.totals.map((n,k)=>n+c[(['kcal','protein','carbs','fat']as const)[k]]);
+      if(totals[0]>ceiling+1e-6||mealMassGrams(components)>mealMassLimitGrams(meal.slot,Math.max(reference.totalKcal,getSlotTargets(meal.slot,daily).kcal))||!isPracticalMeal(meal.slot,components,index===candidates.length-1))continue;
+      expanded.push({components,totals,cost:cost(totals,suffix[index])});
+    }
+    beam=expanded.sort((a,b)=>a.cost-b.cost).slice(0,100);
+    if(!beam.length)return meal;
+  }
+  const best=beam[0];
+  return {...meal,templateName:best.components.map(c=>c.foodItem.name).join(' و '),components:best.components,totalKcal:Math.round(best.totals[0]),totalProtein:round1(best.totals[1]),totalCarbs:round1(best.totals[2]),totalFat:round1(best.totals[3]),totalFiber:round1(best.components.reduce((n,c)=>n+c.fiber,0))};
+}
+
+/** Adjust complete Pro alternatives together against the worst-case daily
+ * envelope. A valid result covers all combinations, not just paired menu rows. */
+function rebalanceProfessionalMenusWithCatalog(engine:EngineCatalog,source:ProfessionalMenuSlot[],targets:MacroTargets,reference:Meal[],pools:ProfessionalMenuSlot[]=source):ProfessionalMenuSlot[]|null {
+  const slots=structuredClone(source),scale=menuTargetVector(targets);
+  const anchors=new Map(reference.map(m=>[m.slot,m]));
+  const dayCalories=reference.reduce((n,m)=>n+m.totalKcal,0);
+  const score=()=>100*professionalMenuViolation(slots,targets)+slots.reduce((sum,s)=>{
+    const base=anchors.get(s.slot)!;
+    return sum+s.options.reduce((n,m)=>n+menuNutrients.reduce((v,k,i)=>v+Math.pow((m[k]-base[k])/Math.max(1,scale[i]),2),0),0)/s.options.length;
+  },0);
+  for(let pass=0;pass<10;pass++) {
+    if(professionalMenusFeasible(slots,targets))return slots;
+    let changed=false;
+    for(const slot of slots)for(let option=0;option<slot.options.length;option++) {
+      const template=engine.templatesById.get(slot.options[option].templateId.split('~')[0]);
+      for(let index=0;index<slot.options[option].components.length;index++) {
+        const original=slot.options[option],component=original.components[index];
+        if(template&&fixedPortion(template,index,component.foodItem.id)!==undefined)continue;
+        const rule=portionRuleFor(engine,component.foodItem),anchor=anchors.get(slot.slot)!;
+        let best=original,bestScore=score();
+        for(const units of professionalPortionCandidates(component.foodItem,rule)) {
+          const candidate=mealWithReplacement(original,index,componentFromUnits(component.foodItem,units));
+          if(candidate.totalKcal>professionalCalorieCeiling(anchor,targets,dayCalories)+1e-6||!isPracticalMeal(slot.slot,candidate.components)||mealMassGrams(candidate.components)>mealMassLimitGrams(slot.slot,anchor.totalKcal))continue;
+          slot.options[option]=candidate;const cost=score();
+          if(cost<bestScore-1e-12){best=candidate;bestScore=cost;}
+        }
+        slot.options[option]=best;if(best!==original)changed=true;
+      }
+    }
+    // Move an entire slot together: min/max ties otherwise block coordinate
+    // descent even when every alternative can take a legal compensating step.
+    for(let index=0;index<slots.length;index++) {
+      const slot=slots[index],other=professionalMenuBounds(slots.filter((_,i)=>i!==index));
+      const limits={min:scale.map((t,k)=>t*(k===0?.95:.9)-other[k].min),max:scale.map((t,k)=>t*(k===0?1.03:1.1)-other[k].max)};
+      const anchor=anchors.get(slot.slot)!;
+      const previous=slot.options,before=score();
+      slot.options=previous.map(m=>fitProfessionalMeal(engine,m,anchor,targets,limits,professionalCalorieCeiling(anchor,targets,dayCalories)));
+      if(score()<before-1e-12)changed=true;else slot.options=previous;
+    }
+    if(!changed || pass===1)for(let index=0;index<slots.length;index++) {
+      const slot=slots[index],count=slot.options.length,other=professionalMenuBounds(slots.filter((_,i)=>i!==index));
+      const limits={min:scale.map((t,k)=>t*(k===0?.95:.9)-other[k].min),max:scale.map((t,k)=>t*(k===0?1.03:1.1)-other[k].max)};
+      const anchor=anchors.get(slot.slot)!,identity=(m:Meal)=>m.components.map(c=>c.foodItem.id).sort().join('|');
+      const candidates=[...new Map(pools[index].options.map(m=>[identity(m),m])).values()].map(m=>fitProfessionalMeal(engine,m,anchor,targets,limits,professionalCalorieCeiling(anchor,targets,dayCalories)));
+      const previous=slot.options;let best=previous,bestScore=score();
+      for(const first of candidates.slice(0,24)) {
+        const selected=[first],used=new Set([identity(first)]);
+        while(selected.length<count){
+          let choice:Meal|undefined,choiceScore=Infinity;
+          for(const candidate of candidates){
+            if(used.has(identity(candidate)))continue;
+            slot.options=[...selected,candidate];const cost=score();
+            if(cost<choiceScore-1e-12){choice=candidate;choiceScore=cost;}
+          }
+          if(!choice)break;selected.push(choice);used.add(identity(choice));
+        }
+        slot.options=selected;const cost=score();
+        if(selected.length===count&&cost<bestScore-1e-12){best=selected;bestScore=cost;}
+      }
+      slot.options=best;if(best!==previous)changed=true;
+    }
+    if(!changed)break;
+  }
+  return professionalMenusFeasible(slots,targets)?slots:null;
+}
+
 /** Options for a printed Pro menu, solved with the same catalog, portions and
  * eligibility rules as the daily engine. Existing B2C generation is unchanged. */
-function getProfessionalMealOptionsWithCatalog(engine: EngineCatalog, base: Meal, preferences: DietaryPreferencesJson, workout: boolean): Meal[] {
+function getProfessionalMealOptionsWithCatalog(engine: EngineCatalog, base: Meal, preferences: DietaryPreferencesJson, workout: boolean, dailyTargets?:MacroTargets,referenceDayCalories?:number): Meal[] {
   const templates = engine.catalog.mealTemplates.filter(t => t.slot === base.slot && isTemplateEligible(engine, t, preferences, workout));
   const target = {kcal:base.totalKcal, protein:base.totalProtein, carbs:base.totalCarbs, fat:base.totalFat};
   const resolved = templates.flatMap(template => {
@@ -1584,7 +1704,7 @@ function getProfessionalMealOptionsWithCatalog(engine: EngineCatalog, base: Meal
   const seen = new Set<string>();
   const options:Meal[] = [];
   const add = (meal:Meal) => {
-    if((meal.slot!=='post_workout'&&meal.totalKcal>target.kcal*1.35)||!isPracticalMeal(meal.slot,meal.components)||mealMassGrams(meal.components)>mealMassLimitGrams(meal.slot,target.kcal)||meal.components.some(c=>!isFoodAllowed(c.foodItem,preferences)))return;
+    if(meal.totalKcal>professionalCalorieCeiling(base,dailyTargets,referenceDayCalories)||!isPracticalMeal(meal.slot,meal.components)||mealMassGrams(meal.components)>mealMassLimitGrams(meal.slot,target.kcal)||meal.components.some(c=>!isFoodAllowed(c.foodItem,preferences)))return;
     const k=key(meal); if (!seen.has(k)) { seen.add(k); options.push(meal); }
   };
   add(base); resolved.forEach(add);
@@ -1593,12 +1713,17 @@ function getProfessionalMealOptionsWithCatalog(engine: EngineCatalog, base: Meal
   // portion/eligibility gates. Never repeat a recipe to fill a count.
   // Two passes also permit two independent approved ingredient substitutions.
   for(let pass=0;pass<2 && options.length<80;pass++) {
-    const frontier=options.slice(0,40);
+    // A recipe that misses the calorie screen can still seed a valid approved
+    // substitution. Screen completed alternatives, not their search ancestors.
+    const frontier=[...options,...resolved].filter((m,i,all)=>all.findIndex(n=>key(n)===key(m))===i).slice(0,80);
     for(const meal of frontier) {
       const template=engine.templatesById.get(meal.templateId.split('~')[0]);
       for(const [index,component] of meal.components.entries()) {
-        if(template && fixedPortion(template,index,component.foodItem.id)!==undefined) continue;
-        for(const food of eligibleSwapFoods(engine,component.foodItem,component.foodItem.id,meal.slot,preferences)) {
+        if(template && meal.slot!=='post_workout' && fixedPortion(template,index,component.foodItem.id)!==undefined) continue;
+        const replacements=meal.slot==='post_workout'
+          ? getSubstitutesForWithCatalog(engine,component.foodItem.id).filter(f=>f.id!==component.foodItem.id&&f.role===component.foodItem.role&&isFoodAllowed(f,preferences)&&(isSwapAllowedForMeal(engine,f,meal.slot)||(['protein','starch'].includes(f.role)&&['lunch','dinner'].some(slot=>isSwapAllowedForMeal(engine,f,slot as MealSlot)))))
+          : eligibleSwapFoods(engine,component.foodItem,component.foodItem.id,meal.slot,preferences);
+        for(const food of replacements) {
           if(meal.components.some(c=>c.foodItem.id===food.id)) continue;
           const swap=buildSwapOption(engine,meal,index,food);
           if(swap.isEquivalent) {
@@ -1609,7 +1734,7 @@ function getProfessionalMealOptionsWithCatalog(engine: EngineCatalog, base: Meal
           // equivalent component swap without checking its entire day envelope.
           if(template)try {
             const variant={...template,id:template.id+'~'+food.id+'-'+index,
-              slots:template.slots.map((fill,j)=>({...fill,primaryFoodItemId:j===index?food.id:meal.components[j].foodItem.id}))};
+              slots:template.slots.map((fill,j)=>({...fill,primaryFoodItemId:j===index?food.id:meal.components[j].foodItem.id,...(meal.slot==='post_workout'&&j===index?{dynamicUnits:true,fixedUnits:undefined}:{})}))};
             const next=buildMeal({slot:base.slot,template:variant,resolved:resolveTemplate(engine,variant,target)});
             add({...next,templateId:template.id+'~'+key(next),templateName:next.components.map(c=>c.foodItem.name).join(' و ')});
           }catch(error){if(!(error instanceof Error && error.message.includes('Could not resolve template')))throw error;}
@@ -1620,7 +1745,32 @@ function getProfessionalMealOptionsWithCatalog(engine: EngineCatalog, base: Meal
       if(options.length>=80) break;
     }
   }
-  return options.sort((a,b)=>scoreTotals({kcal:a.totalKcal,protein:a.totalProtein,carbs:a.totalCarbs,fat:a.totalFat},target)-
+  if(dailyTargets && base.slot!=='post_workout') {
+    // A complete specialist menu may include one complementary protein that
+    // is already used in this meal context by the catalog. This is a new full
+    // recipe, not a falsely "equivalent" ingredient swap.
+    const contextFoods=new Set(engine.catalog.mealTemplates.filter(t=>t.slot===base.slot).flatMap(t=>t.slots.map(f=>f.primaryFoodItemId)));
+    const proteins=engine.catalog.foods.filter(f=>(contextFoods.has(f.id)||f.swapAllowedMeals.includes(base.slot))&&f.role==='protein'&&isFoodAllowed(f,preferences)).sort((a,b)=>b.proteinPerUnit/Math.max(1,b.kcalPerUnit)-a.proteinPerUnit/Math.max(1,a.kcalPerUnit)).slice(0,6);
+    const starters=[...resolved,...options.slice(0,20)];let added=0;
+    for(const meal of starters){
+      if(meal.components.filter(c=>c.foodItem.role==='protein').length>1)continue;
+      const template=engine.templatesById.get(meal.templateId.split('~')[0]);if(!template)continue;
+      for(const food of proteins){
+        if(meal.components.some(c=>c.foodItem.id===food.id))continue;
+        const id=template.id+'~protein-'+food.id;
+        const variant={...template,id,slots:[...meal.components.map((c,index)=>({...template.slots[index],role:c.foodItem.role,primaryFoodItemId:c.foodItem.id})),{role:food.role,primaryFoodItemId:food.id,dynamicUnits:true}]};
+        try {
+          const candidate=buildMeal({slot:base.slot,template:variant,resolved:resolveTemplate(engine,variant,target)});
+          const next=fitProfessionalMeal(engine,candidate,base,dailyTargets,undefined,professionalCalorieCeiling(base,dailyTargets,referenceDayCalories));
+          const before=options.length;add({...next,templateId:template.id+'~'+key(next),templateName:next.components.map(c=>c.foodItem.name).join(' و ')});added+=options.length-before;
+        }catch(error){if(!(error instanceof Error&&error.message.includes('Could not resolve template')))throw error;}
+        if(added>=40)break;
+      }
+      if(added>=40)break;
+    }
+  }
+  const fitted=dailyTargets?options.map(meal=>fitProfessionalMeal(engine,meal,base,dailyTargets,undefined,professionalCalorieCeiling(base,dailyTargets,referenceDayCalories))):options;
+  return fitted.sort((a,b)=>scoreTotals({kcal:a.totalKcal,protein:a.totalProtein,carbs:a.totalCarbs,fat:a.totalFat},target)-
     scoreTotals({kcal:b.totalKcal,protein:b.totalProtein,carbs:b.totalCarbs,fat:b.totalFat},target));
 }
 
@@ -1664,6 +1814,7 @@ export function createMealPlanEngine(source: NutritionCatalog, revision?: string
     getMemberSwapOptions: getMemberSwapOptionsWithCatalog.bind(null, engine),
     swapComponentInMeal: swapComponentInMealWithCatalog.bind(null, engine),
     getProfessionalMealOptions: getProfessionalMealOptionsWithCatalog.bind(null, engine),
+    rebalanceProfessionalMenus: rebalanceProfessionalMenusWithCatalog.bind(null,engine),
   };
 }
 
@@ -1688,3 +1839,5 @@ export const rebalanceMemberDay = (...args: Parameters<MealPlanEngine["rebalance
 export const getMemberSwapOptions = (...args: Parameters<MealPlanEngine["getMemberSwapOptions"]>) => fixtureEngine().getMemberSwapOptions(...args);
 export const swapComponentInMeal = (...args: Parameters<MealPlanEngine["swapComponentInMeal"]>) => fixtureEngine().swapComponentInMeal(...args);
 export const getProfessionalMealOptions = (...args: Parameters<MealPlanEngine["getProfessionalMealOptions"]>) => fixtureEngine().getProfessionalMealOptions(...args);
+
+export const rebalanceProfessionalMenus = (...args: Parameters<MealPlanEngine["rebalanceProfessionalMenus"]>) => fixtureEngine().rebalanceProfessionalMenus(...args);

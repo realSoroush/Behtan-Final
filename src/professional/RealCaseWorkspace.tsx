@@ -202,6 +202,14 @@ function RealCaseDetail({
     [access,setAccess] = useState<WorkspaceStatus|null>(null),
     [historyPage,setHistoryPage] = useState(0),[historyTotal,setHistoryTotal] = useState(0),
     [plansPage,setPlansPage] = useState(0),[plansTotal,setPlansTotal] = useState(0);
+  const [generationFailure, setGenerationFailure] = useState(false);
+  const generationFeedback = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (error && generationFailure && !locked) {
+      generationFeedback.current?.focus({preventScroll:true});
+      generationFeedback.current?.scrollIntoView({block:'center',behavior:'instant'});
+    }
+  }, [error,generationFailure,locked]);
   const pending = useRef(false),
     mounted = useRef(true),
     saveRequest = useRef<{
@@ -316,17 +324,19 @@ function RealCaseDetail({
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
-  async function run(fn: () => Promise<void>) {
+  async function run(fn: () => Promise<void>, generation = false) {
     if (pending.current) return;
     pending.current = true;
     setBusy(true);
     setError("");
     setNotice("");
+    setGenerationFailure(false);
     try {
       await fn();
     } catch (e) {
       if (mounted.current) {
         setError(message(e));
+        setGenerationFailure(generation);
         if (
           e instanceof Error &&
           /PRO_INVALID_INTAKE|PRO_STALE_REVISION|PRO_ACCESS_DENIED/.test(
@@ -384,7 +394,7 @@ function RealCaseDetail({
       generationKey.current = crypto.randomUUID();
       setPlanId("");
       planKey.current = crypto.randomUUID();
-    });
+    }, true);
   }
   async function savePlan() {
     await run(async () => {
@@ -402,6 +412,7 @@ function RealCaseDetail({
     });
   }
   function invalidatePreview() {
+    setError(''); setGenerationFailure(false);
     setPlan(null); setPlanId(''); setDraftId('');
     generationKey.current = crypto.randomUUID();
   }
@@ -439,7 +450,7 @@ function RealCaseDetail({
         {id ? <a href="#pro-plan-builder"><span>۲</span>ساخت برنامه</a> : <span className="pro-path-inactive"><span>۲</span>ساخت برنامه</span>}
         {id ? <a href="#pro-saved-programs"><span>۳</span>برنامه‌ها و خروجی</a> : <span className="pro-path-inactive"><span>۳</span>برنامه‌ها و خروجی</span>}
       </nav>
-      {error && !(previewOpen&&plan) && (
+      {error && (!generationFailure || locked) && !(previewOpen&&plan) && (
         <p role="alert" className="pro-error">
           {error}
         </p>
@@ -600,6 +611,7 @@ function RealCaseDetail({
                   </label>
                   <JalaliDateInput label="تاریخ برنامه" value={date} disabled={busy} onChange={value => { setDate(value); invalidatePreview(); }} />
                 </div>
+                <p className="pro-muted">هر منو یک انتخاب جایگزین برای همان وعده است. برنامه با تعداد انتخاب‌شده در همهٔ وعده‌ها ساخته می‌شود.</p>
                 <label>
                   توضیحات برای مراجع
                   <textarea
@@ -621,6 +633,9 @@ function RealCaseDetail({
                 >
                   <Sparkles size={18} /> تولید و پیش‌نمایش برنامه
                 </button>
+                {error && generationFailure && <div ref={generationFeedback} tabIndex={-1} className="pro-generation-feedback">
+                  <p role="alert" className="pro-error">{error}</p>
+                </div>}
                 {dirty && (
                   <p className="pro-muted">
                     قبل از تولید، پاسخ‌های ویرایش‌شده را ذخیره کنید.

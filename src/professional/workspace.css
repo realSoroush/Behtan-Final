@@ -281,3 +281,5 @@
  .pro-shell .pro-save-bar{align-items:stretch;flex-direction:column}
  .pro-shell .pro-save-bar button{min-height:48px;justify-content:center}
 }
+
+.pro-generation-feedback{scroll-margin-block:24px;margin-top:16px;outline-offset:4px}.pro-generation-feedback .pro-error{margin:0 0 12px;overflow-wrap:anywhere}
