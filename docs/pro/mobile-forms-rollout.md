@@ -22,14 +22,24 @@ Deploying UI before 056 will reject a save containing the new field. For rollbac
 ## Validation
 
 - PGlite full market/Pro suite tests optional-note bounds/types, old records, real save/read/revision history, request replay and no historical mutation; the same suite runs on native PostgreSQL in CI.
-- Nutrition tests compare full generated days with/without manual allergy notes, alongside existing allergen/diet/portion rules (4,100 independent menu combinations).
+- Nutrition tests compare full generated days with/without manual allergy notes, alongside existing allergen/diet/portion rules (32,768 independent menu combinations).
 - Existing home-training tests cover per-day isolation, seven-day bounds, Persian leap dates, immutable snapshots and PDF output.
 - Browser tests run on desktop and mobile: notes save/reload, budget labels, Persian nutrition date to exact ISO save, editor/catalog/preview navigation, catalog no-match feedback, overflow and existing end-to-end flows. Admin metrics tests select Persian dates and assert exact ISO range arguments.
 - Local Chromium cannot launch in this host (socket permission); browser verification is performed in GitHub Actions. Review its final result before merge.
 
-## Nutrition menu-count recovery
+## Exact Pro nutrition menus (PR 50)
 
-Automatic case generation defaults to one menu per meal. A request for multiple menus still requires the exact requested count of distinct, jointly valid options in every meal; the engine never silently fills, duplicates or reduces those options. Generation errors and request IDs appear beside the generation button and receive focus. Only a menu-count shortage with a count above one offers an explicit one-menu retry, using a new request key and the same saved intake, date and notes. No database or API deployment changes are needed for this UI correction.
+Case generation retains the four-menu default and honors every selected count from 1 to 5 in every meal, including the separate workout day. There is no automatic reduction or one-menu fallback. Errors and request IDs remain next to the generation button.
+
+The Pro-only solver now searches compatible recipe groups and re-solves their portions together. It can revisit a slot's recipe choices when portion changes alone cannot fit. Candidate recipes use catalog foods, approved substitutions and one context-approved complementary protein; post-workout whole-meal alternatives can use approved main-meal protein/starch substitutes. Original fixed ingredients remain fixed. Distinctness uses the actual food composition, never a renamed template or a different weight of the same foods.
+
+Gram-measured foods can use 5 g prescription increments as well as their existing catalog servings. Countable/household portions, hard minimum/maximum servings, breakfast egg/bread guardrails and post-workout supplement/volume caps retain their existing limits. Per-option calorie screening now considers the intended slot allocation and available daily headroom, rather than treating one unusually small reference meal as a ceiling for all alternatives.
+
+The final daily constraint is unchanged: EVERY independent choice of one menu from each meal must meet the existing calorie/macro envelope. The same calculation is shared by selection and repair; native PostgreSQL independently validates persisted snapshots. B2C daily generation, allergy assessment and medical eligibility gates are unchanged. Truly sparse or unassessed unsafe catalogs still fail explicitly rather than inventing or duplicating meals.
+
+Regression coverage: seven profile types × all five requested counts, 735 complete menus, 109,375 independently selected combinations, fixed/min/max portions, snapshot arithmetic, authored import/PDF and deterministic output. Browser coverage generates 2–5 menus with the real engine for the previously failing low-energy case and saves the exact five-menu result. The rare-shortage error preserves the requested count.
+
+Deploy the PR's Pro code/API together through the regular Vercel deployment. This solver update requires no migration, environment change, food import or Edge Function deployment. Existing saved plans keep their immutable contents.
 
 ## Production smoke
 

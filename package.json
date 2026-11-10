@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test:pro:profile": "node --experimental-strip-types scripts/pro-specialist-profile.test.mjs",
-    "test:pro:ux": "node --experimental-strip-types scripts/pro-ux.test.mjs && node scripts/pro-ux-followup.test.mjs && node scripts/pro-home-training.test.mjs && node scripts/pro-training-navigation.test.mjs",
+    "test:pro:ux": "node --experimental-strip-types scripts/pro-ux.test.mjs && node scripts/pro-ux-followup.test.mjs && node scripts/pro-home-training.test.mjs && node scripts/pro-training-navigation.test.mjs && node --experimental-strip-types scripts/pro-exact-menus.test.mjs",
     "test:pro:studio": "node --experimental-strip-types scripts/pro-studio.test.mjs && node --experimental-strip-types scripts/pro-catalog-adapter.test.mjs",
     "test:onboarding:lifecycle": "node scripts/onboarding-lifecycle.test.mjs",
     "test:companion": "node --experimental-strip-types scripts/companion-state.test.mjs",

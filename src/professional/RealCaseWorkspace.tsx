@@ -191,7 +191,7 @@ function RealCaseDetail({
     [planId, setPlanId] = useState(""),
     [draftId, setDraftId] = useState(""),
     [connectionWarning, setConnectionWarning] = useState(false),
-    [count, setCount] = useState(1),
+    [count, setCount] = useState(4),
     [date, setDate] = useState(today),
     [notes, setNotes] = useState(""),
     [busy, setBusy] = useState(false),
@@ -203,7 +203,6 @@ function RealCaseDetail({
     [historyPage,setHistoryPage] = useState(0),[historyTotal,setHistoryTotal] = useState(0),
     [plansPage,setPlansPage] = useState(0),[plansTotal,setPlansTotal] = useState(0);
   const [generationFailure, setGenerationFailure] = useState(false);
-  const [menuCountUnavailable, setMenuCountUnavailable] = useState(false);
   const generationFeedback = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (error && generationFailure && !locked) {
@@ -332,14 +331,12 @@ function RealCaseDetail({
     setError("");
     setNotice("");
     setGenerationFailure(false);
-    setMenuCountUnavailable(false);
     try {
       await fn();
     } catch (e) {
       if (mounted.current) {
         setError(message(e));
         setGenerationFailure(generation);
-        setMenuCountUnavailable(e instanceof Error && e.message.includes('PRO_MENU_COUNT_UNAVAILABLE'));
         if (
           e instanceof Error &&
           /PRO_INVALID_INTAKE|PRO_STALE_REVISION|PRO_ACCESS_DENIED/.test(
@@ -387,11 +384,11 @@ function RealCaseDetail({
       setNotice("اطلاعات پرونده ذخیره شد.");
     });
   }
-  async function generate(requestedCount = count) {
+  async function generate() {
     await run(async () => {
       if (dirty || !id || stale || connectionWarning || !access?.can_write || !access?.modules?.nutrition)
         throw new Error('ابتدا اطلاعات پرونده را ذخیره و اتصال را بررسی کنید.');
-      const result = await realCaseApi.generatePlan(org, id, revision, requestedCount, date, notes, generationKey.current);
+      const result = await realCaseApi.generatePlan(org, id, revision, count, date, notes, generationKey.current);
       setPlan(result.plan);setPreviewOpen(true);
       setDraftId(result.draft_id);
       generationKey.current = crypto.randomUUID();
@@ -415,7 +412,7 @@ function RealCaseDetail({
     });
   }
   function invalidatePreview() {
-    setError(''); setGenerationFailure(false); setMenuCountUnavailable(false);
+    setError(''); setGenerationFailure(false);
     setPlan(null); setPlanId(''); setDraftId('');
     generationKey.current = crypto.randomUUID();
   }
@@ -614,7 +611,7 @@ function RealCaseDetail({
                   </label>
                   <JalaliDateInput label="تاریخ برنامه" value={date} disabled={busy} onChange={value => { setDate(value); invalidatePreview(); }} />
                 </div>
-                <p className="pro-muted">هر منو یک انتخاب جایگزین برای همان وعده است. با ۱ منو شروع کنید؛ تعداد بیشتر به گزینه‌های معتبر موجود برای این پرونده بستگی دارد.</p>
+                <p className="pro-muted">هر منو یک انتخاب جایگزین برای همان وعده است. برنامه با تعداد انتخاب‌شده در همهٔ وعده‌ها ساخته می‌شود.</p>
                 <label>
                   توضیحات برای مراجع
                   <textarea
@@ -638,9 +635,6 @@ function RealCaseDetail({
                 </button>
                 {error && generationFailure && <div ref={generationFeedback} tabIndex={-1} className="pro-generation-feedback">
                   <p role="alert" className="pro-error">{error}</p>
-                  {menuCountUnavailable && count > 1 && <button type="button" className="pro-primary" disabled={busy || archived || dirty || stale || !date || connectionWarning || !access?.can_write || !access?.modules?.nutrition} onClick={() => {
-                    setCount(1); invalidatePreview(); void generate(1);
-                  }}>ساخت با ۱ منو برای هر وعده</button>}
                 </div>}
                 {dirty && (
                   <p className="pro-muted">
