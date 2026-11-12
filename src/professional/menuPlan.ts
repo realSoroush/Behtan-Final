@@ -275,15 +275,19 @@ export function generatePrintedPlan(
     if (base.remainingTargetsUnmet)
       throw new Error("موتور نتوانست برنامه کامل و معتبر بسازد.");
     const referenceCalories = base.meals.reduce((total, meal) => total + meal.totalKcal, 0);
+    const eligible = (meal: Meal) =>
+      (engine.canUseProfessionalMeal?.(meal, workout) ?? true) &&
+      professionalRecipeAllowed(meal.components.map(c => c.foodItem));
     const pools = base.meals.map(meal => ({
       slot: meal.slot, label: meal.label,
-      options: (count === 1 && professionalRecipeAllowed(meal.components.map(c => c.foodItem))
+      options: (count === 1 && eligible(meal)
         ? [meal] : [meal, ...engine.getProfessionalMealOptions(meal, preferences, workout, targets, referenceCalories)])
-        .filter(option => professionalRecipeAllowed(option.components.map(c => c.foodItem))),
+        .filter(eligible),
     }));
     const slots = count === 1 && pools.every(pool => pool.options.length === 1) ? pools
       : selectProfessionalMenus(pools,targets,count,engine.rebalanceProfessionalMenus?slots=>engine.rebalanceProfessionalMenus!(slots,targets,base.meals,pools):undefined);
-    if(!slots || !hasExactMenus(slots,pools,count))throw new ProMenuCountError(count,pools.map(slot=>({slot:slot.slot,label:slot.label,available:new Set(slot.options.map(menuIdentity)).size})));
+    if(!slots || !hasExactMenus(slots,pools,count) || slots.some(slot => slot.options.some(meal => !eligible(meal))))
+      throw new ProMenuCountError(count,pools.map(slot=>({slot:slot.slot,label:slot.label,available:new Set(slot.options.map(menuIdentity)).size})));
     if(!menuCombinationsFeasible(slots,targets))throw new Error('مجموع منوها با اهداف موتور سازگار نیست.');
     days.push({ workout, targets, trace, slots });
   }
