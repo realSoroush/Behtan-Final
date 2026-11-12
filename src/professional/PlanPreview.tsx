@@ -1,45 +1,31 @@
 import { mealDescription, roundFa, type PrintedPlan } from "./menuPlan";
+import { nutritionMealSections, nutritionTargetRows } from './nutritionPresentation';
 export function PlanPreview({ plan: p }: { plan: PrintedPlan }) {
   return (
     <article className="pro-plan-preview">
       <h3>برنامه {p.display_name}</h3>
       <p className="pro-muted">
-        نسخه اطلاعات {roundFa(p.intake_revision)} · از هر وعده فقط یک منو انتخاب
-        شود.
+        نسخه اطلاعات {roundFa(p.intake_revision)} · از هر وعده یک منو انتخاب کنید. اگر نوع روز مشخص شده، از گزینه‌های همان روز استفاده کنید.
       </p>
-      {p.days.map((d) => (
-        <section key={String(d.workout)}>
-          <h3>{d.workout ? "روزهای تمرین" : "روزهای استراحت"}</h3>
-          <p className="pro-targets">
-            هدف روزانه: {roundFa(d.targets.targetCalories)} کیلوکالری · پروتئین{" "}
-            {roundFa(d.targets.proteinGrams)} · کربوهیدرات{" "}
-            {roundFa(d.targets.carbGrams)} · چربی {roundFa(d.targets.fatGrams)}{" "}
-            گرم
-          </p>
-          {d.slots.map((s) => (
-            <section key={s.slot}>
-              <h4>
-                {s.label} <small>({roundFa(s.options.length)} منو)</small>
-              </h4>
-              <ol>
-                {s.options.map((m) => (
-                  <li key={m.templateId}>
-                    <p>{mealDescription(m)}</p>
-                    <small>
-                      {roundFa(m.totalKcal)} کیلوکالری · پروتئین{" "}
-                      {roundFa(m.totalProtein)} · کربوهیدرات{" "}
-                      {roundFa(m.totalCarbs)} · چربی {roundFa(m.totalFat)} گرم
-                    </small>
-                  </li>
-                ))}
-              </ol>
-              {s.options.length < p.requested_menus && (
-                <p className="pro-muted">
-                  برای این وعده {roundFa(s.options.length)} گزینه سازگار پیدا
-                  شد.
-                </p>
+      {nutritionTargetRows(p.days).map(({ label, targets }) => (
+        <p key={label ?? 'daily'} className="pro-targets">
+          {label && `${label} · `}هدف روزانه: {roundFa(targets.targetCalories)} کیلوکالری · پروتئین{' '}
+          {roundFa(targets.proteinGrams)} · کربوهیدرات {roundFa(targets.carbGrams)} · چربی {roundFa(targets.fatGrams)} گرم
+        </p>
+      ))}
+      {nutritionMealSections(p).map(({ slot, label, groups }) => (
+        <section key={slot} className="pro-plan-meal">
+          <h4>{label}</h4>
+          {groups.map(group => (
+            <div key={group.label ?? 'daily'}>
+              {group.label && <h5 className="pro-plan-day-label">{group.label}</h5>}
+              <ol>{group.options.map((meal, index) => (
+                <li key={`${meal.templateId}:${index}`}><p>{mealDescription(meal)}</p></li>
+              ))}</ol>
+              {group.options.length < p.requested_menus && (
+                <p className="pro-muted">برای این وعده {roundFa(group.options.length)} گزینه سازگار پیدا شد.</p>
               )}
-            </section>
+            </div>
           ))}
         </section>
       ))}

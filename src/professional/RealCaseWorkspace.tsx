@@ -24,8 +24,7 @@ import {
   type PrintedPlan,
 } from "./menuPlan";
 import { BodyScanPanel } from "./body/BodyScanPanel";
-import {ReportAttachment} from "./body/ReportAttachment";
-import {printPlanWithBody} from "./body/printBodyPlan";
+import { printSavedPlan } from './printPlan';
 import { PlanPreview } from "./PlanPreview";
 import { proErrorMessage, type ProRole } from "./contracts";
 const baseMessage = (e: unknown) =>
@@ -203,6 +202,7 @@ function RealCaseDetail({
     [historyPage,setHistoryPage] = useState(0),[historyTotal,setHistoryTotal] = useState(0),
     [plansPage,setPlansPage] = useState(0),[plansTotal,setPlansTotal] = useState(0);
   const [generationFailure, setGenerationFailure] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const generationFeedback = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (error && generationFailure && !locked) {
@@ -328,6 +328,7 @@ function RealCaseDetail({
     if (pending.current) return;
     pending.current = true;
     setBusy(true);
+    setGenerating(generation);
     setError("");
     setNotice("");
     setGenerationFailure(false);
@@ -353,7 +354,10 @@ function RealCaseDetail({
       }
     } finally {
       pending.current = false;
-      if (mounted.current) setBusy(false);
+      if (mounted.current) {
+        setGenerating(false);
+        setBusy(false);
+      }
     }
   }
   async function save(allowDuplicate=false) {
@@ -389,6 +393,7 @@ function RealCaseDetail({
       if (dirty || !id || stale || connectionWarning || !access?.can_write || !access?.modules?.nutrition)
         throw new Error('ابتدا اطلاعات پرونده را ذخیره و اتصال را بررسی کنید.');
       const result = await realCaseApi.generatePlan(org, id, revision, count, date, notes, generationKey.current);
+      if (!mounted.current) return;
       setPlan(result.plan);setPreviewOpen(true);
       setDraftId(result.draft_id);
       generationKey.current = crypto.randomUUID();
@@ -460,7 +465,7 @@ function RealCaseDetail({
           {notice}
         </p>
       )}
-      {busy && <AppLoading label="در حال انجام…" variant="inline" />}
+      {busy && !generating && <AppLoading label="در حال انجام…" variant="inline" />}
       {connectionWarning && (
         <p role="status" className="pro-muted">
           اتصال موقتاً برقرار نیست؛ تغییرات شما حفظ شده‌اند. پس از اتصال، بررسی دوباره انجام می‌شود.
@@ -641,9 +646,22 @@ function RealCaseDetail({
                     قبل از تولید، پاسخ‌های ویرایش‌شده را ذخیره کنید.
                   </p>
                 )}
-                {plan && previewOpen && (
-                  <>
-                    <PanelModal title="برنامه غذایی مراجع" busy={busy} onClose={()=>setPreviewOpen(false)}>{error&&<p role="alert" className="pro-error">{error}</p>}{notice&&<p role="status" className="pro-success">{notice}</p>}{busy&&<AppLoading label="در حال انجام…" variant="inline" />}<PlanPreview plan={plan} /><button disabled={busy||!access?.can_write||!access?.modules?.nutrition||dirty||stale} onClick={()=>{setAuthoredSeed(fromPrintedPlan(plan));setPreviewOpen(false);setAuthoredOpen(true);}}>تدوین همهٔ منوها در استودیوی تغذیه</button>{planId&&id&&<ReportAttachment org={org} record={id} plan={planId} revision={plan.intake_revision} canWrite={Boolean(access?.can_write)&&!archived}/>}
+                {(generating || (plan && previewOpen)) && (
+                  <PanelModal title={generating ? 'در حال ساخت برنامه غذایی' : 'برنامه غذایی مراجع'} busy={busy} onClose={() => setPreviewOpen(false)}>
+                    {generating ? (
+                      <AppLoading label="در حال محاسبه و چیدن منوها…">
+                        <p>این مرحله ممکن است چند ثانیه طول بکشد. پیش‌نمایش پس از آماده‌شدن همین‌جا باز می‌شود.</p>
+                      </AppLoading>
+                    ) : plan && <>
+                    {error && <p role="alert" className="pro-error">{error}</p>}
+                    {notice && <p role="status" className="pro-success">{notice}</p>}
+                    {busy && <AppLoading label="در حال انجام…" variant="inline" />}
+                    <PlanPreview plan={plan} />
+                    <button disabled={busy || !access?.can_write || !access?.modules?.nutrition || dirty || stale} onClick={() => {
+                      setAuthoredSeed(fromPrintedPlan(plan));
+                      setPreviewOpen(false);
+                      setAuthoredOpen(true);
+                    }}>تدوین همهٔ منوها در استودیوی تغذیه</button>
                     <div className="pro-actions">
                       <button
                         disabled={busy || archived || Boolean(planId) || dirty || stale || !access?.can_write || !access?.modules?.nutrition}
@@ -653,15 +671,16 @@ function RealCaseDetail({
                       </button>
                       <button
                         disabled={busy || !planId}
-                        onClick={() => void run(() => printPlanWithBody(plan,org,planId))}
+                        onClick={() => void run(() => printSavedPlan(plan, org, planId))}
                       >
                         خروجی PDF / چاپ
                       </button>
                     </div>
                     <p className="pro-muted">
                       برای PDF قابل جست‌وجو، در پنجره چاپ خود مرورگر مقصد «Save as PDF» را انتخاب کنید.
-                    </p></PanelModal>
-                  </>
+                    </p>
+                    </>}
+                  </PanelModal>
                 )}
                 <div id="pro-saved-programs" className="pro-block-heading pro-saved-heading"><span className="pro-block-icon"><FileText size={21} /></span><div><small>آرشیو مراجع</small><h3>برنامه‌های ذخیره‌شده</h3></div></div>
                 <h4>برنامه‌های خودکار تغذیه</h4>

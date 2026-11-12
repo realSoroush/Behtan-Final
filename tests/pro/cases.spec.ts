@@ -15,9 +15,22 @@ test("create actual record, save, generate menus, save plan and print Persian PD
   ).toBeVisible();
   expect(state.cases).toHaveLength(1);
   await setJalaliDate(page,'تاریخ برنامه','2026-11-09');
+  let finishGeneration!: () => void;
+  const delayed = new Promise<void>(resolve => { finishGeneration = resolve; });
+  await page.route('**/api/pro-plan', async route => {
+    if (route.request().method() === 'POST' && route.request().postDataJSON().action === 'generate') await delayed;
+    await route.fallback();
+  });
   await page
     .getByRole("button", { name: "تولید و پیش‌نمایش برنامه", exact: true })
     .click();
+  try {
+    const loading = page.getByRole('dialog', { name: 'در حال ساخت برنامه غذایی' });
+    await expect(loading.getByRole('status')).toContainText('در حال محاسبه و چیدن منوها');
+    await expect(loading.getByRole('button', { name: 'بستن پنجره' })).toBeDisabled();
+  } finally {
+    finishGeneration();
+  }
   await expect(page.locator(".pro-plan-preview")).toBeVisible();
   await page
     .getByRole("button", { name: "ذخیره این برنامه", exact: true })
@@ -42,7 +55,8 @@ test("create actual record, save, generate menus, save plan and print Persian PD
   await expect(popup.locator("header")).toContainText("مراجع تست");
   await expect(popup.locator("table").first()).toBeVisible();
   const firstMeal = popup.locator('.meal-table').first();
-  await expect(firstMeal.locator('thead h3')).toContainText('روزهای استراحت');
+  await expect(firstMeal.locator('thead h2')).toContainText('صبحانه');
+  await expect(firstMeal.locator('.day-label')).toHaveCount(0);
   await expect(firstMeal.locator('tbody tr')).toHaveCount(4);
   const pdf = await popup.pdf({ path: info.outputPath('nutrition-plan.pdf'), preferCSSPageSize: true, printBackground: true });
   expect(pdf.toString('latin1')).toContain('/ToUnicode');

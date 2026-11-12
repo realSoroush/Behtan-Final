@@ -8,6 +8,7 @@ import {isPracticalMeal} from '../src/utils/mealPlanEngine.ts';
 import {fromPrintedPlan,sectionMenus,validateAuthored} from '../src/professional/studioModel.ts';
 import {authoredHtml} from '../src/professional/authoredPlan.ts';
 import {printedPlanHtml} from '../src/professional/printPlan.ts';
+import {nutritionMealSections,nutritionTargetRows} from '../src/professional/nutritionPresentation.ts';
 import {describeProfessionalRecipe,professionalRecipeAllowed} from '../src/utils/professionalMenuPolicy.ts';
 const catalog=installTestNutritionCatalog();
 const base={...emptyRealIntake(),display_name:'Synthetic exact-menu case',birth_date:'1992-04-23',weight_kg:75,height_cm:165,safety_confirmed:true};
@@ -93,7 +94,18 @@ assert.equal(selectProfessionalMenus(overBudget,day.targets,4,()=>{repairCalls++
 assert(repairCalls>0,'Even a macro-feasible repair cannot return duplicate menus');
 
 const pdfHtml=printedPlanHtml(pdfCase,'https://example.com');
-assert.equal((pdfHtml.match(/class="meal-table"/g)||[]).length,13);
-assert.equal((pdfHtml.match(/scope="row"/g)||[]).length,52);
+const sections=nutritionMealSections(pdfCase);
+assert.equal(sections.length,7);
+assert(sections.filter(section=>section.groups.some(group=>!group.label)).length>=3,'Routine meals are shared where feasible');
+assert.equal(sections.find(section=>section.slot==='post_workout').groups[0].label,'فقط روزهای تمرین');
+assert.equal(nutritionTargetRows(pdfCase.days).length,1);
+assert.equal((pdfHtml.match(/class="meal-table"/g)||[]).length,7);
+assert.equal((pdfHtml.match(/scope="row"/g)||[]).length,sections.flatMap(s=>s.groups).reduce((sum,g)=>sum+g.options.length,0));
 assert(pdfHtml.includes('قاشق غذاخوری')&&pdfHtml.includes('وزن پخته'));
+
+const oldSnapshot=JSON.parse(JSON.stringify(pdfCase));
+const breakfast=oldSnapshot.days[1].slots.find(slot=>slot.slot==='breakfast');
+breakfast.options[0].components[0].grams+=5;
+assert.deepEqual(nutritionMealSections(oldSnapshot).find(s=>s.slot==='breakfast').groups.map(g=>[g.label,g.options.length]),
+  [['روزهای استراحت',4],['روزهای تمرین',4]],'Different prescribed portions remain visible for their respective day');
 console.log(`PASS exact Pro menus: ${plans} profiles/counts, ${menus} menus, ${combinations} independent combinations; allergens/diets, fixed/min/max servings, 5 g precision, snapshots/IDs/arithmetic, authoring/PDF and sparse-catalog rejection; slowest ${Math.round(maxMs)} ms`);
