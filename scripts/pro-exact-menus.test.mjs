@@ -4,12 +4,14 @@ import {installTestNutritionCatalog} from './setup-test-nutrition-catalog.mjs';
 import {emptyRealIntake,generatePrintedPlan,menuCombinationsFeasible,menuIdentity,ProMenuCountError,selectProfessionalMenus} from '../src/professional/menuPlan.ts';
 import {DEFAULT_PROTEIN_ENGINE_POLICY as policy} from '../src/utils/proteinPolicy.ts';
 import {isMealSnapshot} from '../src/utils/mealValidation.ts';
-import {isPracticalMeal} from '../src/utils/mealPlanEngine.ts';
+import {createMealPlanEngine,isPracticalMeal} from '../src/utils/mealPlanEngine.ts';
 import {fromPrintedPlan,sectionMenus,validateAuthored} from '../src/professional/studioModel.ts';
 import {authoredHtml} from '../src/professional/authoredPlan.ts';
 import {printedPlanHtml} from '../src/professional/printPlan.ts';
+import {nutritionMealSections,nutritionTargetRows} from '../src/professional/nutritionPresentation.ts';
 import {describeProfessionalRecipe,professionalRecipeAllowed} from '../src/utils/professionalMenuPolicy.ts';
 const catalog=installTestNutritionCatalog();
+const templates=new Map(catalog.mealTemplates.map(template=>[template.id,template]));
 const base={...emptyRealIntake(),display_name:'Synthetic exact-menu case',birth_date:'1992-04-23',weight_kg:75,height_cm:165,safety_confirmed:true};
 const profiles=[
  ['low-energy',{}],
@@ -33,7 +35,8 @@ for(const [name,patch] of profiles)for(let count=1;count<=5;count++){
    for(const meal of slot.options){
     menus++;assert(isMealSnapshot(meal,slot.slot));assert(isPracticalMeal(slot.slot,meal.components));
     assert(professionalRecipeAllowed(meal.components.map(c=>c.foodItem)),name+' compatible recipe');
-    const original=catalog.mealTemplates.find(t=>t.id===meal.templateId.split('~')[0]);assert(original);
+     const original=templates.get(meal.templateId.split('~')[0]);assert(original);
+     assert(!(day.workout ? original.isRestDayOnly : original.isWorkoutDayOnly),name+' respects catalog day restrictions');
     for(const [index,c] of meal.components.entries()){
      assert(!c.foodItem.allergyFlags.some(a=>intake.allergies.includes(a)));assert(!c.foodItem.excludedForVegetarian.includes(intake.vegetarian_status));
      const rule=catalog.portionRules[c.foodItem.id];assert(c.units>=rule.minUnits-1e-6&&c.units<=rule.hardMaxUnits+1e-6,name+' hard serving bounds');
@@ -61,9 +64,10 @@ assert.throws(()=>generatePrintedPlan({...base,allergies:['egg']},1,5,policy,'20
 const repeat=generatePrintedPlan(base,1,5,policy,'2026-11-10');assert.deepEqual(repeat.days,sample.days,'Deterministic solve');
 
 // Same printed targets as the four-menu PDF regression, with synthetic intake.
-const pdfCase=generatePrintedPlan({...base,gender:'male',pregnancy_status:'not_applicable',
+const pdfIntake={...base,gender:'male',pregnancy_status:'not_applicable',
   birth_date:'2003-01-15',height_cm:178,weight_kg:122.9,activity_level:'lightly_active',
-  protein_budget:'balanced',workout_days:3,training_type:'resistance'},1,4,policy,'2026-11-12');
+  protein_budget:'balanced',workout_days:3,training_type:'resistance'};
+const pdfCase=generatePrintedPlan(pdfIntake,1,4,policy,'2026-11-12');
 for (const day of pdfCase.days) {
   const {targetCalories,proteinGrams,carbGrams,fatGrams}=day.targets;
   assert.deepEqual([targetCalories,proteinGrams,carbGrams,fatGrams],[2302,174,258,64]);
@@ -93,7 +97,26 @@ assert.equal(selectProfessionalMenus(overBudget,day.targets,4,()=>{repairCalls++
 assert(repairCalls>0,'Even a macro-feasible repair cannot return duplicate menus');
 
 const pdfHtml=printedPlanHtml(pdfCase,'https://example.com');
-assert.equal((pdfHtml.match(/class="meal-table"/g)||[]).length,13);
-assert.equal((pdfHtml.match(/scope="row"/g)||[]).length,52);
+const sections=nutritionMealSections(pdfCase);
+assert.equal(sections.length,7);
+assert(sections.filter(section=>section.groups.some(group=>!group.label)).length>=3,'Routine meals are shared where feasible');
+assert.equal(sections.find(section=>section.slot==='post_workout').groups[0].label,'فقط روزهای تمرین');
+assert.equal(nutritionTargetRows(pdfCase.days).length,1);
+assert.equal((pdfHtml.match(/class="meal-table"/g)||[]).length,7);
+assert.equal((pdfHtml.match(/scope="row"/g)||[]).length,sections.flatMap(s=>s.groups).reduce((sum,g)=>sum+g.options.length,0));
 assert(pdfHtml.includes('قاشق غذاخوری')&&pdfHtml.includes('وزن پخته'));
+
+const restrictedCatalog=structuredClone(catalog);
+const restOnlyId=pdfCase.days[1].slots[0].options[0].templateId.split('~')[0];
+assert(templates.has(restOnlyId));
+restrictedCatalog.mealTemplates.find(t=>t.id===restOnlyId).isRestDayOnly=true;
+const restricted=generatePrintedPlan(pdfIntake,1,4,policy,'2026-11-12','',createMealPlanEngine(restrictedCatalog));
+assert(restricted.days[1].slots.every(s=>s.options.every(m=>m.templateId.split('~')[0]!==restOnlyId)),
+  'Rest-only recipes cannot enter a workout menu group through the base plan or shared menus');
+
+const oldSnapshot=JSON.parse(JSON.stringify(pdfCase));
+const breakfast=oldSnapshot.days[1].slots.find(slot=>slot.slot==='breakfast');
+breakfast.options[0].components[0].grams+=5;
+assert.deepEqual(nutritionMealSections(oldSnapshot).find(s=>s.slot==='breakfast').groups.map(g=>[g.label,g.options.length]),
+  [['روزهای استراحت',4],['روزهای تمرین',4]],'Different prescribed portions remain visible for their respective day');
 console.log(`PASS exact Pro menus: ${plans} profiles/counts, ${menus} menus, ${combinations} independent combinations; allergens/diets, fixed/min/max servings, 5 g precision, snapshots/IDs/arithmetic, authoring/PDF and sparse-catalog rejection; slowest ${Math.round(maxMs)} ms`);

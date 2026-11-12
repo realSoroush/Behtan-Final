@@ -1706,6 +1706,7 @@ function getProfessionalMealOptionsWithCatalog(engine: EngineCatalog, base: Meal
   });
   const key = (meal:Meal) => meal.components.map(c=>c.foodItem.id).sort().join('|');
   const seen = new Set<string>();
+  const alreadyFitted = new Set<Meal>();
   const options:Meal[] = [];
   const add = (meal:Meal) => {
     if(meal.totalKcal>professionalCalorieCeiling(base,dailyTargets,referenceDayCalories)||!isPracticalMeal(meal.slot,meal.components)||mealMassGrams(meal.components)>mealMassLimitGrams(meal.slot,target.kcal)||meal.components.some(c=>!isFoodAllowed(c.foodItem,preferences))||!professionalRecipeAllowed(meal.components.map(c=>c.foodItem)))return;
@@ -1720,7 +1721,12 @@ function getProfessionalMealOptionsWithCatalog(engine: EngineCatalog, base: Meal
   for(let pass=0;pass<2 && options.length<80;pass++) {
     // A recipe that misses the calorie screen can still seed a valid approved
     // substitution. Screen completed alternatives, not their search ancestors.
-    const frontier=[...options,...resolved].filter((m,i,all)=>all.findIndex(n=>key(n)===key(m))===i).slice(0,80);
+    const ancestors = new Map<string, Meal>();
+    for (const meal of [...options, ...resolved]) {
+      const identity = key(meal);
+      if (!ancestors.has(identity)) ancestors.set(identity, meal);
+    }
+    const frontier = [...ancestors.values()].slice(0, 80);
     for(const meal of frontier) {
       const template=engine.templatesById.get(meal.templateId.split('~')[0]);
       for(const [index,component] of meal.components.entries()) {
@@ -1767,14 +1773,20 @@ function getProfessionalMealOptionsWithCatalog(engine: EngineCatalog, base: Meal
         try {
           const candidate=buildMeal({slot:base.slot,template:variant,resolved:resolveTemplate(engine,variant,target)});
           const next=fitProfessionalMeal(engine,candidate,base,dailyTargets,undefined,professionalCalorieCeiling(base,dailyTargets,referenceDayCalories));
-          const before=options.length;add({...next,templateId:template.id+'~'+key(next),templateName:next.components.map(c=>c.foodItem.name).join(' و ')});added+=options.length-before;
+          const fitted = {...next,templateId:template.id+'~'+key(next),templateName:next.components.map(c=>c.foodItem.name).join(' و ')};
+          const before = options.length;
+          add(fitted);
+          if (options.length > before) {
+            alreadyFitted.add(fitted);
+            added++;
+          }
         }catch(error){if(!(error instanceof Error&&error.message.includes('Could not resolve template')))throw error;}
         if(added>=40)break;
       }
       if(added>=40)break;
     }
   }
-  const fitted=dailyTargets?options.map(meal=>fitProfessionalMeal(engine,meal,base,dailyTargets,undefined,professionalCalorieCeiling(base,dailyTargets,referenceDayCalories))):options;
+  const fitted=dailyTargets?options.map(meal=>alreadyFitted.has(meal) ? meal : fitProfessionalMeal(engine,meal,base,dailyTargets,undefined,professionalCalorieCeiling(base,dailyTargets,referenceDayCalories))):options;
   return fitted.sort((a,b)=>scoreTotals({kcal:a.totalKcal,protein:a.totalProtein,carbs:a.totalCarbs,fat:a.totalFat},target)-
     scoreTotals({kcal:b.totalKcal,protein:b.totalProtein,carbs:b.totalCarbs,fat:b.totalFat},target));
 }
@@ -1809,6 +1821,11 @@ export function createMealPlanEngine(source: NutritionCatalog, revision?: string
   };
   return {
     getSubstitutesFor: getSubstitutesForWithCatalog.bind(null, engine),
+    canUseProfessionalMeal(meal: Meal, workout: boolean): boolean {
+      const template = engine.templatesById.get(meal.templateId.split('~')[0]);
+      return Boolean(template && template.slot === meal.slot &&
+        (workout ? !template.isRestDayOnly : meal.slot !== 'post_workout' && !template.isWorkoutDayOnly));
+    },
     generateDailyMealPlan(...args: Parameters<OmitEngine<typeof generateDailyMealPlanWithCatalog>>): DailyMealPlan {
       const plan = generateDailyMealPlanWithCatalog(engine, ...args);
       return revision ? { ...plan, nutritionContext: { revision, engineVersion: MEAL_POLICY_VERSION } } : plan;
@@ -1844,5 +1861,6 @@ export const rebalanceMemberDay = (...args: Parameters<MealPlanEngine["rebalance
 export const getMemberSwapOptions = (...args: Parameters<MealPlanEngine["getMemberSwapOptions"]>) => fixtureEngine().getMemberSwapOptions(...args);
 export const swapComponentInMeal = (...args: Parameters<MealPlanEngine["swapComponentInMeal"]>) => fixtureEngine().swapComponentInMeal(...args);
 export const getProfessionalMealOptions = (...args: Parameters<MealPlanEngine["getProfessionalMealOptions"]>) => fixtureEngine().getProfessionalMealOptions(...args);
+export const canUseProfessionalMeal = (...args: Parameters<MealPlanEngine['canUseProfessionalMeal']>) => fixtureEngine().canUseProfessionalMeal(...args);
 
 export const rebalanceProfessionalMenus = (...args: Parameters<MealPlanEngine["rebalanceProfessionalMenus"]>) => fixtureEngine().rebalanceProfessionalMenus(...args);

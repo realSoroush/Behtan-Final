@@ -277,72 +277,25 @@ test("revocation closes nested report dialogs and restores page scrolling", asyn
     "hidden",
   );
 });
-test("approved matching report attaches once and appears after the original diet in PDF", async ({
-  page,
-}) => {
+test("nutrition preview, saving and PDF work without requesting body reports", async ({ page }) => {
   await setup(page, { existing: true });
-  let attached = false;
-  let attaches = 0;
-  await page.route("**/rest/v1/rpc/pro_body_reports", (r) =>
-    r.fulfill({
-      json: [
-        {
-          id: "90000000-0000-4000-8000-000000000004",
-          intake_revision: 1,
-          created_at: report.created_at,
-          report,
-          approved_at: report.created_at,
-        },
-      ],
-    }),
-  );
-  await page.route("**/rest/v1/rpc/pro_plan_body_report", (r) =>
-    r.fulfill({ json: attached ? report : null }),
-  );
-  await page.route("**/rest/v1/rpc/pro_attach_body_report", (r) => {
-    attaches++;
-    attached = true;
-    return r.fulfill({ json: null });
+  const bodyRequests: string[] = [];
+  await page.route(/\/rest\/v1\/rpc\/pro_(body_reports|plan_body_report|attach_body_report)(?:\?|$)/, route => {
+    bodyRequests.push(route.request().url());
+    return route.abort('failed');
   });
+
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "بازکردن پرونده", exact: true })
-    .click();
-  await page
-    .getByRole("button", { name: "تولید و پیش‌نمایش برنامه", exact: true })
-    .click();
-  await page
-    .getByRole("button", { name: "ذخیره این برنامه", exact: true })
-    .click();
-  const select = page.getByRole("combobox", {
-    name: "گزارش بدن برای PDF",
-    exact: true,
-  });
-  await select.click();
-  await page.getByRole("option").last().click();
-  await page
-    .getByRole("button", {
-      name: "تأیید و پیوست به PDF این برنامه",
-      exact: true,
-    })
-    .click();
-  await expect(
-    page.getByText(
-      "گزارش تأییدشده به این برنامه متصل است و در انتهای PDF درج می‌شود.",
-      { exact: true },
-    ),
-  ).toBeVisible();
-  expect(attaches).toBe(1);
+  await page.getByRole("button", { name: "بازکردن پرونده", exact: true }).click();
+  await page.getByRole("button", { name: "تولید و پیش‌نمایش برنامه", exact: true }).click();
+  await page.getByRole("button", { name: "ذخیره این برنامه", exact: true }).click();
+  await expect(page.getByRole("button", { name: "برنامه ذخیره شده", exact: true })).toBeVisible();
+  await expect(page.getByText("پیوست گزارش بدن", { exact: true })).toHaveCount(0);
+
   const popupEvent = page.waitForEvent("popup");
-  await page
-    .getByRole("button", { name: "خروجی PDF / چاپ", exact: true })
-    .click();
+  await page.getByRole("button", { name: "خروجی PDF / چاپ", exact: true }).click();
   const popup = await popupEvent;
-  await expect(popup.locator(".body-appendix")).toContainText(
-    "گزارش تصویری و اندازه‌های بدن",
-  );
   await expect(popup.locator("header").first()).toContainText("برنامه غذایی");
-  await expect(popup.locator("body > section").last()).toHaveClass(
-    "body-appendix",
-  );
+  await expect(popup.locator(".body-appendix")).toHaveCount(0);
+  expect(bodyRequests).toEqual([]);
 });

@@ -1,7 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
-import { readNutritionContext, NutritionContextError } from '../src/utils/nutritionContext.ts';
+import { readNutritionContext, NutritionContextError, type NutritionContext } from '../src/utils/nutritionContext.ts';
 import type { RealIntake } from '../src/professional/menuPlan.ts';
 import { ProServerError, type PlanDependencies, type ServerDraft } from './proPlanService.ts';
+
+let catalogCache: { source: string; context: NutritionContext } | undefined;
 
 function databaseError(error: { message: string; code?: string }, status = 0): never {
   const known = /PRO_(ACCESS_DENIED|STALE_REVISION|REQUEST_CONFLICT|MODULE_DISABLED|INVALID_PLAN|DRAFT_EXPIRED|GENERATION_LIMIT|SUBSCRIPTION_EXPIRED|CASE_LIMIT)/.exec(error.message)?.[0];
@@ -41,12 +43,16 @@ export function supabasePlanDependencies(): PlanDependencies {
       return data.user.id;
     },
     async readCase(token, org, record) {
-      const { data, error, status } = await userClient(token).from('pro_real_cases').select('answers,revision,archived_at')
-        .eq('organization_id', org).eq('id',record).single();
+      const db = userClient(token);
+      const signal = AbortSignal.timeout(12000);
+      const [{ data, error, status }, access] = await Promise.all([
+        db.from('pro_real_cases').select('answers,revision,archived_at')
+          .eq('organization_id', org).eq('id', record).abortSignal(signal).retry(false).single(),
+        db.rpc('pro_workspace_status', { p_org: org }).abortSignal(signal).retry(false),
+      ]);
       if (error) databaseError(error,status);
       if (!data) throw new ProServerError('PRO_ACCESS_DENIED',403);
       if(data.archived_at)throw new ProServerError('PRO_CASE_ARCHIVED',409);
-      const access=await userClient(token).rpc('pro_workspace_status',{p_org:org});
       if(access.error)databaseError(access.error,access.status);
       if(access.data?.modules?.nutrition===false)throw new ProServerError('PRO_MODULE_DISABLED',403);
       if(!access.data?.can_write)throw new ProServerError('PRO_SUBSCRIPTION_EXPIRED',403);
@@ -58,7 +64,10 @@ export function supabasePlanDependencies(): PlanDependencies {
       // B2C billing policies intentionally remain unchanged.
       void token;
       try {
-        return await readNutritionContext(admin, AbortSignal.timeout(12000));
+        const cached = catalogCache?.source === url ? catalogCache.context : undefined;
+        const context = await readNutritionContext(admin, AbortSignal.timeout(12000), cached);
+        catalogCache = { source: url, context };
+        return context;
       } catch (error) {
         if (error instanceof NutritionContextError) {
           if (error.status === 401 || error.status === 403) throw new ProServerError('PRO_SERVER_CREDENTIAL_INVALID', 503);

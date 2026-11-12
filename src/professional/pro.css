@@ -446,6 +446,11 @@
   font-weight: 700;
   margin: 24px 0 10px;
 }
+.pro-plan-day-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 12px 0 4px;
+}
 .pro-plan-preview ol {
   list-style: decimal;
   padding-inline-start: 24px;

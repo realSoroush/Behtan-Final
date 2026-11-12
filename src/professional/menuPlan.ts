@@ -12,6 +12,7 @@ import type {
   ProteinEnginePolicy,
 } from "@/types";
 import {
+  canUseProfessionalMeal,
   generateDailyMealPlan,
   getProfessionalMealOptions,
   rebalanceProfessionalMenus,
@@ -110,6 +111,8 @@ export function selectProfessionalMenus(pools:MenuDay['slots'],targets:MacroTarg
     }
     const choices = [...byRecipe.values()];
     const recipes = new Map(choices.map(meal => [meal, describeProfessionalRecipe(meal)]));
+    const vectors = new Map(choices.map(meal => [meal, vector(meal)]));
+    const anchorVector = pool.options[0] && vector(pool.options[0]);
     const variety = (meals: Meal[]) => professionalMenuVarietyPenalty(meals.map(meal => recipes.get(meal)!), pool.slot);
     const found=new Map<string,{meals:Meal[];min:number[];max:number[];variety:number}>();
     const addGroup = (meals: Meal[]) => {
@@ -120,11 +123,14 @@ export function selectProfessionalMenus(pools:MenuDay['slots'],targets:MacroTarg
       const meals=[anchor];
       while(meals.length<count) {
         let best:Meal|undefined,score=Infinity;
+        const current = bounds(meals);
         for(const candidate of choices) {
           if(meals.includes(candidate))continue;
-          const group = [...meals, candidate];
-          const b=bounds(group);
-          const cost=b.min.reduce((s,x,i)=>s+(b.max[i]-x)/daily[i],variety(group));
+          const candidateVector = vectors.get(candidate)!;
+          const cost = current.min.reduce((sum, min, i) => {
+            const value = candidateVector[i];
+            return sum + (Math.max(current.max[i], value) - Math.min(min, value)) / daily[i];
+          }, variety([...meals, candidate]));
           if(cost<score){score=cost;best=candidate;}
         }
         if(!best)break;meals.push(best);
@@ -138,10 +144,10 @@ export function selectProfessionalMenus(pools:MenuDay['slots'],targets:MacroTarg
       };
       visit(0,[]);
     }
-    return [...found.values()].sort((a,b)=>{
-      const cost=(g:typeof a)=>g.min.reduce((n,v,i)=>n+(g.max[i]-v)/daily[i]+.1*Math.abs((g.max[i]+v)/2-vector(pool.options[0])[i])/daily[i],g.variety);
-      return cost(a)-cost(b);
-    }).slice(0,120);
+    return [...found.values()].map(group => ({
+      ...group,
+      cost: group.min.reduce((n,v,i)=>n+(group.max[i]-v)/daily[i]+.1*Math.abs((group.max[i]+v)/2-anchorVector[i])/daily[i],group.variety),
+    })).sort((a, b) => a.cost - b.cost).slice(0, 120);
   });
   if(groups.some(g=>!g.length))return null;
   type State={chosen:number[];min:number[];max:number[];score:number;variety:number};
@@ -150,13 +156,20 @@ export function selectProfessionalMenus(pools:MenuDay['slots'],targets:MacroTarg
     const rest=pools.slice(slot+1).map(p=>vector(p.options[0]));
     const reference=fields.map((_,i)=>rest.reduce((s,v)=>s+v[i],0));
     const next:State[]=[];
+    let cutoff = Infinity;
     for(const state of beam)for(const [index,group] of groups[slot].entries()) {
       const min=state.min.map((n,i)=>n+group.min[i]),max=state.max.map((n,i)=>n+group.max[i]);
       if(!repair && min.some((n,i)=>max[i]-n>daily[i]*(i===0?.09:.20)+1e-6))continue;
       const variety = state.variety + group.variety;
       const score=min.reduce((s,n,i)=>s+.2*(max[i]-n)/daily[i]+20*(Math.max(0,daily[i]*(i===0?.94:.9)-n-reference[i])+Math.max(0,max[i]+reference[i]-daily[i]*(i===0?1.03:1.1)))/daily[i]+Math.abs((max[i]+n)/2+reference[i]-daily[i])/daily[i],variety);
+      // Ties retain the earlier state under the existing stable sort.
+      if (score >= cutoff) continue;
       next.push({chosen:[...state.chosen,index],min,max,score,variety});
-      if(next.length>=20000){next.sort((a,b)=>a.score-b.score);next.length=2500;}
+      if (next.length >= 5000) {
+        next.sort((a, b) => a.score - b.score);
+        next.length = 2500;
+        cutoff = next[2499].score;
+      }
     }
     beam=next.sort((a,b)=>a.score-b.score).slice(0,2500);
     if(!beam.length)return null;
@@ -174,6 +187,46 @@ export function selectProfessionalMenus(pools:MenuDay['slots'],targets:MacroTarg
   return null;
 }
 
+/** Prefer a shared menu wherever an existing complete menu group can serve
+ * both days. Each retained day still validates all independent choices. */
+function shareDayMenus(rest: MenuDay, workout: MenuDay, eligible: MealPlanEngine['canUseProfessionalMeal']) {
+  const restSlots = [...rest.slots];
+  const workoutSlots = [...workout.slots];
+  const commonSlots = restSlots.flatMap((slot, restIndex) => {
+    const workoutIndex = workoutSlots.findIndex(item => item.slot === slot.slot);
+    if (workoutIndex < 0) return [];
+    const trainingSlot = workoutSlots[workoutIndex];
+    return [{ restIndex, workoutIndex, slot, trainingSlot,
+      restCanShare: slot.options.every(meal => eligible(meal, true)),
+      workoutCanShare: trainingSlot.options.every(meal => eligible(meal, false)) }];
+  });
+  let sharedBest = 0;
+  const visit = (index: number, shared: number) => {
+    if (shared + commonSlots.length - index <= sharedBest) return;
+    if (index === commonSlots.length) {
+      if (menuCombinationsFeasible(restSlots, rest.targets) && menuCombinationsFeasible(workoutSlots, workout.targets)) {
+        sharedBest = shared;
+        rest.slots = [...restSlots];
+        workout.slots = [...workoutSlots];
+      }
+      return;
+    }
+    const { restIndex, workoutIndex, slot, trainingSlot, restCanShare, workoutCanShare } = commonSlots[index];
+    if (restCanShare) {
+      workoutSlots[workoutIndex] = slot;
+      visit(index + 1, shared + 1);
+      workoutSlots[workoutIndex] = trainingSlot;
+    }
+    if (workoutCanShare) {
+      restSlots[restIndex] = trainingSlot;
+      visit(index + 1, shared + 1);
+      restSlots[restIndex] = slot;
+    }
+    visit(index + 1, shared);
+  };
+  visit(0, 0);
+}
+
 export function generatePrintedPlan(
   a: RealIntake,
   revision: number,
@@ -181,7 +234,7 @@ export function generatePrintedPlan(
   policy: ProteinEnginePolicy,
   date: string,
   notes = "",
-  engine: Pick<MealPlanEngine, "generateDailyMealPlan" | "getProfessionalMealOptions"> & Partial<Pick<MealPlanEngine,"rebalanceProfessionalMenus">> = { generateDailyMealPlan, getProfessionalMealOptions,rebalanceProfessionalMenus },
+  engine: Pick<MealPlanEngine, 'generateDailyMealPlan' | 'getProfessionalMealOptions'> & Partial<Pick<MealPlanEngine, 'rebalanceProfessionalMenus' | 'canUseProfessionalMeal'>> = { generateDailyMealPlan, getProfessionalMealOptions, rebalanceProfessionalMenus, canUseProfessionalMeal },
 ): PrintedPlan {
   if (!Number.isInteger(count) || count < 1 || count > 5)
     throw new Error("تعداد منو باید بین ۱ تا ۵ باشد.");
@@ -222,18 +275,23 @@ export function generatePrintedPlan(
     if (base.remainingTargetsUnmet)
       throw new Error("موتور نتوانست برنامه کامل و معتبر بسازد.");
     const referenceCalories = base.meals.reduce((total, meal) => total + meal.totalKcal, 0);
+    const eligible = (meal: Meal) =>
+      (engine.canUseProfessionalMeal?.(meal, workout) ?? true) &&
+      professionalRecipeAllowed(meal.components.map(c => c.foodItem));
     const pools = base.meals.map(meal => ({
       slot: meal.slot, label: meal.label,
-      options: (count === 1 && professionalRecipeAllowed(meal.components.map(c => c.foodItem))
+      options: (count === 1 && eligible(meal)
         ? [meal] : [meal, ...engine.getProfessionalMealOptions(meal, preferences, workout, targets, referenceCalories)])
-        .filter(option => professionalRecipeAllowed(option.components.map(c => c.foodItem))),
+        .filter(eligible),
     }));
     const slots = count === 1 && pools.every(pool => pool.options.length === 1) ? pools
       : selectProfessionalMenus(pools,targets,count,engine.rebalanceProfessionalMenus?slots=>engine.rebalanceProfessionalMenus!(slots,targets,base.meals,pools):undefined);
-    if(!slots || !hasExactMenus(slots,pools,count))throw new ProMenuCountError(count,pools.map(slot=>({slot:slot.slot,label:slot.label,available:new Set(slot.options.map(menuIdentity)).size})));
+    if(!slots || !hasExactMenus(slots,pools,count) || slots.some(slot => slot.options.some(meal => !eligible(meal))))
+      throw new ProMenuCountError(count,pools.map(slot=>({slot:slot.slot,label:slot.label,available:new Set(slot.options.map(menuIdentity)).size})));
     if(!menuCombinationsFeasible(slots,targets))throw new Error('مجموع منوها با اهداف موتور سازگار نیست.');
     days.push({ workout, targets, trace, slots });
   }
+  if (days.length === 2 && engine.canUseProfessionalMeal) shareDayMenus(days[0], days[1], engine.canUseProfessionalMeal);
   return {
     version: 1,
     menu_contract:'exact-v2',
