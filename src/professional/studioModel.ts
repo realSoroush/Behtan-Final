@@ -2,6 +2,7 @@ import type { AuthoredContent, AuthoredLine, AuthoredSection, AuthoredMenu } fro
 import type { FoodItem } from '../types/index.ts';
 import type { PrintedPlan } from './menuPlan.ts';
 import {validTrainingDate} from './training/trainingDate.ts';
+import { foodWeightBasis } from './foodAmounts.ts';
 
 export type GroupKind = 1 | 2 | 3;
 export interface TrainingPrescription { group: string; kind: GroupKind; sets: number; reps: number; rest: number; seconds?:number }
@@ -53,7 +54,7 @@ export function nutritionMenuSummary(lines: AuthoredLine[]): string {
 export function foodLine(food: FoodItem, grams = 100): AuthoredLine {
   return { name: food.name, details: '', food: {
     id: food.id, grams, gramsPerUnit: food.gramsPerUnit,
-    basis: ({ raw: 'خام', cooked: 'پخته', dry: 'خشک', ready: 'آماده مصرف' } as Record<string, string>)[food.preparationState || 'ready'],
+    basis: foodWeightBasis(food) ?? 'آماده مصرف',
     kcal: food.kcalPerUnit, protein: food.proteinPerUnit, carbs: food.carbsPerUnit, fat: food.fatPerUnit,
   } };
 }

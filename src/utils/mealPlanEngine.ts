@@ -1,4 +1,5 @@
 import {professionalMenusFeasible,professionalMenuViolation,professionalMenuBounds,menuTargetVector,menuNutrients,type ProfessionalMenuSlot} from './professionalMenuEnvelope.ts';
+import { describeProfessionalRecipe, professionalMenuIdentity, professionalMenuVarietyPenalty, professionalRecipeAllowed } from './professionalMenuPolicy.ts';
 import { foodAllowedByAllergens } from './allergens.ts';
 /**
  * mealPlanEngine.ts
@@ -1664,21 +1665,24 @@ function rebalanceProfessionalMenusWithCatalog(engine:EngineCatalog,source:Profe
     if(!changed || pass===1)for(let index=0;index<slots.length;index++) {
       const slot=slots[index],count=slot.options.length,other=professionalMenuBounds(slots.filter((_,i)=>i!==index));
       const limits={min:scale.map((t,k)=>t*(k===0?.95:.9)-other[k].min),max:scale.map((t,k)=>t*(k===0?1.03:1.1)-other[k].max)};
-      const anchor=anchors.get(slot.slot)!,identity=(m:Meal)=>m.components.map(c=>c.foodItem.id).sort().join('|');
+      const anchor=anchors.get(slot.slot)!,identity=professionalMenuIdentity;
       const candidates=[...new Map(pools[index].options.map(m=>[identity(m),m])).values()].map(m=>fitProfessionalMeal(engine,m,anchor,targets,limits,professionalCalorieCeiling(anchor,targets,dayCalories)));
-      const previous=slot.options;let best=previous,bestScore=score();
+      const previous=slot.options;
+      const recipes=new Map([...candidates,...previous].map(meal=>[meal,describeProfessionalRecipe(meal)]));
+      const recipeScore=()=>score()+professionalMenuVarietyPenalty(slot.options.map(meal=>recipes.get(meal)!),slot.slot);
+      let best=previous,bestScore=recipeScore();
       for(const first of candidates.slice(0,24)) {
         const selected=[first],used=new Set([identity(first)]);
         while(selected.length<count){
           let choice:Meal|undefined,choiceScore=Infinity;
           for(const candidate of candidates){
             if(used.has(identity(candidate)))continue;
-            slot.options=[...selected,candidate];const cost=score();
+            slot.options=[...selected,candidate];const cost=recipeScore();
             if(cost<choiceScore-1e-12){choice=candidate;choiceScore=cost;}
           }
           if(!choice)break;selected.push(choice);used.add(identity(choice));
         }
-        slot.options=selected;const cost=score();
+        slot.options=selected;const cost=recipeScore();
         if(selected.length===count&&cost<bestScore-1e-12){best=selected;bestScore=cost;}
       }
       slot.options=best;if(best!==previous)changed=true;
@@ -1704,8 +1708,9 @@ function getProfessionalMealOptionsWithCatalog(engine: EngineCatalog, base: Meal
   const seen = new Set<string>();
   const options:Meal[] = [];
   const add = (meal:Meal) => {
-    if(meal.totalKcal>professionalCalorieCeiling(base,dailyTargets,referenceDayCalories)||!isPracticalMeal(meal.slot,meal.components)||mealMassGrams(meal.components)>mealMassLimitGrams(meal.slot,target.kcal)||meal.components.some(c=>!isFoodAllowed(c.foodItem,preferences)))return;
-    const k=key(meal); if (!seen.has(k)) { seen.add(k); options.push(meal); }
+    if(meal.totalKcal>professionalCalorieCeiling(base,dailyTargets,referenceDayCalories)||!isPracticalMeal(meal.slot,meal.components)||mealMassGrams(meal.components)>mealMassLimitGrams(meal.slot,target.kcal)||meal.components.some(c=>!isFoodAllowed(c.foodItem,preferences))||!professionalRecipeAllowed(meal.components.map(c=>c.foodItem)))return;
+    const identity=professionalMenuIdentity(meal);
+    if (!seen.has(identity)) { seen.add(identity); options.push(meal); }
   };
   add(base); resolved.forEach(add);
   if(!options.length&&base.slot!=='post_workout')throw new MealPlanGenerationError(base.slot,'ترکیب مجاز با اندازهٔ مناسب برای این وعده پیدا نشد.');
@@ -1756,7 +1761,7 @@ function getProfessionalMealOptionsWithCatalog(engine: EngineCatalog, base: Meal
       if(meal.components.filter(c=>c.foodItem.role==='protein').length>1)continue;
       const template=engine.templatesById.get(meal.templateId.split('~')[0]);if(!template)continue;
       for(const food of proteins){
-        if(meal.components.some(c=>c.foodItem.id===food.id))continue;
+        if(meal.components.some(c=>c.foodItem.id===food.id)||!professionalRecipeAllowed([...meal.components.map(c=>c.foodItem),food]))continue;
         const id=template.id+'~protein-'+food.id;
         const variant={...template,id,slots:[...meal.components.map((c,index)=>({...template.slots[index],role:c.foodItem.role,primaryFoodItemId:c.foodItem.id})),{role:food.role,primaryFoodItemId:food.id,dynamicUnits:true}]};
         try {

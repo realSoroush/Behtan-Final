@@ -41,6 +41,11 @@ test("create actual record, save, generate menus, save plan and print Persian PD
   await expect(popup.locator("h1")).toContainText("برنامه غذایی");
   await expect(popup.locator("header")).toContainText("مراجع تست");
   await expect(popup.locator("table").first()).toBeVisible();
+  const firstMeal = popup.locator('.meal-table').first();
+  await expect(firstMeal.locator('thead h3')).toContainText('روزهای استراحت');
+  await expect(firstMeal.locator('tbody tr')).toHaveCount(4);
+  const pdf = await popup.pdf({ path: info.outputPath('nutrition-plan.pdf'), preferCSSPageSize: true, printBackground: true });
+  expect(pdf.toString('latin1')).toContain('/ToUnicode');
   await expect(popup.getByRole('region', {name:'مشخصات متخصص',exact:true})).toContainText(specialist.full_name);
   await expect(popup.getByRole('region', {name:'مشخصات متخصص',exact:true})).toContainText(specialist.contact_phone);
   await expect(popup.getByRole('region', {name:'مشخصات متخصص',exact:true})).toContainText(specialist.address);

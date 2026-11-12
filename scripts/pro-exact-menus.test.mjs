@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import {performance} from 'node:perf_hooks';
 import {installTestNutritionCatalog} from './setup-test-nutrition-catalog.mjs';
-import {emptyRealIntake,generatePrintedPlan,menuCombinationsFeasible,menuIdentity,ProMenuCountError} from '../src/professional/menuPlan.ts';
+import {emptyRealIntake,generatePrintedPlan,menuCombinationsFeasible,menuIdentity,ProMenuCountError,selectProfessionalMenus} from '../src/professional/menuPlan.ts';
 import {DEFAULT_PROTEIN_ENGINE_POLICY as policy} from '../src/utils/proteinPolicy.ts';
 import {isMealSnapshot} from '../src/utils/mealValidation.ts';
 import {isPracticalMeal} from '../src/utils/mealPlanEngine.ts';
 import {fromPrintedPlan,sectionMenus,validateAuthored} from '../src/professional/studioModel.ts';
 import {authoredHtml} from '../src/professional/authoredPlan.ts';
+import {printedPlanHtml} from '../src/professional/printPlan.ts';
+import {describeProfessionalRecipe,professionalRecipeAllowed} from '../src/utils/professionalMenuPolicy.ts';
 const catalog=installTestNutritionCatalog();
 const base={...emptyRealIntake(),display_name:'Synthetic exact-menu case',birth_date:'1992-04-23',weight_kg:75,height_cm:165,safety_confirmed:true};
 const profiles=[
@@ -30,6 +32,7 @@ for(const [name,patch] of profiles)for(let count=1;count<=5;count++){
    assert.equal(new Set(slot.options.map(m=>m.templateId)).size,count,name+' stable distinct IDs');
    for(const meal of slot.options){
     menus++;assert(isMealSnapshot(meal,slot.slot));assert(isPracticalMeal(slot.slot,meal.components));
+    assert(professionalRecipeAllowed(meal.components.map(c=>c.foodItem)),name+' compatible recipe');
     const original=catalog.mealTemplates.find(t=>t.id===meal.templateId.split('~')[0]);assert(original);
     for(const [index,c] of meal.components.entries()){
      assert(!c.foodItem.allergyFlags.some(a=>intake.allergies.includes(a)));assert(!c.foodItem.excludedForVegetarian.includes(intake.vegetarian_status));
@@ -56,4 +59,41 @@ const sparse={generateDailyMealPlan(){return{meals:sample.days[0].slots.map(s=>s
 assert.throws(()=>generatePrintedPlan(base,1,5,policy,'2026-11-10','',sparse),ProMenuCountError,'A genuinely sparse engine cannot invent or repeat recipes');
 assert.throws(()=>generatePrintedPlan({...base,allergies:['egg']},1,5,policy,'2026-11-10'),'Unassessed legacy allergen data must fail closed');
 const repeat=generatePrintedPlan(base,1,5,policy,'2026-11-10');assert.deepEqual(repeat.days,sample.days,'Deterministic solve');
+
+// Same printed targets as the four-menu PDF regression, with synthetic intake.
+const pdfCase=generatePrintedPlan({...base,gender:'male',pregnancy_status:'not_applicable',
+  birth_date:'2003-01-15',height_cm:178,weight_kg:122.9,activity_level:'lightly_active',
+  protein_budget:'balanced',workout_days:3,training_type:'resistance'},1,4,policy,'2026-11-12');
+for (const day of pdfCase.days) {
+  const {targetCalories,proteinGrams,carbGrams,fatGrams}=day.targets;
+  assert.deepEqual([targetCalories,proteinGrams,carbGrams,fatGrams],[2302,174,258,64]);
+  assert(menuCombinationsFeasible(day.slots,day.targets));
+  assert(day.slots.every(s=>s.options.length===4 && new Set(s.options.map(menuIdentity)).size===4));
+  const snack=day.slots.find(s=>s.slot==='morning_snack');
+  assert(snack.options.some(m=>!describeProfessionalRecipe(m).usesPowder),'A morning snack without protein powder is available');
+}
+const postWorkout=pdfCase.days[1].slots.find(s=>s.slot==='post_workout');
+assert(new Set(postWorkout.options.map(m=>describeProfessionalRecipe(m).primaryProtein).filter(Boolean)).size>=2,
+  'Post-workout alternatives vary the whole-food protein');
+
+const day=pdfCase.days[0];
+const first=day.slots[0].options[0];
+const alias=structuredClone(first);
+alias.components.reverse().forEach((component,index)=>{
+  component.foodItem.id='alias-'+index;
+  component.foodItem.name=' '+component.foodItem.name.replaceAll('ی','ي').replaceAll('ک','ك')+' ';
+});
+assert.equal(menuIdentity(first),menuIdentity(alias),'Equivalent printed ingredients have one identity');
+assert.equal(selectProfessionalMenus([{...day.slots[0],options:[first,alias]},...day.slots.slice(1)],day.targets,2),null);
+const aliasedRepair=[{...day.slots[0],options:[first,alias,...day.slots[0].options.slice(2)]},...day.slots.slice(1)];
+assert(menuCombinationsFeasible(aliasedRepair,day.targets));
+const overBudget=day.slots.map(s=>({...s,options:s.options.map(m=>({...m,totalKcal:m.totalKcal+100}))}));
+let repairCalls=0;
+assert.equal(selectProfessionalMenus(overBudget,day.targets,4,()=>{repairCalls++;return aliasedRepair;}),null);
+assert(repairCalls>0,'Even a macro-feasible repair cannot return duplicate menus');
+
+const pdfHtml=printedPlanHtml(pdfCase,'https://example.com');
+assert.equal((pdfHtml.match(/class="meal-table"/g)||[]).length,13);
+assert.equal((pdfHtml.match(/scope="row"/g)||[]).length,52);
+assert(pdfHtml.includes('قاشق غذاخوری')&&pdfHtml.includes('وزن پخته'));
 console.log(`PASS exact Pro menus: ${plans} profiles/counts, ${menus} menus, ${combinations} independent combinations; allergens/diets, fixed/min/max servings, 5 g precision, snapshots/IDs/arithmetic, authoring/PDF and sparse-catalog rejection; slowest ${Math.round(maxMs)} ms`);

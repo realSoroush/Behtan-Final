@@ -659,7 +659,7 @@ function RealCaseDetail({
                       </button>
                     </div>
                     <p className="pro-muted">
-                      در پنجره چاپ، مقصد «Save as PDF» را انتخاب کنید.
+                      برای PDF قابل جست‌وجو، در پنجره چاپ خود مرورگر مقصد «Save as PDF» را انتخاب کنید.
                     </p></PanelModal>
                   </>
                 )}
