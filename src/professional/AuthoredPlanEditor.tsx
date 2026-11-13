@@ -11,9 +11,9 @@ import { type AuthoredContent, type AuthoredSnapshot, printAuthored } from './au
 import { lineDescription, prepareContent, trainingLine, validateAuthored } from './studioModel';
 import type { RealIntake } from './menuPlan';
 import './studio.css';
-import {tehranToday} from '@/components/ui/JalaliDateInput';
+import { getTehranDateKey } from '@/utils/dailyMealProgress';
 const empty = (kind: 'nutrition' | 'training'): AuthoredContent => ({ version: 1,
-  ...(kind==='training'?{startDate:tehranToday()}:{}),
+  ...(kind==='training'?{startDate:getTehranDateKey()}:{}),
   title: kind === 'nutrition' ? 'برنامه غذایی اختصاصی' : 'برنامه تمرینی اختصاصی', notes: '', reviewed: false,
   sections: [{ title: kind === 'nutrition' ? 'صبحانه' : 'روز اول', lines: kind === 'training' ? [trainingLine()] : [{name:'',details:''}] }],
 });

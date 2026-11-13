@@ -1,5 +1,5 @@
 import { issueLabels, viewLabels, type BodyReport } from "./contracts";
-export function reportMetrics(r: BodyReport) {
+function reportMetrics(r: BodyReport) {
   const fa = (n: number | null) =>
     n === null
       ? "ثبت نشده"

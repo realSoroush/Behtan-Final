@@ -58,7 +58,13 @@ export function useUserProfile(userId: string | undefined, refreshOnReturn = fal
 
   useEffect(() => {
     void fetch();
-    const refresh=()=>void fetch();window.addEventListener('member-profile-changed',refresh);return()=>{requestSequence.current++;window.removeEventListener('member-profile-changed',refresh);};
+    const refresh = () => void fetch();
+    const sequence = requestSequence;
+    window.addEventListener('member-profile-changed', refresh);
+    return () => {
+      sequence.current++;
+      window.removeEventListener('member-profile-changed', refresh);
+    };
   }, [fetch]);
 
   useEffect(() => {

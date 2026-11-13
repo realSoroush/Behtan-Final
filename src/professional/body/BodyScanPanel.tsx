@@ -1,5 +1,5 @@
 import { AppLoading } from '@/components/ui/AppLoading';
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PanelSelect } from "@/components/ui/PanelSelect";
 import { PanelModal } from "@/components/ui/PanelModal";
 import { bodyApi, bodyError, preparePhoto } from "./api";
@@ -36,19 +36,25 @@ export function BodyScanPanel({
   const key = useRef(crypto.randomUUID()),
     working = useRef(false),
     alive = useRef(true);
-  const reload = async () => {
-    const result = await bodyApi.list(org, record);
-    if (alive.current) setRows(result);
-  };
+  const listRequests = useRef(0);
+  const reload = useCallback(async () => {
+    const request = ++listRequests.current;
+    try {
+      const result = await bodyApi.list(org, record);
+      if (request === listRequests.current) setRows(result);
+    } catch (error) {
+      if (request === listRequests.current) setError(bodyError(error));
+    }
+  }, [org, record]);
   useEffect(() => {
     alive.current = true;
-    void reload().catch((e) => {
-      if (alive.current) setError(bodyError(e));
-    });
+    void reload();
+    const requests = listRequests;
     return () => {
       alive.current = false;
+      requests.current++;
     };
-  }, [org, record]);
+  }, [reload]);
   async function run(action: () => Promise<void>) {
     if (working.current) return;
     working.current = true;
@@ -244,7 +250,7 @@ export function BodyScanPanel({
                 )
               ) {
                 changed();
-                void reload().catch((e) => setError(bodyError(e)));
+                void reload();
               }
             }}
           >
@@ -299,8 +305,7 @@ export function BodyScanPanel({
             </button>
           )}
           <p className="pro-muted">
-            برای پیوست PDF، پس از تأیید گزارش، برنامه ذخیره‌شده همان نسخه
-            اطلاعات را باز کنید.
+            گزارش بدن در سوابق همین پرونده در دسترس است.
           </p>
         </PanelModal>
       )}

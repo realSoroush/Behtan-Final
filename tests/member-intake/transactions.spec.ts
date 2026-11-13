@@ -12,6 +12,7 @@ import {processMemberIntake,intakeDependencies} from '../../server/member/mealIn
 import {memberHandler} from '../../server/member/http';
 import {processMemberMealSchedule,mealScheduleDependencies} from '../../server/member/mealSchedule';
 import type {Meal,UserProfile} from '../../src/types';
+import type { IntakeFixture } from './fixture';
 const secret='synthetic-postgrest-test-secret-32-characters-minimum';
 const jwt=(claims:Record<string,unknown>)=>{
  const parts=[{alg:'HS256',typ:'JWT'},{...claims,exp:Math.floor(Date.now()/1000)+3600}].map(v=>Buffer.from(JSON.stringify(v)).toString('base64url'));
@@ -25,7 +26,7 @@ const options={auth:{persistSession:false,autoRefreshToken:false},global:{fetch:
  url.pathname=url.pathname.replace(/^\/rest\/v1(?=\/|$)/,'');return fetch(url,init);
 }}};
 const admin=createClient(endpoint,jwt({role:'service_role'}),options);
-let server:Server,base:string,db:Client,user:string,other:string,token:string,fixture:any;
+let server:Server,base:string,db:Client,user:string,other:string,token:string,fixture:IntakeFixture;
 let held: {promise:Promise<void>;release:()=>void}|null=null;
 const latch=()=>{let release!:()=>void;return{promise:new Promise<void>(r=>release=r),release};};
 const intakeDeps=intakeDependencies(admin);
@@ -41,11 +42,12 @@ test.beforeAll(async()=>{
  {vegetarianStatus:'none',allergies:[]},{conditions:[],medications:'',injuries:'',pregnancyStatus:'not_applicable',eatingDisorderStatus:'none',safetyScreeningVersion:1,safetyAnswersConfirmed:true}]);
  const state=(await db.query("select member_read_meal_day($1,(now() at time zone 'Asia/Tehran')::date,null) s",[user])).rows[0].s;
  const profile=state.profile as UserProfile,day=(await db.query("select ((now() at time zone 'Asia/Tehran')::date)::text d")).rows[0].d;
- fixture={user,day,extraId:randomUUID(),revision:state.catalog_revision,context:memberScheduleContext(profile,catalog,policy),profileContext:memberProfileContext(profile)};
  token=jwt({role:'authenticated',sub:user});
- const food=catalog.foods[0];fixture.meal={slot:'breakfast',label:'Synthetic meal',templateId:'synthetic',templateName:'Synthetic',consumed:false,
+ const food=catalog.foods[0];
+ const meal ={slot:'breakfast',label:'Synthetic meal',templateId:'synthetic',templateName:'Synthetic',consumed:false,
  components:[{foodItem:food,units:1,grams:food.gramsPerUnit,kcal:food.kcalPerUnit,protein:food.proteinPerUnit,carbs:food.carbsPerUnit,fat:food.fatPerUnit,fiber:food.fiberPerUnit}],
  totalKcal:food.kcalPerUnit,totalProtein:food.proteinPerUnit,totalCarbs:food.carbsPerUnit,totalFat:food.fatPerUnit,totalFiber:food.fiberPerUnit} satisfies Meal;
+ fixture={user,day,extraId:randomUUID(),revision:state.catalog_revision,context:memberScheduleContext(profile,catalog,policy),profileContext:memberProfileContext(profile),meal};
  // GoTrue is deliberately a synthetic verified JWT gate in this fixture.
  // The application HTTP handler, services, actual PostgREST and PG17 are real.
  server=createServer(memberHandler(()=>async(bearer,action,input)=>{
@@ -59,7 +61,7 @@ test.beforeAll(async()=>{
 });
 test.afterAll(async()=>{held?.release();server?.closeAllConnections();await new Promise<void>(r=>server?.close(()=>r()));await db?.end();});
 async function open(page:Page){
- await page.addInitScript(({fixture,token})=>{(window as any).intakeFixture=fixture;localStorage.setItem('sb-pro-test-auth-token',JSON.stringify({access_token:token,refresh_token:'synthetic',expires_at:Math.floor(Date.now()/1000)+3600,user:{id:fixture.user}}));},{fixture,token});
+ await page.addInitScript(({fixture,token})=>{Object.assign(window,{intakeFixture:fixture});localStorage.setItem('sb-pro-test-auth-token',JSON.stringify({access_token:token,refresh_token:'synthetic',expires_at:Math.floor(Date.now()/1000)+3600,user:{id:fixture.user}}));},{fixture,token});
  await page.route('**/api/member',async route=>route.fulfill({response:await route.fetch({url:base,timeout:25000})}));
  await page.goto('/tests/member-intake/harness.html');await expect(page.getByRole('button',{name:'record',exact:true})).toBeEnabled();
 }

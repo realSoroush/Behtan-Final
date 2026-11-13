@@ -3,8 +3,13 @@ import { expect, test, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { processMemberMealSchedule, type MemberDayState, type MealScheduleDependencies } from "../../server/member/mealSchedule";
 import { DEFAULT_PROTEIN_ENGINE_POLICY } from "../../src/utils/proteinPolicy";
-import type { DailyMealPlan, UserProfile } from "../../src/types";
-const raw = JSON.parse(
+import type { DailyMealPlan, Meal, NutritionCatalog, UserProfile } from "../../src/types";
+const raw: {
+  FOOD_ITEMS: NutritionCatalog['foods'];
+  FOOD_SUBSTITUTES: NutritionCatalog['substitutes'];
+  MEAL_TEMPLATES: NutritionCatalog['mealTemplates'];
+  PORTION_RULES: NutritionCatalog['portionRules'];
+} = JSON.parse(
   readFileSync(
     new URL(
       "../../scripts/fixtures/nutrition-catalog.fixture.json",
@@ -707,7 +712,7 @@ test('returning to progress reads updated evidence without reloading the app', a
 });
 
 test('focusing the app refreshes a remotely updated diet before the next save', async ({ page }) => {
-  let diet = profile.dietary_preferences_json;
+  let diet: NonNullable<UserProfile['dietary_preferences_json']> = { vegetarianStatus: 'none', allergies: [] };
   await page.unroute('**/src/hooks/useUserProfile.ts*');
   await page.route('**/rest/v1/user_profiles?*', route =>
     route.fulfill({ json: [{ ...profile, dietary_preferences_json: diet }] }));
@@ -715,7 +720,7 @@ test('focusing the app refreshes a remotely updated diet before the next save', 
   await expect(page.locator('#today-panel .member-meal-card')).toBeVisible();
   diet = { ...diet, allergies: ['celery'] };
   const fixture = fixtures.get(page)!;
-  fixture.profile = { ...fixture.profile, dietary_preferences_json: diet as UserProfile['dietary_preferences_json'] };
+  fixture.profile = { ...fixture.profile, dietary_preferences_json: diet };
   const prior = fixture.saved.length;
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await expect.poll(() => fixture.saved.length).toBeGreaterThan(prior);
@@ -781,14 +786,20 @@ test('account saves celery allergy while preserving existing food preferences', 
 test('allergy change keeps consumed history but undo and reopening expose only safe prescriptions', async ({ page }) => {
   await page.getByRole('button', { name: 'تغییر وعده', exact: true }).click();
   await expect(page.locator('#today-panel [data-food-id="sangak_bread"]').first()).toBeVisible();
-  let eaten: any;
+  const consumedMeals: Meal[] = [];
   page.on('request', request => {
-    if (request.method() === 'POST' && request.url().includes('/api/member') && request.postDataJSON().action === 'meal_intake' && request.postDataJSON().input.kind === 'record') eaten = request.postDataJSON().input.meal;
+    if (request.method() !== 'POST' || !request.url().includes('/api/member')) return;
+    const payload = request.postDataJSON();
+    if (payload.action === 'meal_intake' && payload.input.kind === 'record') {
+      consumedMeals.push(payload.input.meal);
+    }
   });
   await page.getByRole('button', { name: 'علامت‌گذاری وعده به‌عنوان مصرف‌شده' }).click();
   await page.getByRole('dialog', { name: 'تأیید ثبت وعده' }).getByRole('button', { name: 'بله، ثبت کن' }).click();
   await expect(page.locator('.meal-receipt')).toBeVisible();
-  expect(eaten.components.some((c: any) => c.foodItem.allergyFlags.includes('gluten'))).toBe(true);
+  expect(consumedMeals).toHaveLength(1);
+  const [eaten] = consumedMeals;
+  expect(eaten.components.some((c) => c.foodItem.allergyFlags.includes('gluten'))).toBe(true);
   const changed = { ...profile, dietary_preferences_json: { vegetarianStatus: 'none', allergies: ['gluten'] } };
   await page.route('**/src/hooks/useUserProfile.ts*', route => route.fulfill({ contentType: 'text/javascript',
     body: `const profile=${JSON.stringify(changed)};export function useUserProfile(){return {profile,loading:false,error:null,refetch:async()=>{}}}` }));
@@ -804,13 +815,13 @@ test('allergy change keeps consumed history but undo and reopening expose only s
   await expect(historical).toContainText(eaten.components[0].foodItem.name);
   await historical.locator('.day-meal-undo').click();
   await expect(historical.locator('.day-meal-undo')).toHaveCount(0);
-  const forbidden = raw.FOOD_ITEMS.filter((f: any) => f.allergyFlags.includes('gluten')).map((f: any) => f.id);
+  const forbidden = raw.FOOD_ITEMS.filter((f) => f.allergyFlags.includes('gluten')).map((f) => f.id);
   for (const id of forbidden) await expect(historical.locator(`[data-food-id="${id}"]`)).toHaveCount(0);
   await day.getByRole('button', { name: 'بستن', exact: true }).click();
   await expect.poll(() => fixture.saved.length).toBeGreaterThan(firstNew);
   for (const plan of fixture.saved.slice(firstNew)) {
-    expect(plan.meals.every((m: any) => !m.consumed && !m.source)).toBe(true);
-    expect(plan.meals.every((m: any) => m.components.every((c: any) => !c.foodItem.allergyFlags.includes('gluten')))).toBe(true);
+    expect(plan.meals.every((m) => !m.consumed && !m.source)).toBe(true);
+    expect(plan.meals.every((m) => m.components.every((c) => !c.foodItem.allergyFlags.includes('gluten')))).toBe(true);
   }
   await page.reload();
   await expect(page.locator('#today-panel .member-meal-card')).toBeVisible();

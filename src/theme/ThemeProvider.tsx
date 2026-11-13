@@ -1,18 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 
-export type ThemeMode = 'light' | 'dark';
+import { ThemeContext, type ThemeContextValue, type ThemeMode } from './themeContext';
 
 const THEME_STORAGE_KEY = 'behtan-theme';
-
-interface ThemeContextValue {
-  theme: ThemeMode;
-  isDark: boolean;
-  setTheme: (theme: ThemeMode) => void;
-  toggleTheme: () => void;
-}
-
-const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function getSystemTheme(): ThemeMode {
   if (typeof window === 'undefined') return 'light';
@@ -76,13 +67,3 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
-
-export function useTheme(): ThemeContextValue {
-  const context = useContext(ThemeContext);
-  if (!context) {
-    throw new Error('useTheme must be used inside ThemeProvider.');
-  }
-  return context;
-}
-
-export { THEME_STORAGE_KEY };

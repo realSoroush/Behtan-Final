@@ -1,17 +1,13 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import type { Rive } from '@rive-app/canvas';
 import type { CompanionMood } from './companionState';
+import { CompanionAssets } from './CompanionAssets';
 import './companion.css';
 
 export type MascotMood = CompanionMood | 'idle' | 'listening' | 'rest';
-export const MASCOT_MODES: Record<MascotMood, number> = {
+const MASCOT_MODES: Record<MascotMood, number> = {
   idle: 0, welcome: 1, listening: 2, thinking: 3, celebrate: 4, calm: 5, guide: 6, rest: 7,
 };
-// Preview supplies embedded bytes; production serves versioned assets locally.
-export const CompanionAssets = createContext({
-  rive: '/mascot/behtan-companion.riv', fallback: '/mascot/behtan-rest.svg', wasm: '',
-});
-
 interface Props {
   mood?: MascotMood;
   size?: 'small' | 'medium' | 'hero' | 'studio';

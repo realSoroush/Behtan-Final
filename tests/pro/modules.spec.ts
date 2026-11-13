@@ -1,10 +1,11 @@
 import { test, expect } from "@playwright/test";
 import { setup, org, record } from "./real-fixture";
+import type { AuthoredSnapshot } from "../../src/professional/authoredPlan";
 test("authored nutrition can be saved, exported, cloned and retried without duplicates", async ({
   page,
 }, info) => {
   await setup(page, { existing: true });
-  const rows: any[] = [],
+  const rows: AuthoredSnapshot[] = [],
     keys: string[] = [];
   let lose = true;
   await page.route("**/rest/v1/pro_authored_plans?*", (r) =>
@@ -22,6 +23,7 @@ test("authored nutrition can be saved, exported, cloned and retried without dupl
         kind: b.p_kind,
         content: b.p_content,
         intake_revision: 1,
+        display_name: "مراجع تست",
         recorded_at: "2026-10-22T12:00:00Z",
       });
     if (lose) {

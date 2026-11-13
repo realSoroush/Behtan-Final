@@ -2,7 +2,7 @@ import {JalaliDateInput} from '@/components/ui/JalaliDateInput';
 import{useEffect,useState}from'react';
 import{AppLoading}from'@/components/ui/AppLoading';
 import{PROFESSIONS}from'@/professional/specialistProfile';
-import{commercialRpc}from'./AdminProCatalog';
+import{commercialRpc}from'./commercialRpc';
 type Metrics={specialists:number;specialists_by_profession:{profession:string;count:number}[];specialists_date_unknown:number;specialists_date_fallback:number;clients:number;nutrition_total:number;nutrition_automatic:number;nutrition_authored:number;training_total:number;training_automatic:number;training_authored:number;body_reports:number};
 const cards=[['specialists','متخصصین ثبت‌شده'],['clients','مراجعین ثبت‌شده'],['nutrition_total','کل برنامه‌های تغذیه'],['nutrition_authored','تغذیه اختصاصی'],['nutrition_automatic','تغذیه خودکار'],['training_total','کل برنامه‌های تمرینی'],['training_automatic','تمرین خودکار'],['training_authored','تمرین اختصاصی'],['body_reports','تحلیل‌های تصویری موفق']]as const;
 const fa=(n:number)=>n.toLocaleString('fa-IR');

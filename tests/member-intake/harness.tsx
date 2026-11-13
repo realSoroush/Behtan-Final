@@ -1,10 +1,10 @@
 // Test-only surface: exercise the production hook over real HTTP/PostgREST.
-import React from 'react';
 import {createRoot} from 'react-dom/client';
 import {useMemberMealSchedule} from '../../src/hooks/useMemberMealSchedule';
-import type {Meal} from '../../src/types';
-const fixture = (window as unknown as { intakeFixture: { user: string; day: string; context: string; revision: string; profileContext: string; extraId: string; meal: Meal } }).intakeFixture;
-function Harness() {
+import type { IntakeFixture } from './fixture';
+const fixture = (window as Window & { intakeFixture?: IntakeFixture }).intakeFixture;
+if (!fixture) throw new Error('Missing synthetic intake fixture');
+function Harness({ fixture }: { fixture: IntakeFixture }) {
   const state=useMemberMealSchedule(fixture.user,fixture.day,fixture.context,fixture.revision,fixture.profileContext);
   const run=(kind:'record'|'undo-record'|'skip'|'undo-skip')=>{
     void state.changeIntake(kind==='record'?{kind,slot:'breakfast',meal:fixture.meal}:{kind,slot:'breakfast'}).catch(()=>{});
@@ -20,4 +20,4 @@ function Harness() {
     <button onClick={()=>void state.retry().catch(()=>{})}>reload state</button>
   </>;
 }
-createRoot(document.getElementById('root')!).render(<Harness/>);
+createRoot(document.getElementById('root')!).render(<Harness fixture={fixture}/>);

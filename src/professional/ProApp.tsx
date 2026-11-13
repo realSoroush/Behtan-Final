@@ -167,9 +167,10 @@ function Workspace({userId,phone,view,caseVisit,navigate,onDirty}:{userId:string
     void refresh();
     const focus=()=>{void refresh();};
     window.addEventListener("focus", focus);
+    const workspaceRequests = seq;
     return () => {
       alive=false;
-      seq.current++;
+      workspaceRequests.current++;
       window.removeEventListener("focus", focus);
     };
   }, [load]);

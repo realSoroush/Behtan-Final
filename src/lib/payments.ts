@@ -66,7 +66,15 @@ export async function startCheckout(plan:SubscriptionPlan,upgrade=false) {
   const capabilities = await paymentRequest<{checkoutProtocol:number}>({action:'capabilities'});
   if (capabilities.checkoutProtocol !== 2) throw new Error(messages.PAYMENT_VERSION_UNAVAILABLE);
   let trainingInput: unknown;
-  if(plan.code==='gold'){try{trainingInput=JSON.parse(sessionStorage.getItem(TRAINING_DRAFT_KEY)??'null');}catch{}if(!trainingInput)throw Error('ابتدا اطلاعات تمرین را کامل کن.');}
+  if (plan.code === 'gold') {
+    try {
+      trainingInput = JSON.parse(sessionStorage.getItem(TRAINING_DRAFT_KEY) ?? 'null');
+    } catch {
+      // An unreadable draft is handled the same way as a missing one.
+      trainingInput = null;
+    }
+    if (!trainingInput) throw Error('ابتدا اطلاعات تمرین را کامل کن.');
+  }
   const preflight=await memberRequest<{id:string}>('preflight',{input:{training:plan.code==='gold',trainingInput}}).catch(e=>{track('preflight_failed');throw e;});track('preflight_ok');track('checkout_started');
   const result=await paymentRequest<{order:PaymentOrder}>({action:'create_v2',planCode:plan.code,priceToman:plan.priceToman,durationDays:plan.durationDays,preflight:preflight.id,upgrade});
   if(result.order.paymentUrl) {

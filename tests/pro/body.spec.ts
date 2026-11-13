@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { setup } from "./real-fixture";
-const report = {
+import type { BodyReport, StoredBodyReport } from "../../src/professional/body/contracts";
+const report: BodyReport = {
   version: 1,
   created_at: "2026-10-22T12:00:00Z",
   intake_revision: 1,
@@ -112,7 +113,7 @@ test("custom selects remain usable inside native modal top layer", async ({
 test("existing approved reports remain visible when workspace is read-only", async ({
   page,
 }) => {
-  const state = await setup(page, { existing: true });
+  await setup(page, { existing: true });
   await page.route("**/rest/v1/rpc/pro_workspace_status", (r) =>
     r.fulfill({
       json: {
@@ -161,9 +162,9 @@ test("photo upload strips metadata and retries the same request after connection
   page,
 }, info) => {
   await setup(page, { existing: true });
-  let calls: any[] = [];
+  const calls: { key: string }[] = [];
   let first = true;
-  let stored: any[] = [];
+  let stored: StoredBodyReport[] = [];
   await page.route("**/rest/v1/rpc/pro_body_reports", (r) =>
     r.fulfill({ json: stored }),
   );

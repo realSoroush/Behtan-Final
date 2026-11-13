@@ -1,10 +1,19 @@
 import {setJalaliDate} from '../set-jalali-date';
 import {test,expect,type Page} from '@playwright/test';
 import {setup,org,user} from '../pro/real-fixture';
+import type { ProOffer } from '../../src/professional/modules';
+import type { AccountInput } from '../../server/proAccountHttp';
+
+type WorkspaceRequest = { p_expected?: number; p_user?: string };
 async function adminSetup(page:Page,{denied=false,lose=false,stale=false}={}){
  await setup(page);
- const workspace:any={id:org,name:'کلینیک تست Pro',status:'active',license_status:null,expires_at:null,pilot_expires_at:'2026-11-19T00:00:00Z',case_limit:null,revision:0,case_count:4,plan_count:8,members:[{user_id:user,phone:'989000000001',roles:['owner']}]};
- const requests:any[]=[];const committed=new Map();let loss=lose;
+ const workspace: {
+  id: string; name: string; status: string; license_status: string | null; expires_at: string | null;
+  pilot_expires_at: string; case_limit: number | null; revision: number; case_count: number; plan_count: number;
+  members: { user_id: string; phone: string; roles: string[] }[];
+ } = {id:org,name:'کلینیک تست Pro',status:'active',license_status:null,expires_at:null,pilot_expires_at:'2026-11-19T00:00:00Z',case_limit:null,revision:0,case_count:4,plan_count:8,members:[{user_id:user,phone:'989000000001',roles:['owner']}]};
+ const requests: WorkspaceRequest[] = [];
+ const committed = new Map<string, typeof workspace>();let loss=lose;
  await page.route('https://pro-test.supabase.co/**',async route=>{
   const path=new URL(route.request().url()).pathname,b=route.request().postDataJSON();
   if(path.endsWith('/admin_overview')){await route.fulfill(denied?{status:403,json:{message:'ADMIN_REQUIRED'}}:{json:{stats:{},users:[],plans:[]}});return;}
@@ -68,10 +77,12 @@ test('cleanup requires confirmation and reports removed temporary rows',async({p
 });
 
 test('admin creates Pro account by phone without a browser service key',async({page})=>{
- await adminSetup(page);let request:any;await page.route('**/api/pro-account',async route=>{request=route.request().postDataJSON();expect(route.request().headers().authorization).toContain('Bearer ');await route.fulfill({json:{user_id:'10000000-0000-4000-8000-000000000099',organization_id:'20000000-0000-4000-8000-000000000099'}})});
+ await adminSetup(page);const requests: AccountInput[] = [];await page.route('**/api/pro-account',async route=>{requests.push(route.request().postDataJSON());expect(route.request().headers().authorization).toContain('Bearer ');await route.fulfill({json:{user_id:'10000000-0000-4000-8000-000000000099',organization_id:'20000000-0000-4000-8000-000000000099'}})});
  await page.getByRole('button',{name:'مدیریت Pro',exact:true}).click();await page.getByRole('button',{name:'ساخت حساب Pro',exact:true}).click();
  await page.getByLabel('شماره مالک Pro').fill('09121234567');await page.getByLabel('نام پنل جدید Pro').fill('پنل شماره جدید');await page.getByLabel('دلیل پنل جدید Pro').fill('تست دسترسی');
  await page.getByRole('button',{name:'ساخت و فعال‌سازی پنل',exact:true}).click();await expect(page.getByLabel('شماره مالک Pro')).toHaveCount(0);
+ expect(requests).toHaveLength(1);
+ const [request] = requests;
  expect(request.phone).toBe('09121234567');expect(Object.keys(request).sort()).toEqual(['expires','key','limit','name','phone','reason']);
 });
 
@@ -86,21 +97,21 @@ test('admin layout is readable on mobile in both themes',async({page},info)=>{
 });
 
 test('admin edits a public Pro tariff with exact period prices',async({page})=>{
- await adminSetup(page);let offer:any={code:'training',title:'برنامه‌سازی تمرینی',subtitle:'فقط تمرین',features:['PDF فارسی'],prices:{'1':2490000,'3':5990000,'6':9490000,'12':14990000},revision:1,active:true};let saved:any;
+ await adminSetup(page);let offer: ProOffer = {code:'training',title:'برنامه‌سازی تمرینی',subtitle:'فقط تمرین',features:['PDF فارسی'],prices:{'1':2490000,'3':5990000,'6':9490000,'12':14990000},revision:1,active:true};let saved: {p_title: string; p_prices: ProOffer["prices"]; p_expected: number};
  await page.route('**/rest/v1/rpc/admin_pro_offers',r=>r.fulfill({json:[offer]}));
  await page.route('**/rest/v1/rpc/admin_pro_save_offer',r=>{saved=r.request().postDataJSON();offer={...offer,title:saved.p_title,prices:saved.p_prices,revision:2};return r.fulfill({json:offer});});
  await page.getByRole('button',{name:'مدیریت Pro',exact:true}).click();await page.getByRole('button',{name:'ویرایش تعرفه برنامه‌سازی تمرینی',exact:true}).click();
  await page.getByLabel('نام کارت اشتراک').fill('پنل تمرین حرفه‌ای');await page.getByLabel('قیمت یک ماهه').fill('2500000');await page.getByRole('button',{name:'ذخیره تعرفه',exact:true}).click();
- await expect(page.locator('.admin-pro-offer-grid')).toContainText('پنل تمرین حرفه‌ای');expect(saved.p_prices['1']).toBe(2500000);expect(saved.p_prices['12']).toBe(14990000);expect(saved.p_expected).toBe(1);
+ await expect(page.locator('.admin-pro-offer-grid')).toContainText('پنل تمرین حرفه‌ای');expect(saved!.p_prices['1']).toBe(2500000);expect(saved!.p_prices['12']).toBe(14990000);expect(saved!.p_expected).toBe(1);
 });
 test('admin changes a workspace to training-only without altering its license',async({page})=>{
- const state=await adminSetup(page);let saved:any;await page.route('**/rest/v1/rpc/admin_pro_set_modules',r=>{saved=r.request().postDataJSON();return r.fulfill({json:{nutrition:saved.p_nutrition,training:saved.p_training,revision:1}});});
+ const state=await adminSetup(page);let saved: {p_nutrition: boolean; p_training: boolean};await page.route('**/rest/v1/rpc/admin_pro_set_modules',r=>{saved=r.request().postDataJSON();return r.fulfill({json:{nutrition:saved.p_nutrition,training:saved.p_training,revision:1}});});
  await page.getByRole('button',{name:'مدیریت Pro',exact:true}).click();await page.getByRole('button',{name:'مدیریت فضای کاری',exact:true}).click();
- await page.getByRole('combobox',{name:'ماژول‌های پنل Pro'}).click();await page.getByRole('option',{name:'فقط تمرین',exact:true}).click();await page.getByRole('button',{name:'ثبت ماژول‌های پنل',exact:true}).click();await expect(page.getByRole('status')).toContainText('ماژول‌های پنل ذخیره شدند');expect(saved.p_nutrition).toBe(false);expect(saved.p_training).toBe(true);expect(state.requests).toHaveLength(0);
+ await page.getByRole('combobox',{name:'ماژول‌های پنل Pro'}).click();await page.getByRole('option',{name:'فقط تمرین',exact:true}).click();await page.getByRole('button',{name:'ثبت ماژول‌های پنل',exact:true}).click();await expect(page.getByRole('status')).toContainText('ماژول‌های پنل ذخیره شدند');expect(saved!.p_nutrition).toBe(false);expect(saved!.p_training).toBe(true);expect(state.requests).toHaveLength(0);
 });
 
 test('Pro metrics use the selected date range and reject a reversed range without a request',async({page})=>{
- await adminSetup(page);const requests:any[]=[];
+ await adminSetup(page);const requests: { p_from: string | null; p_to: string | null }[] = [];
  await page.route('**/rpc/admin_pro_metrics',async route=>{const body=route.request().postDataJSON();requests.push(body);return route.fulfill({json:{specialists:body.p_from?1:2,specialists_by_profession:[{profession:'nutritionist',count:body.p_from?1:2}],specialists_date_unknown:0,specialists_date_fallback:0,clients:4,nutrition_total:8,nutrition_automatic:5,nutrition_authored:3,training_total:6,training_automatic:4,training_authored:2,body_reports:3}});});
  await page.getByRole('button',{name:'مدیریت Pro',exact:true}).click();const stats=page.getByRole('region',{name:'آمار فعالیت پنل پرو'});await expect(stats).toContainText('متخصصین ثبت‌شده');
  await setJalaliDate(page,'آمار پرو از تاریخ','2026-11-01');await setJalaliDate(page,'آمار پرو تا تاریخ','2026-11-08');await stats.getByRole('button',{name:'اعمال بازه'}).click();await expect.poll(()=>requests.at(-1)?.p_from).toBe('2026-11-01');expect(requests.at(-1)?.p_to).toBe('2026-11-08');

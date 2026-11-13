@@ -1,6 +1,6 @@
 import { NEW_ALLERGEN_NOTICE } from '@/utils/allergens';
 import { useState } from 'react';
-import { ALLERGIES } from '@/components/onboarding/Step7Dietary';
+import { ALLERGIES } from '@/components/onboarding/dietaryOptions';
 import { supabase } from '@/lib/supabaseClient';
 import type { Allergy, DietaryPreferencesJson } from '@/types';
 import { MemberDialog } from './MemberDialog';

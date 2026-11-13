@@ -1,6 +1,6 @@
 import {setJalaliDate} from '../set-jalali-date';
 import { expect, test } from "@playwright/test";
-import { setup, fillNew, specialist } from "./real-fixture";
+import { setup, fillNew, specialist, base } from "./real-fixture";
 test("create actual record, save, generate menus, save plan and print Persian PDF", async ({
   page,
 }, info) => {
@@ -243,7 +243,7 @@ test('server generation and publish response loss retries do not duplicate snaps
 
 test('server search and pagination find a case beyond the first page',async({page})=>{
  const state=await setup(page);
- for(let i=0;i<31;i++)state.cases.push({id:crypto.randomUUID(),organization_id:'20000000-0000-4000-8000-000000000001',display_name:'مراجع '+i,phone:'',revision:1,updated_at:'2026-10-21T00:00:00Z'});
+ for(let i=0;i<31;i++)state.cases.push({id:crypto.randomUUID(),organization_id:'20000000-0000-4000-8000-000000000001',display_name:'مراجع '+i,phone:'',answers:{...base,display_name:'مراجع '+i},revision:1,updated_at:'2026-10-21T00:00:00Z',archived_at:null,archive_revision:0});
  await page.goto('/');
  await expect(page.getByRole('button',{name:'بازکردن پرونده',exact:true})).toHaveCount(25);
  await page.getByRole('button',{name:'صفحه بعد',exact:true}).click();
@@ -302,7 +302,7 @@ test('manual allergy notes persist separately and the budget and diet labels mat
 });
 
 test('a genuine catalog shortage stays visible and preserves the requested count',async({page})=>{
- await setup(page,{existing:true});const sent:any[]=[];
+ await setup(page,{existing:true});const sent: { count: number }[] = [];
  const trace='a3f95e2b-ee11-49cf-baf9-3e4582832522';
  await page.route('**/api/pro-plan',async route=>{
   const body=route.request().postDataJSON();
@@ -340,7 +340,7 @@ test('the real engine delivers and saves the selected 2–5 distinct menus for a
 });
 
 test('a one-menu generation failure stays visible without suggesting an unrelated menu-count retry',async({page})=>{
- await setup(page,{existing:true});const sent:any[]=[];
+ await setup(page,{existing:true});const sent: { count: number }[] = [];
  await page.route('**/api/pro-plan',async route=>{
   const body=route.request().postDataJSON();if(body.action!=='generate')return route.fallback();
   sent.push(body);return route.fulfill({status:422,json:{error:'PRO_GENERATION_FAILED'}});

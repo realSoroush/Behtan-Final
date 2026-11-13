@@ -226,16 +226,19 @@ function CaseDetail({
         setAccess(null);
       }
     } finally {
-      loading.current = false;
-      if (mounted.current && seq === sequence.current) setBusy(false);
+      if (seq === sequence.current) {
+        loading.current = false;
+        if (mounted.current) setBusy(false);
+      }
     }
   }, [org, record.id]);
   useEffect(() => {
     mounted.current = true;
     void reload();
+    const requests = sequence;
     return () => {
       mounted.current = false;
-      sequence.current++;
+      requests.current++;
     };
   }, [reload]);
   useEffect(() => {

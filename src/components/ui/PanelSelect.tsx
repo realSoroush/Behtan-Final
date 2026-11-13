@@ -82,8 +82,11 @@ export function PanelSelect({ children, value, defaultValue, onChange, disabled,
         if (!enabled.length) return;
         const index = enabled.indexOf(active);
         setActive(e.key === 'Home' ? enabled[0] : e.key === 'End' ? enabled[enabled.length - 1] : enabled[(index + (e.key === 'ArrowDown' ? 1 : -1) + enabled.length) % enabled.length]);
-      } else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open ? choose(active) : show(); }
-      else if (e.key.length === 1) {
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (open) choose(active);
+        else show();
+      } else if (e.key.length === 1) {
         const ordered = [...options.keys()].slice(active + 1).concat([...options.keys()].slice(0, active + 1));
         const index = ordered.find(i => !options[i].disabled && options[i].label.startsWith(e.key));
         if (index != null) { if (!open) show(); setActive(index); }

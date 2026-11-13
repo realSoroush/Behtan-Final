@@ -5,29 +5,6 @@ import { OptionCard } from '@/components/ui/Card';
 import { useOnboardingStore } from '@/hooks/useOnboardingStore';
 import type { Gender } from '@/types';
 
-export const PROVINCES = [
-  'تهران', 'اصفهان', 'فارس', 'خراسان رضوی', 'مازندران',
-  'آذربایجان شرقی', 'آذربایجان غربی', 'کرمانشاه', 'البرز', 'گیلان',
-  'خوزستان', 'کرمان', 'گلستان', 'قم', 'هرمزگان',
-  'لرستان', 'سیستان و بلوچستان', 'همدان', 'مرکزی', 'بوشهر',
-  'زنجان', 'اردبیل', 'چهارمحال و بختیاری', 'کهگیلویه و بویراحمد',
-  'سمنان', 'ایلام', 'خراسان شمالی', 'خراسان جنوبی', 'قزوین', 'یزد', 'کردستان'
-];
-
-export const CITIES_BY_PROVINCE: Record<string, string[]> = {
-  تهران: ['تهران', 'ری', 'شهریار', 'اسلامشهر', 'پردیس', 'دماوند', 'ورامین', 'رباط‌کریم'],
-  اصفهان: ['اصفهان', 'کاشان', 'خمینی‌شهر', 'نجف‌آباد', 'شاهین‌شهر', 'فلاورجان', 'زرین‌شهر'],
-  'خراسان رضوی': ['مشهد', 'نیشابور', 'سبزوار', 'قوچان', 'تربت‌حیدریه', 'کاشمر'],
-  البرز: ['کرج', 'نظرآباد', 'هشتگرد', 'طالقان', 'ساوجبلاغ'],
-  فارس: ['شیراز', 'مرودشت', 'کازرون', 'جهرم', 'لارستان', 'فسا', 'داراب'],
-  گیلان: ['رشت', 'بندر انزلی', 'لاهیجان', 'رودبار', 'آستارا'],
-  مازندران: ['ساری', 'بابل', 'آمل', 'قائم‌شهر', 'نوشهر', 'چالوس', 'تنکابن'],
-};
-
-// Retained for the existing admin scenario picker; onboarding accepts actual city names.
-export const DEFAULT_CITIES = ['مرکز استان', 'شهرهای دیگر'];
-
-
 export function Step1Gender() {
   const { data, updateData, nextStep, currentStep, prevStep } = useOnboardingStore();
   const canContinue = Boolean(data.displayName?.trim()) && !!data.gender;

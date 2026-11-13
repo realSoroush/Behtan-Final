@@ -6,7 +6,7 @@ import { CORRECTIVE_SEED } from '../../src/professional/training/corrective/seed
 async function arrange(page: Page, lostResponse = false, workout = false) {
   const fixture = await setup(page, { existing: true });
   if(workout){fixture.cases[0].answers.workout_days=3;fixture.cases[0].answers.training_type='resistance';}
-  const snapshots: AuthoredSnapshot[] = [], requests: any[] = [];
+  const snapshots: AuthoredSnapshot[] = [], requests: { p_key: string }[] = [];
   const archiveRequests: URL[] = [];
   let archiveFailure = false;
   await page.route('**/rest/v1/pro_authored_plans?*', route => {
@@ -254,7 +254,8 @@ test('switching private corrective exercises resets the editor to the selected i
  await arrange(page);const rows=[
   {...structuredClone(CORRECTIVE_SEED[0]),id:'custom-10000000-0000-4000-8000-000000000001',nameFa:'حرکت اختصاصی الف',ownerOrg:org,revision:1},
   {...structuredClone(CORRECTIVE_SEED[1]),id:'custom-10000000-0000-4000-8000-000000000002',nameFa:'حرکت اختصاصی ب',ownerOrg:org,revision:3},
- ];const writes:any[]=[];
+ ];
+ const writes: { p_exercise: (typeof rows)[number]; p_expected: number }[] = [];
  await page.route('**/rest/v1/rpc/pro_corrective_bank',route=>route.fulfill({json:rows}));
  await page.route('**/rest/v1/rpc/pro_save_corrective_exercise',route=>{const body=route.request().postDataJSON();writes.push(body);return route.fulfill({json:{...body.p_exercise,revision:body.p_expected+1}});});
  await training(page);await page.getByRole('button',{name:'بانک حرکات اصلاحی',exact:true}).click();

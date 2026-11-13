@@ -33,7 +33,7 @@ const localToday = () =>
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
-export function initialTrainingInput(): TrainingInput {
+function initialTrainingInput(): TrainingInput {
   return {
     version: 1,
     location: "home",
@@ -89,10 +89,11 @@ export function TrainingPanel({
     [notice, setNotice] = useState(""),
     [checked, setChecked] = useState(false);
   const previewRef = useRef<HTMLElement>(null);
+  const selectedId = selected?.id;
   useEffect(() => {
-    if (selected)
+    if (selectedId)
       previewRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
-  }, [selected?.id]);
+  }, [selectedId]);
   const pending = useRef(false),
     request = useRef(crypto.randomUUID()),
     alive = useRef(true),
