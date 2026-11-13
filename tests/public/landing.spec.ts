@@ -80,15 +80,21 @@ test('Pro uses actual catalog periods and links to the existing panel',async({pa
  await expect(page.locator('#pro-price-grid')).toContainText('۱۰۰٬۰۰۰');
  await page.getByRole('button',{name:'۳ ماهه',exact:true}).click();await expect(page.locator('#pro-price-grid')).toContainText('۲۸۰٬۰۰۰');
  await expect(page.locator('#pro-price-grid a')).toHaveAttribute('href','https://pro.behtan.fit/?plan=training&months=3');
- await expect(page.locator('.white-label a.btn')).toContainText('درخواست دموی رایگان');
+ await expect(page.locator('.white-label a.btn')).toContainText('درخواست دموی وایت‌لیبل');
  await expect(page.locator('.white-label a.btn')).toHaveAttribute('href',/^https:\/\/t\.me\/soroushkheradmand/);
+ const trial = page.locator('.pro-final a.btn');
+ await expect(trial).toContainText('تست رایگان پنل پرو');
+ await page.route('https://pro.behtan.fit/', route => route.fulfill({ contentType:'text/html', body:'<title>Pro panel</title>' }));
+ await trial.click();
+ await expect(page).toHaveURL('https://pro.behtan.fit/');
 });
 test('mobile menu reaches Pro and closes after navigation',async({page,isMobile})=>{
  test.skip(!isMobile,'Compact menu is shown on mobile.');
  await page.goto('/site.html');await page.locator('#menu-toggle').click();await expect(page.locator('#site-nav')).toBeVisible();
  await page.locator('#site-nav').getByRole('link',{name:'متخصصین',exact:true}).click();
  await expect(page.locator('#pro-page')).toBeVisible();await expect(page.locator('#menu-toggle')).toHaveAttribute('aria-expanded','false');
- await expect(page.locator('.nav-inner>.btn')).toHaveText('درخواست دموی رایگان');
+ await expect(page.locator('.nav-inner>.btn')).toHaveText('تست رایگان پنل پرو');
+ await expect(page.locator('.nav-inner>.btn')).toHaveAttribute('href','https://pro.behtan.fit/');
 });
 test('reduced motion keeps the new content visible and usable',async({page})=>{
  await page.emulateMedia({reducedMotion:'reduce'});await page.goto('/site.html');
