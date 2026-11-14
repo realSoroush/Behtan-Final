@@ -2,15 +2,15 @@ import './jalali-date.css';
 import {useEffect,useRef,useState} from 'react';
 import {PanelSelect} from './PanelSelect';
 import {isoToJalali,jalaliMonthLength,jalaliToIso} from '@/utils/jalaliDate';
+import { getTehranDateKey } from '@/utils/dailyMealProgress';
 const months=['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
-export const tehranToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tehran',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const read=(value:string)=>isoToJalali(value)||{year:0,month:0,day:0};
 const fa=(n:number)=>n.toLocaleString('fa-IR',{useGrouping:false});
 /** Date-only field: Persian editing, ISO storage, no timezone conversion of the day. */
 export function JalaliDateInput({value,onChange,label='تاریخ شروع تمرین',disabled=false}:{value:string;onChange:(iso:string)=>void;label?:string;disabled?:boolean}){
  const [draft,setDraft]=useState(()=>read(value)),emitted=useRef(value);
  useEffect(()=>{if(value!==emitted.current){setDraft(read(value));emitted.current=value;}},[value]);
- const year=isoToJalali(tehranToday())!.year;
+ const year=isoToJalali(getTehranDateKey())!.year;
  const years=[...new Set([...(draft.year?[draft.year]:[]),...Array.from({length:11},(_,i)=>year-5+i)])].sort((a,b)=>b-a);
  const days=draft.month?jalaliMonthLength(draft.year||year,draft.month):31;
  function change(key:'year'|'month'|'day',number:number){

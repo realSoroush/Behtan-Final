@@ -1,8 +1,9 @@
 import { AppLoading } from '@/components/ui/AppLoading';
-import {TrainingSetup,useTrainingDraft} from '@/member/TrainingSetup';
+import { TrainingSetup } from '@/member/TrainingSetup';
+import { useTrainingDraft } from '@/member/useTrainingDraft';
 import {track} from '@/member/analytics';
 import {periodOffer} from '@/member/offers';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, Check, RefreshCw, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { StepHeader } from '@/components/ui/StepHeader';
@@ -115,13 +116,14 @@ export function Step11Paywall({ onComplete, checkout = false }: { onComplete: (p
   useEffect(() => {
     if (loading || error || typeof location === 'undefined') return;
     const requested = new URLSearchParams(location.search).get('plan');
-    if (requested && monthlyPlans.some(p => p.code === requested)) {
-      updateData({selectedTier: requested as typeof data.selectedTier});
+    const requestedPlan = monthlyPlans.find(plan => plan.code === requested);
+    if (requestedPlan) {
+      updateData({ selectedTier: requestedPlan.code });
       const url = new URL(location.href); url.searchParams.delete('plan');
       history.replaceState(null, '', url.pathname + url.search + url.hash);
     }
   }, [loading, error, monthlyPlans, updateData]);
-  const plans=monthlyPlans.map(p=>periodOffer(p,period));
+  const plans = useMemo(() => monthlyPlans.map(plan => periodOffer(plan, period)), [monthlyPlans, period]);
   const selectedPlan = plans.find((plan) => plan.code === data.selectedTier) ?? null;
   const [checking, setChecking] = useState(false);
   const checkingRef = useRef(false);

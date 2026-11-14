@@ -1,5 +1,5 @@
 import { AppLoading } from '@/components/ui/AppLoading';
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 type Review = {
   id: string;
@@ -21,6 +21,11 @@ const empty = (): Review => ({
   sort_order: 0,
   revision: 0,
 });
+const explain = (e: unknown) =>
+  e instanceof Error && e.message === "STALE"
+    ? "این مورد هم‌زمان تغییر کرده؛ دوباره دریافت کنید."
+    : "عملیات انجام نشد. دسترسی مدیر، اتصال و اجرای مایگریشن محتوای سایت را بررسی کنید.";
+
 export function AdminMarketing() {
   const [rows, setRows] = useState<Review[]>([]),
     [edit, setEdit] = useState<Review | null>(null),
@@ -29,11 +34,7 @@ export function AdminMarketing() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
-  const explain = (e: unknown) =>
-    e instanceof Error && e.message === "STALE"
-      ? "این مورد هم‌زمان تغییر کرده؛ دوباره دریافت کنید."
-      : "عملیات انجام نشد. دسترسی مدیر، اتصال و اجرای مایگریشن محتوای سایت را بررسی کنید.";
-  async function load() {
+  const load = useCallback(async () => {
     setBusy(true);
     setError("");
     try {
@@ -60,10 +61,10 @@ export function AdminMarketing() {
     } finally {
       setBusy(false);
     }
-  }
+  }, []);
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
   async function saveVideo() {
     setBusy(true);
     setError("");

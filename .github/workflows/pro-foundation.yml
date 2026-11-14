@@ -24,10 +24,18 @@ jobs:
           node-version: "24"
           cache: npm
       - run: npm ci
+      - name: Lint source and test fixtures
+        run: npm run lint
+      - name: Type-check browser tests and fixtures
+        run: npm run typecheck:tests
+      - name: Audit runtime dependencies
+        run: npm audit --omit=dev --audit-level=moderate
+      - name: Audit all dependencies, including build tools
+        run: npm audit --audit-level=moderate
       - run: npm run test:pro:ux
       - run: npm run test:member:intake
       - run: npm run test:engine:safety
-      - run: npm run test:landing
+      - run: npm run test:landing && npm run test:theme && npm run test:allergies && npm run test:protein-budget
       - run: node --experimental-strip-types scripts/member-redesign.test.mjs
       - run: node --experimental-strip-types scripts/member-dialog-scroll.test.mjs
       - run: node --experimental-strip-types scripts/member-meal-confirmation.test.mjs

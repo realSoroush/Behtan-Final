@@ -254,15 +254,16 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
   const legacyPlan = Boolean(mealPlan && !schedule.day?.schedule?.server_verified);
   const changesBlocked = !intakeReady || legacyPlan;
 
+  const { submit: submitMealSchedule } = schedule;
   const generateToday = useCallback(async (workout: boolean, regenerate: boolean) => {
     setGenerationError(null);
     try {
-      await schedule.submit(todayKey, { kind: 'generate', workout, regenerate });
+      await submitMealSchedule(todayKey, { kind: 'generate', workout, regenerate });
     } catch (error) {
       if (generationRef.current !== generationKey) return;
       setGenerationError({ key: generationKey, message: error instanceof Error ? error.message : 'ساخت برنامه انجام نشد.' });
     }
-  }, [schedule.submit, todayKey, generationKey]);
+  }, [submitMealSchedule, todayKey, generationKey]);
 
   useEffect(() => {
     if (!nutritionResult || !profile?.dietary_preferences_json || !intakeReady || mealPlan ||

@@ -54,7 +54,7 @@ for (const meal of treeNutFreePlan.meals) {
 const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(here, '..');
 const typesSource = readFileSync(resolve(projectRoot, 'src/types/index.ts'), 'utf8');
-const dietaryStepSource = readFileSync(resolve(projectRoot, 'src/components/onboarding/Step7Dietary.tsx'), 'utf8');
+const dietaryStepSource = readFileSync(resolve(projectRoot, 'src/components/onboarding/dietaryOptions.ts'), 'utf8');
 const migrationSource = readFileSync(
   resolve(projectRoot, 'supabase/migrations/20260904_007_split_peanut_tree_nut_allergy.sql'),
   'utf8'

@@ -1,7 +1,6 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { setup, base, org, record } from "./real-fixture";
 import { buildTrainingPlan, TrainingError } from "../../src/training/engine";
-import type { RealIntake } from "../../src/professional/menuPlan";
 import type { TrainingSnapshot, TrainingInput } from "../../src/training/types";
 const input: TrainingInput = {
   version: 1,
@@ -21,7 +20,7 @@ const input: TrainingInput = {
   },
 };
 async function arrange(
-  page: any,
+  page: Page,
   { saved = false, readonly = false, failOnce = false } = {},
 ) {
   const fixture = await setup(page, { existing: true });
@@ -34,7 +33,7 @@ async function arrange(
           created_at: "2026-10-22T12:00:00Z",
           approved_at: "2026-10-22T12:00:00Z",
           plan: buildTrainingPlan(
-            base as RealIntake,
+            base,
             input,
             1,
             new Date("2026-10-22T12:00:00Z"),
@@ -45,16 +44,16 @@ async function arrange(
     : [];
   const keys: string[] = [];
   let aborted = false;
-  await page.route("**/rest/v1/rpc/pro_training_history", (r: any) =>
+  await page.route("**/rest/v1/rpc/pro_training_history", (r) =>
     r.fulfill({ json: { rows, total: rows.length } }),
   );
-  await page.route("**/rest/v1/rpc/pro_approve_training", (r: any) => {
+  await page.route("**/rest/v1/rpc/pro_approve_training", (r) => {
     const b = r.request().postDataJSON();
     const s = rows.find((x) => x.id === b.p_plan)!;
     s.approved_at = "2026-10-22T12:00:00Z";
     return r.fulfill({ json: null });
   });
-  await page.route("**/api/pro-training", async (r: any) => {
+  await page.route("**/api/pro-training", async (r) => {
     const b = r.request().postDataJSON();
     expect(b.org).toBe(org);
     expect(b.record).toBe(record);
@@ -68,7 +67,7 @@ async function arrange(
           created_at: "2026-10-22T12:00:00Z",
           approved_at: null,
           plan: buildTrainingPlan(
-            base as RealIntake,
+            base,
             b.input,
             1,
             new Date("2026-10-22T12:00:00Z"),
@@ -102,7 +101,7 @@ async function arrange(
   await page.getByRole("button", { name: "تمرین‌دهی خودکار", exact: true }).click();
   return { fixture, rows, keys };
 }
-async function fill(page: any) {
+async function fill(page: Page) {
   await page.getByLabel("تمرین شنبه",{exact:true}).check();
   await page.getByLabel("تمرین سه‌شنبه",{exact:true}).check();
   await page.getByLabel("یک جفت دمبل قابل‌کنترل", { exact: true }).check();
@@ -199,7 +198,7 @@ test("training draft, animation, approval and saved history are usable", async (
   await page
     .getByRole("button", { name: "برنامه تمرینی مراجع", exact: true })
     .click();
-  page.once("dialog", (dialog: any) => dialog.accept());
+  page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "تمرین‌دهی خودکار", exact: true }).click();
   await page.getByRole("button", { name: "مشاهده تمرین" }).click();
   await expect(

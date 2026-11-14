@@ -20,7 +20,6 @@ export default [
     plugins: {
       '@typescript-eslint': tsPlugin,
       'react-hooks': reactHooks,
-      'react-refresh': reactRefresh,
     },
     rules: {
       ...js.configs.recommended.rules,
@@ -29,11 +28,13 @@ export default [
       // TypeScript resolves identifiers (including Deno/React globals) during
       // type-checking; ESLint's base rule reports false positives in TS files.
       'no-undef': 'off',
-      'react-refresh/only-export-components': [
-        'warn',
-        { allowConstantExport: true },
-      ],
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
-  }
+  },
+  {
+    // The Vite app modules are Fast Refresh boundaries. Standalone preview and
+    // browser test entry points mount their own roots and use a full reload.
+    files: ['src/**/*.tsx'],
+    ...reactRefresh.configs.vite,
+  },
 ];

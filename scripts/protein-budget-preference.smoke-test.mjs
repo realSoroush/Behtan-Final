@@ -1,3 +1,4 @@
+import { memberNutrition } from '../src/member/nutrition.ts';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -166,16 +167,34 @@ assert(mealAuditFeasible === auditWeights.length * auditModes.length, 'Budget mo
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 const step7 = readFileSync(resolve(root, 'src/components/onboarding/Step7Dietary.tsx'), 'utf8');
-const dashboard = readFileSync(resolve(root, 'src/components/dashboard/DashboardPage.tsx'), 'utf8');
+const dietaryOptions = readFileSync(resolve(root, 'src/components/onboarding/dietaryOptions.ts'), 'utf8');
 const wizard = readFileSync(resolve(root, 'src/components/onboarding/OnboardingWizard.tsx'), 'utf8');
 const migration = readFileSync(resolve(root, 'supabase/migrations/20260905_010_protein_budget_preference.sql'), 'utf8');
 
-assert(step7.includes("value: 'economic'"), 'Economic onboarding option missing');
-assert(step7.includes("value: 'balanced'"), 'Balanced onboarding option missing');
-assert(step7.includes("value: 'performance'"), 'Performance onboarding option missing');
+assert(dietaryOptions.includes("value: 'economic'"), 'Economic onboarding option missing');
+assert(dietaryOptions.includes("value: 'balanced'"), 'Balanced onboarding option missing');
+assert(dietaryOptions.includes("value: 'performance'"), 'Performance onboarding option missing');
 assert(step7.includes('disabled={!data.proteinBudgetPreference}'), 'Budget choice is not required for new onboarding');
 assert(wizard.includes('protein_budget_preference: data.proteinBudgetPreference'), 'Final onboarding save does not persist budget preference');
-assert(dashboard.includes("profile.protein_budget_preference ?? 'performance'"), 'Legacy profile compatibility fallback missing');
+const legacyProfile = {
+  birth_date: base.birthDateISO,
+  weight: base.weightKg,
+  height: base.heightCm,
+  gender: base.gender,
+  goal: base.goal,
+  activity_level: base.activityLevel,
+  weight_loss_speed: base.weightLossSpeed,
+  activity_profile_json: { trainingType: base.trainingType },
+  medical_conditions_json: {
+    conditions: [], medications: '', injuries: '', pregnancyStatus: 'not_applicable',
+    eatingDisorderStatus: 'none', safetyScreeningVersion: 1, safetyAnswersConfirmed: true,
+  },
+};
+const memberLegacy = memberNutrition(legacyProfile, DEFAULT_PROTEIN_ENGINE_POLICY, false);
+const memberPerformance = memberNutrition({ ...legacyProfile, protein_budget_preference: 'performance' }, DEFAULT_PROTEIN_ENGINE_POLICY, false);
+assert(memberLegacy.trace.proteinBudgetPreference === 'performance' &&
+  memberLegacy.targets.proteinGrams === memberPerformance.targets.proteinGrams,
+  'Member plan must retain the performance target for a legacy profile');
 assert(migration.includes("in ('economic', 'balanced', 'performance')"), 'User preference DB constraint missing');
 assert(migration.includes('budget_positions_order_check'), 'Budget policy ordering DB constraint missing');
 

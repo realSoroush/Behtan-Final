@@ -78,8 +78,9 @@ export function RealCaseWorkspace({
   }, [org,query,page,archivedOnly]);
   useEffect(() => {
     void load();
+    const requests = seq;
     return () => {
-      seq.current++;
+      requests.current++;
     };
   }, [load]);
   async function archiveRow(row:CaseSummary){

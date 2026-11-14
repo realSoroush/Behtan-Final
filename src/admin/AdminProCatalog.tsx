@@ -1,20 +1,9 @@
 import { AppLoading } from '@/components/ui/AppLoading';
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { commercialRpc } from "./commercialRpc";
 import { PanelModal } from "@/components/ui/PanelModal";
 import { PanelSelect } from "@/components/ui/PanelSelect";
 import { DURATIONS, type ProOffer } from "@/professional/modules";
-export async function commercialRpc<T>(
-  name: string,
-  args: Record<string, unknown> = {},
-): Promise<T> {
-  const { data, error } = await supabase
-    .rpc(name, args)
-    .abortSignal(AbortSignal.timeout(15000))
-    .retry(false);
-  if (error) throw new Error(error.message);
-  return data as T;
-}
 const errorText = (e: unknown) =>
   e instanceof Error && e.message.includes("PRO_STALE_REVISION")
     ? "اطلاعات در جای دیگری تغییر کرده است؛ پنجره را ببندید و دوباره باز کنید."

@@ -1,5 +1,6 @@
 import { AppLoading } from '@/components/ui/AppLoading';
-import {TrainingSetup,useTrainingDraft} from './TrainingSetup';
+import { TrainingSetup } from './TrainingSetup';
+import { useTrainingDraft } from './useTrainingDraft';
 import { trainingError } from "../professional/training/api";
 import { useEffect, useState } from "react";
 import type { SubscriptionPlan, UserProfile } from "../types";

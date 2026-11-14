@@ -1,10 +1,17 @@
 import {CORRECTIVE_SEED} from '../../src/professional/training/corrective/seed';
-import { generatePrintedPlan } from '../../src/professional/menuPlan.ts';
+import { generatePrintedPlan, type PrintedPlan, type RealIntake } from '../../src/professional/menuPlan.ts';
+import type { RealCase, RealRevision, SavedRealPlan } from '../../src/professional/realCaseApi';
+import type { NutritionCatalog } from '../../src/types';
 import { installTestNutritionCatalog } from '../../scripts/setup-test-nutrition-catalog.mjs';
 import { DEFAULT_PROTEIN_ENGINE_POLICY } from '../../src/utils/proteinPolicy.ts';
 import type { Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
-const fixture = JSON.parse(
+const fixture: {
+  FOOD_ITEMS: NutritionCatalog['foods'];
+  FOOD_SUBSTITUTES: NutritionCatalog['substitutes'];
+  MEAL_TEMPLATES: NutritionCatalog['mealTemplates'];
+  PORTION_RULES: NutritionCatalog['portionRules'];
+} = JSON.parse(
   readFileSync(
     new URL(
       "../../scripts/fixtures/nutrition-catalog.fixture.json",
@@ -17,9 +24,8 @@ export const user = "10000000-0000-4000-8000-000000000001",
   org = "20000000-0000-4000-8000-000000000001",
   record = "30000000-0000-4000-8000-000000000001";
 export const specialist = { completed: true, full_name: 'متخصص تست به‌تن', contact_phone: '09111234567', profession: 'nutritionist', province: 'مازندران', city: 'ساری', address: 'خیابان فرهنگ، واحد ۴۰۱' };
-const f = fixture as any;
-const foods = f.FOOD_ITEMS.map((x: any) => {
-  const r = f.PORTION_RULES[x.id];
+const foods = fixture.FOOD_ITEMS.map((x) => {
+  const r = fixture.PORTION_RULES[x.id];
   return {
     id: x.id,
     name: x.name,
@@ -47,7 +53,7 @@ const foods = f.FOOD_ITEMS.map((x: any) => {
     portion_step: r.step,
   };
 });
-const templates = f.MEAL_TEMPLATES.map((t: any) => ({
+const templates = fixture.MEAL_TEMPLATES.map((t) => ({
   id: t.id,
   slot: t.slot,
   display_name: t.displayName,
@@ -59,8 +65,8 @@ const templates = f.MEAL_TEMPLATES.map((t: any) => ({
   goal_tags: t.goalTags,
   is_active: true,
 }));
-const slots = f.MEAL_TEMPLATES.flatMap((t: any) =>
-  t.slots.map((s: any, i: number) => ({
+const slots = fixture.MEAL_TEMPLATES.flatMap((t) =>
+  t.slots.map((s, i) => ({
     template_id: t.id,
     position: i,
     role: s.role,
@@ -93,7 +99,7 @@ const policy = {
   max_protein_calorie_fraction: 0.35,
   fat_calorie_fraction: 0.25,
 };
-export const base = {
+export const base: RealIntake = {
   display_name: "مراجع تست",
   phone: "",
   gender: "female",
@@ -121,7 +127,7 @@ export async function setup(
 ) {
   let professional = { ...specialist, completed: profileComplete, ...(profileComplete ? {} : { full_name: '', profession: '', province: '', city: '', address: '' }) };
   const profileRequests: Record<string, string>[] = [];
-  const cases: any[] = existing
+  const cases: RealCase[] = existing
     ? [
         {
           id: record,
@@ -131,10 +137,12 @@ export async function setup(
           phone: "",
           revision: 1,
           updated_at: "2026-10-21T10:00:00Z",
+          archived_at: null,
+          archive_revision: 0,
         },
       ]
     : [];
-  const versions: any[] = existing
+  const versions: RealRevision[] = existing
     ? [
         {
           revision: 1,
@@ -143,19 +151,19 @@ export async function setup(
         },
       ]
     : [];
-  const plans: any[] = [];
-  const requests: any[] = [];
-  const committed = new Map();
+  const plans: SavedRealPlan[] = [];
+  const requests: { p_key: string; p_answers: RealIntake }[] = [];
+  const committed = new Map<string, { id: string; revision: number }>();
   let writable = true;
   let renewal: {id:string;created_at:string}|null=null;
   let offline = false, failPlan = false, failGeneration = false;
-  const draftMap = new Map<string, any>();
-  const planMap = new Map<string, any>();
+  const draftMap = new Map<string, { draft_id: string; plan: PrintedPlan }>();
+  const planMap = new Map<string, string>();
   let fail = false,
     invalid = false,
     stale = false,
     active = allowed;
-  const organizations: any[] = emptyOrg
+  const organizations = emptyOrg
     ? []
     : [{ id: org, name: "فضای کاری تست", mode: "sandbox", status: "active" }];
   await page.addInitScript(
@@ -184,7 +192,7 @@ export async function setup(
       path = u.pathname;
     if (offline) { await route.abort('failed'); return; }
     const b = req.postDataJSON();
-    let data: any = [];
+    let data: unknown = [];
     if(path.endsWith('/pro_corrective_bank'))data=CORRECTIVE_SEED;
     else if (path.endsWith('/pro_specialist_profile')) data = professional;
     else if (path.endsWith('/pro_save_specialist_profile')) {
@@ -224,7 +232,7 @@ export async function setup(
       const found=cases.filter(c=>Boolean(c.archived_at)===Boolean(b.p_archived)&&(!b.p_search||(c.display_name+' '+c.phone).includes(b.p_search)));
       data={rows:found.slice(b.p_page*25,b.p_page*25+25),total:found.length};
     } else if(path.endsWith('/pro_duplicate_cases')){data=[];
-    } else if(path.endsWith('/pro_set_case_archived')){const c=cases.find(c=>c.id===b.p_record);c.archived_at=b.p_archived?'2026-10-21T12:00:00Z':null;c.archive_revision=(c.archive_revision??0)+1;data={archived_at:c.archived_at,archive_revision:c.archive_revision};
+    } else if(path.endsWith('/pro_set_case_archived')){const c=cases.find(c=>c.id===b.p_record);if(!c)return route.fulfill({status:404,json:{message:'PRO_CASE_NOT_FOUND'}});c.archived_at=b.p_archived?'2026-10-21T12:00:00Z':null;c.archive_revision=(c.archive_revision??0)+1;data={archived_at:c.archived_at,archive_revision:c.archive_revision};
     } else if(path.endsWith('/pro_subscription_details')){data={can_write:writable,source:'admin',expires_at:'2026-11-19T00:00:00Z',case_limit:200,case_count:cases.length,can_request_renewal:true,history:[],renewal};
     } else if(path.endsWith('/pro_request_renewal')){renewal={id:b.p_key,created_at:'2026-10-21T12:00:00Z'};data=b.p_key;
     } else if(path.endsWith('/pro_browse_case_history')) {
@@ -271,6 +279,8 @@ export async function setup(
           answers: b.p_answers,
           revision: rev,
           updated_at: "2026-10-21T11:00:00Z",
+          archived_at: null,
+          archive_revision: 0,
         };
         cases.splice(0, 1, c);
         versions.unshift({
@@ -297,7 +307,7 @@ export async function setup(
       data = id;
     } else if (path.endsWith("/food_items")) data = foods;
     else if (path.endsWith("/food_substitutes"))
-      data = f.FOOD_SUBSTITUTES.flatMap((g: any) =>
+      data = fixture.FOOD_SUBSTITUTES.flatMap((g) =>
         g.substituteIds.map((id: string) => ({
           food_item_id: g.foodItemId,
           substitute_food_item_id: id,
@@ -315,7 +325,7 @@ export async function setup(
     const b = route.request().postDataJSON();
     if (!active) { await route.fulfill({status:403,json:{error:'PRO_ACCESS_DENIED'}}); return; }
     if (b.action === 'catalog') {
-      await route.fulfill({json:{foods:f.FOOD_ITEMS}});return;
+      await route.fulfill({json:{foods:fixture.FOOD_ITEMS}});return;
     }
     if (b.action === 'generate') {
       if (!draftMap.has(b.key)) {

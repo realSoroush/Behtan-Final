@@ -1,14 +1,8 @@
 import { PanelSelect } from '@/components/ui/PanelSelect';
 import './TrainingSetup.css';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { EQUIPMENT, WEEKDAYS } from '../training/engine';
 import type { Equipment, TrainingInput } from '../training/types';
-import {TRAINING_DRAFT_KEY} from './trainingDraft';
-export function useTrainingDraft(){
- const [input,setInput]=useState<TrainingInput>(()=>{try{const v=JSON.parse(sessionStorage.getItem(TRAINING_DRAFT_KEY)??'null');if(v?.version===1 && Array.isArray(v.days) && v.screening)return {...v,screening:{...v.screening,confirmed:false}};}catch{}return {version:1,location:'home',experience:'beginner',goal:'general',days:[],minutes:45,equipment:[],start_date:new Date().toISOString().slice(0,10),screening:{confirmed:false,symptoms:false,pain:false,restriction:false,recent_surgery:false}};});
- useEffect(()=>{try{sessionStorage.setItem(TRAINING_DRAFT_KEY,JSON.stringify(input));}catch{/* Checkout requires a readable draft and reports a recoverable error. */}},[input]);
- return [input,setInput] as const;
-}
 export function TrainingSetup({input,setInput}:{input:TrainingInput;setInput:(input:TrainingInput)=>void}){
  const [section,setSection]=useState<'schedule'|'equipment'|'safety'>('schedule');
  return <div className="member-training-setup">

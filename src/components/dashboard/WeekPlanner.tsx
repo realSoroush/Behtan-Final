@@ -37,8 +37,9 @@ export function WeekPlanner({
     [error, setError] = useState("");
   const [building, setBuilding] = useState(false);
   const [view,setView]=useState<'meals'|'ingredients'>('meals');
+  const { loadWeek } = schedule;
   useEffect(() => {
-    const sync = () => { if (document.visibilityState === 'visible') void schedule.loadWeek(); };
+    const sync = () => { if (document.visibilityState === 'visible') void loadWeek(); };
     sync();
     window.addEventListener('focus', sync);
     document.addEventListener('visibilitychange', sync);
@@ -46,7 +47,7 @@ export function WeekPlanner({
       window.removeEventListener('focus', sync);
       document.removeEventListener('visibilitychange', sync);
     };
-  }, [schedule.loadWeek]);
+  }, [loadWeek]);
   const alive=useRef(true);
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addPlanDays(today, i)), [today]);
