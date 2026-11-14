@@ -1,4 +1,5 @@
-import { mealDescription, roundFa, type PrintedPlan } from "./menuPlan";
+import { mealDescription, roundFa } from './mealDisplay';
+import type { PrintedPlan } from './menuPlan';
 import { nutritionMealSections, nutritionTargetRows } from './nutritionPresentation';
 export function PlanPreview({ plan: p }: { plan: PrintedPlan }) {
   return (

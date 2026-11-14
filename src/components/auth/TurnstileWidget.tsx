@@ -16,35 +16,28 @@ let loadPromise: Promise<void> | null = null;
 function loadTurnstile(): Promise<void> {
   if (window.turnstile) return Promise.resolve();
   if (loadPromise) return loadPromise;
-  const existing = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null;
-  if (existing) {
-    loadPromise = new Promise((resolve, reject) => {
-      if (existing.dataset.loaded === 'true') {
-        if (window.turnstile) resolve();
-        else reject(new Error('TURNSTILE_LOAD_FAILED'));
-        return;
-      }
-      existing.addEventListener('load', () => {
-        if (window.turnstile) resolve();
-        else reject(new Error('TURNSTILE_LOAD_FAILED'));
-      }, { once: true });
-      existing.addEventListener('error', () => reject(new Error('TURNSTILE_LOAD_FAILED')), { once: true });
-    });
-    return loadPromise;
-  }
-  loadPromise = new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.id = SCRIPT_ID;
-    script.src = SCRIPT_URL;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-      script.dataset.loaded = 'true';
+  const script = document.createElement('script');
+  script.id = SCRIPT_ID;
+  script.src = SCRIPT_URL;
+  script.async = true;
+  script.defer = true;
+  loadPromise = new Promise<void>((resolve, reject) => {
+    const fail = () => reject(new Error('TURNSTILE_LOAD_FAILED'));
+    const timeout = window.setTimeout(fail, 15_000);
+    const ready = () => {
+      window.clearTimeout(timeout);
       if (window.turnstile) resolve();
-      else reject(new Error('TURNSTILE_LOAD_FAILED'));
+      else fail();
     };
-    script.onerror = () => reject(new Error('TURNSTILE_LOAD_FAILED'));
+    script.onload = ready;
+    script.onerror = () => { window.clearTimeout(timeout); fail(); };
     document.head.appendChild(script);
+  }).catch(error => {
+    script.onload = null;
+    script.onerror = null;
+    script.remove();
+    loadPromise = null;
+    throw error;
   });
   return loadPromise;
 }
@@ -73,12 +66,12 @@ export function TurnstileWidget({ resetKey, onToken, onError }: {
         language: 'fa',
         size: 'flexible',
         action: 'request_phone_otp',
-        callback: (token: string) => onToken(token),
-        'expired-callback': () => onToken(null),
-        'timeout-callback': () => onToken(null),
-        'error-callback': () => { onToken(null); onError(); },
+        callback: (token: string) => { if (!disposed) onToken(token); },
+        'expired-callback': () => { if (!disposed) onToken(null); },
+        'timeout-callback': () => { if (!disposed) { onToken(null); onError(); } },
+        'error-callback': () => { if (!disposed) { onToken(null); onError(); } },
       });
-    }).catch(onError);
+    }).catch(() => { if (!disposed) onError(); });
     return () => {
       disposed = true;
       if (widgetId && window.turnstile) window.turnstile.remove(widgetId);

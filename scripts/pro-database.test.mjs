@@ -491,6 +491,8 @@ try {
   const {testModulesDatabase}=await import('./pro-modules-database.test.mjs');
   await testModulesDatabase({db,asUser,rpc,equal,denied});
   if(process.env.BEHTAN_MARKET_TEST==='true'){const{testMarketDatabase}=await import('./market-database.test.mjs');await testMarketDatabase({db});}
+  const {testGenerationAccess} = await import('./pro-generation-access.test.mjs');
+  await testGenerationAccess({db,asUser,rpc,equal,denied});
   console.log(
     `PASS: ${checks} Professional database assertions (${process.env.PRO_TEST_DATABASE_URL ? "native PostgreSQL" : "PGlite"}); tenant isolation, grants, RLS, OTP, retries, assignments, revocation, caps, B2C separation`,
   );

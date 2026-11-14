@@ -34,6 +34,7 @@ export function proErrorMessage(error: unknown): string {
   if (code.includes('PRO_CASE_LIMIT')) return 'ظرفیت پرونده‌های این فضای کاری تکمیل شده است.';
   if (code.includes('PRO_SERVER_NOT_CONFIGURED')) return 'سرویس ساخت برنامه هنوز تنظیم نشده است؛ تنظیمات سرور پنل را بررسی کنید.';
   if (code.includes('PRO_AUTH_REQUIRED')) return 'نشست ورود منقضی شده است؛ دوباره وارد شوید.';
+  if (code.includes('PRO_REQUEST_TIMEOUT')) return 'پاسخ ساخت برنامه طول کشید. دوباره تلاش کنید تا نتیجهٔ همان درخواست بررسی شود.';
   if (code.includes('PRO_CONNECTION_ERROR')) return 'ارتباط موقتاً برقرار نیست؛ اطلاعات شما حفظ شده است. دوباره تلاش کنید.';
   if (code.includes('PRO_DRAFT_EXPIRED')) return 'زمان پیش‌نمایش تمام شده است؛ برنامه را دوباره تولید کنید.';
   if (code.includes('PRO_GENERATION_LIMIT')) return 'تعداد درخواست‌های ساخت برنامه زیاد شده است؛ کمی بعد دوباره تلاش کنید.';

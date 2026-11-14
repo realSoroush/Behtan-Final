@@ -1,3 +1,4 @@
+import { mapSupabaseAuthError } from './supabaseAuthError';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabaseClient';
 import {
@@ -17,33 +18,6 @@ function mapSession(session: Session | null): AuthSession | null {
     },
     expiresAt: session.expires_at ?? null,
   };
-}
-
-function mapSupabaseAuthError(error: unknown): AuthServiceError {
-  const value = error as { message?: string; status?: number; code?: string } | null;
-  const message = value?.message?.toLowerCase() ?? '';
-
-  if (value?.status === 429 || message.includes('rate limit') || message.includes('too many')) {
-    return new AuthServiceError('rate_limited', value?.message);
-  }
-
-  if (message.includes('captcha')) {
-    return new AuthServiceError('captcha_required', value?.message);
-  }
-
-  if (message.includes('sms') || message.includes('provider') || message.includes('hook')) {
-    return new AuthServiceError('sms_delivery_failed', value?.message);
-  }
-
-  if (message.includes('token') || message.includes('otp') || message.includes('invalid')) {
-    return new AuthServiceError('invalid_otp', value?.message);
-  }
-
-  if (message.includes('fetch') || message.includes('network')) {
-    return new AuthServiceError('network_error', value?.message);
-  }
-
-  return new AuthServiceError('unknown', value?.message);
 }
 
 export class SupabaseAuthAdapter implements AuthAdapter {
@@ -70,7 +44,11 @@ export class SupabaseAuthAdapter implements AuthAdapter {
       },
     });
 
-    if (error) throw mapSupabaseAuthError(error);
+    if (error) {
+      const failure = mapSupabaseAuthError(error, 'send');
+      console.warn(JSON.stringify({ event: 'phone_otp_send_failed', code: failure.code, provider_status: error.status, at: new Date().toISOString() }));
+      throw failure;
+    }
     return { status: 'otp_required' };
   }
 
@@ -82,7 +60,7 @@ export class SupabaseAuthAdapter implements AuthAdapter {
     });
 
     if (error || !data.session || !data.user) {
-      throw mapSupabaseAuthError(error ?? new Error('Missing session after OTP verification'));
+      throw mapSupabaseAuthError(error ?? new Error('Missing session after OTP verification'), 'verify');
     }
 
     // Keep profile bootstrap inside the adapter. The rest of the app does not

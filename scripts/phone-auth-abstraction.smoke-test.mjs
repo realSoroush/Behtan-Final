@@ -1,3 +1,4 @@
+import { mapSupabaseAuthError } from '../src/services/auth/supabaseAuthError.ts';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -84,3 +85,14 @@ console.log('✅ Production phone OTP test passed');
 console.log('   Auth: Supabase Phone OTP only');
 console.log('   Delivery: signed Send SMS Hook -> SMS.ir Verify API');
 console.log('   Abuse protection: Cloudflare Turnstile + resend cooldown');
+
+for (const [error, phase, expected] of [
+  [{ code: 'sms_send_failed', status: 422, message: 'invalid payload' }, 'send', 'sms_delivery_failed'],
+  [{ code: 'hook_timeout', status: 500 }, 'send', 'sms_delivery_failed'],
+  [{ code: 'captcha_failed', message: 'invalid OTP' }, 'send', 'captcha_required'],
+  [{ code: 'over_sms_send_rate_limit', status: 422 }, 'send', 'rate_limited'],
+  [{ code: 'request_timeout', status: 504 }, 'send', 'request_timeout'],
+  [{ status: 422, message: 'unrecognized invalid value' }, 'send', 'unknown'],
+  [{ code: 'otp_expired' }, 'verify', 'invalid_otp'],
+  [{ status: 503, name: 'AuthRetryableFetchError' }, 'verify', 'network_error'],
+]) assert(mapSupabaseAuthError(error, phase).code === expected, 'OTP error classification: ' + expected);

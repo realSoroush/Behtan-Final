@@ -32,6 +32,6 @@ export default defineConfig({
   server: { port: 5174 },
   build: {
     outDir: 'dist-admin',
-    emptyOutDir: true,
+    manifest: true, emptyOutDir: true,
   },
 });

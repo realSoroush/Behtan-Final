@@ -2,14 +2,11 @@ import { JalaliDateInput } from '@/components/ui/JalaliDateInput';
 import {normalizeCaseSearch} from './caseSearch';
 import { AppLoading } from '@/components/ui/AppLoading';
 import {fromPrintedPlan} from './studioModel';
-import {AuthoredPlanEditor} from './AuthoredPlanEditor';
-import {AuthoredPlanArchive} from './AuthoredPlanArchive';
 import type {AuthoredContent} from './authoredPlan';
-import {TrainingPanel} from './training/TrainingPanel';
 import {PanelModal} from "@/components/ui/PanelModal";
 import { PanelSelect } from "@/components/ui/PanelSelect";
 import { Archive, ArchiveRestore, ArrowRight, Check, ChevronLeft, FileText, FolderHeart, Plus, RefreshCw, Save, Search, Sparkles, UserRound, Users, Dumbbell, Utensils, ScanLine, ArrowUpLeft, PenLine } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { CaseIntakeForm } from "./CaseIntakeForm";
 import {
   realCaseApi,
@@ -18,15 +15,15 @@ import {
   type RealRevision,
   type SavedRealPlan,
 } from "./realCaseApi";
-import {
-  emptyRealIntake,
-  type RealIntake,
-  type PrintedPlan,
-} from "./menuPlan";
-import { BodyScanPanel } from "./body/BodyScanPanel";
+import { emptyRealIntake } from "./emptyRealIntake";
+import type { RealIntake, PrintedPlan } from "./menuPlan";
 import { printSavedPlan } from './printPlan';
 import { PlanPreview } from "./PlanPreview";
 import { proErrorMessage, type ProRole } from "./contracts";
+const AuthoredPlanEditor = lazy(() => import('./AuthoredPlanEditor').then(m => ({ default: m.AuthoredPlanEditor })));
+const AuthoredPlanArchive = lazy(() => import('./AuthoredPlanArchive').then(m => ({ default: m.AuthoredPlanArchive })));
+const TrainingPanel = lazy(() => import('./training/TrainingPanel').then(m => ({ default: m.TrainingPanel })));
+const BodyScanPanel = lazy(() => import('./body/BodyScanPanel').then(m => ({ default: m.BodyScanPanel })));
 const baseMessage = (e: unknown) =>
   e instanceof Error && !e.message.startsWith("PRO_")
     ? e.message
@@ -204,6 +201,12 @@ function RealCaseDetail({
     [plansPage,setPlansPage] = useState(0),[plansTotal,setPlansTotal] = useState(0);
   const [generationFailure, setGenerationFailure] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [slowGeneration, setSlowGeneration] = useState(false);
+  useEffect(() => {
+    if (!generating) return;
+    const timer = window.setTimeout(() => setSlowGeneration(true), 8_000);
+    return () => window.clearTimeout(timer);
+  }, [generating]);
   const generationFeedback = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (error && generationFailure && !locked) {
@@ -273,13 +276,26 @@ function RealCaseDetail({
       mounted.current = false;
     };
   }, [initialId, hydrate, org]);
+  const lockCase = useCallback(() => {
+    setLocked(true);setScanOpen(false);setPreviewOpen(false);setTrainingOpen(false);setAuthoredOpen(false);
+    saveRequest.current = null;
+    setDraftId('');
+    setPlanId('');
+    setForm(emptyRealIntake());
+    setSaved("");
+    setHistory([]);
+    setPlans([]);
+    setPlan(null);
+  }, []);
   useEffect(() => {
     if (!id) return;
     let active = true;
+    let checking = false;
     const check = async () => {
-      if (pending.current || document.hidden) return;
+      if (pending.current || checking || document.hidden) return;
+      checking = true;
       try {
-        const [c,status] = await Promise.all([realCaseApi.get(org,id),realCaseApi.status(org)]);
+        const [c,status] = await Promise.all([realCaseApi.getRevision(org,id),realCaseApi.status(org)]);
         if (active) {
           setAccess(status);setArchived(Boolean(c.archived_at));
           setConnectionWarning(false);
@@ -287,34 +303,30 @@ function RealCaseDetail({
         }
       } catch (e) {
         if (active && e instanceof Error && e.message === 'PRO_ACCESS_DENIED') {
-          setLocked(true);setScanOpen(false);setPreviewOpen(false);setTrainingOpen(false);setAuthoredOpen(false);
-          saveRequest.current = null;
-          setDraftId('');
-          setPlanId('');
-          setForm(emptyRealIntake());
-          setSaved("");
-          setHistory([]);
-          setPlans([]);
-          setPlan(null);
+          lockCase();
           setError(message(e));
         } else if (active) {
           // Temporary transport/5xx failure is not evidence of revoked access.
           // Keep the in-memory form and pending idempotency keys intact.
           setConnectionWarning(true);
         }
+      } finally {
+        checking = false;
       }
     };
     const visible = () => { if (!document.hidden) void check(); };
     document.addEventListener('visibilitychange', visible);
     window.addEventListener("focus", check);
+    window.addEventListener("online", check);
     const t = window.setInterval(() => void check(), 30000);
     return () => {
       active = false;
       window.removeEventListener("focus", check);
+      window.removeEventListener("online", check);
       document.removeEventListener("visibilitychange", visible);
       window.clearInterval(t);
     };
-  }, [id, org, revision]);
+  }, [id, org, revision, lockCase]);
   useEffect(() => {
     const warn = (e: BeforeUnloadEvent) => {
       if (dirty) {
@@ -329,6 +341,7 @@ function RealCaseDetail({
     if (pending.current) return;
     pending.current = true;
     setBusy(true);
+    setSlowGeneration(false);
     setGenerating(generation);
     setError("");
     setNotice("");
@@ -339,6 +352,7 @@ function RealCaseDetail({
       if (mounted.current) {
         setError(message(e));
         setGenerationFailure(generation);
+        if (e instanceof Error && e.message.includes('PRO_ACCESS_DENIED')) lockCase();
         if (
           e instanceof Error &&
           /PRO_INVALID_INTAKE|PRO_STALE_REVISION|PRO_ACCESS_DENIED/.test(
@@ -442,15 +456,15 @@ function RealCaseDetail({
         <button className="pro-module-card" disabled={busy} onClick={()=>setTrainingOpen(true)} aria-label="برنامه تمرینی مراجع"><span className="pro-module-symbol"><Dumbbell size={22}/></span><span><strong>تمرین مراجع</strong><small>{access?.modules?.training?'جلسات، حرکات و برنامه اختصاصی':'مشاهده سوابق تمرین'}</small></span><ArrowUpLeft size={18}/></button>
         <button className="pro-module-card" disabled={busy} onClick={()=>setScanOpen(true)} aria-label="تحلیل تصویری بدن و گزارش‌ها"><span className="pro-module-symbol"><ScanLine size={22}/></span><span><strong>گزارش بدن</strong><small>عکس‌ها، ارزیابی و گزارش‌های ثبت‌شده</small></span><ArrowUpLeft size={18}/></button>
       </div>}
-      {id&&authoredOpen&&<PanelModal title="تدوین اختصاصی برنامه غذایی" busy={authoredBusy} onClose={()=>{if(!authoredDirty||window.confirm("تغییرات ثبت‌نشده برنامه غذایی کنار گذاشته شوند؟"))setAuthoredOpen(false);}}><AuthoredPlanEditor org={org} record={id} revision={revision} kind="nutrition" name={form.display_name} canWrite={Boolean(access?.can_write&&access?.modules?.nutrition)&&!archived&&!dirty&&!stale&&!connectionWarning} onBusy={setAuthoredBusy} onDirty={setAuthoredDirty} onSaved={()=>setAuthoredArchiveVersion(v=>v+1)} intake={form} seed={authoredSeed} onGenerate={async(requestedCount=1)=>{
+      {id&&authoredOpen&&<PanelModal title="تدوین اختصاصی برنامه غذایی" busy={authoredBusy} onClose={()=>{if(!authoredDirty||window.confirm("تغییرات ثبت‌نشده برنامه غذایی کنار گذاشته شوند؟"))setAuthoredOpen(false);}}><Suspense fallback={<AppLoading label="در حال بازکردن ابزار پرونده…" />}><AuthoredPlanEditor org={org} record={id} revision={revision} kind="nutrition" name={form.display_name} canWrite={Boolean(access?.can_write&&access?.modules?.nutrition)&&!archived&&!dirty&&!stale&&!connectionWarning} onBusy={setAuthoredBusy} onDirty={setAuthoredDirty} onSaved={()=>setAuthoredArchiveVersion(v=>v+1)} intake={form} seed={authoredSeed} onGenerate={async(requestedCount=1)=>{
         if(!id||dirty||stale||connectionWarning||archived||!access?.can_write||!access?.modules?.nutrition)throw new Error('PRO_STALE_REVISION');
         const signature=JSON.stringify([org,id,revision,requestedCount,date,notes]);
         if(studioGeneration.current?.signature!==signature)studioGeneration.current={signature,key:crypto.randomUUID()};
         const result=await realCaseApi.generatePlan(org,id,revision,requestedCount,date,notes,studioGeneration.current.key);
         studioGeneration.current=null;return fromPrintedPlan(result.plan);
-      }}/></PanelModal>}
-      {id&&!locked&&trainingOpen&&<PanelModal title="برنامه تمرینی مراجع" busy={trainingBusy} onClose={()=>{if(!trainingDirty||window.confirm("تغییرات ثبت‌نشده برنامه تمرینی کنار گذاشته شوند؟"))setTrainingOpen(false);}}><TrainingPanel org={org} record={id} revision={revision} name={form.display_name} canWrite={Boolean(access?.can_write&&access?.modules?.training)&&!archived&&!dirty&&!stale&&!connectionWarning} onBusy={setTrainingBusy} onDirty={setTrainingDirty} onSaved={()=>setAuthoredArchiveVersion(v=>v+1)}/></PanelModal>}
-      {id&&scanOpen&&<PanelModal title="تحلیل تصویری بدن" busy={scanBusy} onClose={()=>setScanOpen(false)}><BodyScanPanel org={org} record={id} revision={revision} canWrite={Boolean(access?.can_write)&&!archived&&!dirty&&!stale&&!connectionWarning} onBusy={setScanBusy}/></PanelModal>}
+      }}/></Suspense></PanelModal>}
+      {id&&!locked&&trainingOpen&&<PanelModal title="برنامه تمرینی مراجع" busy={trainingBusy} onClose={()=>{if(!trainingDirty||window.confirm("تغییرات ثبت‌نشده برنامه تمرینی کنار گذاشته شوند؟"))setTrainingOpen(false);}}><Suspense fallback={<AppLoading label="در حال بازکردن ابزار پرونده…" />}><TrainingPanel org={org} record={id} revision={revision} name={form.display_name} canWrite={Boolean(access?.can_write&&access?.modules?.training)&&!archived&&!dirty&&!stale&&!connectionWarning} onBusy={setTrainingBusy} onDirty={setTrainingDirty} onSaved={()=>setAuthoredArchiveVersion(v=>v+1)}/></Suspense></PanelModal>}
+      {id&&scanOpen&&<PanelModal title="تحلیل تصویری بدن" busy={scanBusy} onClose={()=>setScanOpen(false)}><Suspense fallback={<AppLoading label="در حال بازکردن ابزار پرونده…" />}><BodyScanPanel org={org} record={id} revision={revision} canWrite={Boolean(access?.can_write)&&!archived&&!dirty&&!stale&&!connectionWarning} onBusy={setScanBusy}/></Suspense></PanelModal>}
       <nav className="pro-case-path" aria-label="مسیر آماده‌سازی برنامه">
         <a href="#pro-intake-editor"><span>۱</span>اطلاعات مراجع</a>
         {id ? <a href="#pro-plan-builder"><span>۲</span>ساخت برنامه</a> : <span className="pro-path-inactive"><span>۲</span>ساخت برنامه</span>}
@@ -651,7 +665,9 @@ function RealCaseDetail({
                   <PanelModal title={generating ? 'در حال ساخت برنامه غذایی' : 'برنامه غذایی مراجع'} busy={busy} onClose={() => setPreviewOpen(false)}>
                     {generating ? (
                       <AppLoading label="در حال محاسبه و چیدن منوها…">
-                        <p>این مرحله ممکن است چند ثانیه طول بکشد. پیش‌نمایش پس از آماده‌شدن همین‌جا باز می‌شود.</p>
+                        <p>{slowGeneration
+                          ? 'ساخت منوها هنوز ادامه دارد. پیش‌نمایش پس از آماده‌شدن همین‌جا باز می‌شود.'
+                          : 'این مرحله ممکن است چند ثانیه طول بکشد. پیش‌نمایش پس از آماده‌شدن همین‌جا باز می‌شود.'}</p>
                       </AppLoading>
                     ) : plan && <>
                     {error && <p role="alert" className="pro-error">{error}</p>}
@@ -711,7 +727,7 @@ function RealCaseDetail({
                   ))}
                 </ul>
                 <div className="pro-actions"><button disabled={busy||plansPage===0} onClick={()=>void run(async()=>{const r=await realCaseApi.plans(org,id,plansPage-1);setPlans(r.rows);setPlansPage(p=>p-1);})}>برنامه‌های جدیدتر</button><span>صفحه {(plansPage+1).toLocaleString('fa-IR')} · {plansTotal.toLocaleString('fa-IR')} برنامه</span><button disabled={busy||(plansPage+1)*10>=plansTotal} onClick={()=>void run(async()=>{const r=await realCaseApi.plans(org,id,plansPage+1);setPlans(r.rows);setPlansPage(p=>p+1);})}>برنامه‌های قدیمی‌تر</button></div>
-                <AuthoredPlanArchive key={`${org}:${id}:${authoredArchiveVersion}`} org={org} record={id} name={form.display_name} />
+                <Suspense fallback={<AppLoading label="در حال بازکردن ابزار پرونده…" />}><AuthoredPlanArchive key={`${org}:${id}:${authoredArchiveVersion}`} org={org} record={id} name={form.display_name} /></Suspense>
               </section>
             </>
           )}

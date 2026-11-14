@@ -6,9 +6,12 @@ import { ProServerError, type PlanDependencies, type ServerDraft } from './proPl
 let catalogCache: { source: string; context: NutritionContext } | undefined;
 
 function databaseError(error: { message: string; code?: string }, status = 0): never {
-  const known = /PRO_(ACCESS_DENIED|STALE_REVISION|REQUEST_CONFLICT|MODULE_DISABLED|INVALID_PLAN|DRAFT_EXPIRED|GENERATION_LIMIT|SUBSCRIPTION_EXPIRED|CASE_LIMIT)/.exec(error.message)?.[0];
+  const known = /PRO_(ACCESS_DENIED|STALE_REVISION|REQUEST_CONFLICT|MODULE_DISABLED|INVALID_PLAN|CASE_ARCHIVED|DRAFT_EXPIRED|GENERATION_LIMIT|SUBSCRIPTION_EXPIRED|CASE_LIMIT)/.exec(error.message)?.[0];
   if(error.code==='PGRST202')throw new ProServerError('PRO_MIGRATION_REQUIRED',503);
-  if (known) throw new ProServerError(known, known === 'PRO_ACCESS_DENIED' ? 403 : known === 'PRO_GENERATION_LIMIT' ? 429 : 409);
+  if (known) {
+    const denied = ['PRO_ACCESS_DENIED','PRO_MODULE_DISABLED','PRO_SUBSCRIPTION_EXPIRED'].includes(known);
+    throw new ProServerError(known, denied ? 403 : known === 'PRO_GENERATION_LIMIT' ? 429 : 409);
+  }
   if (status === 401) throw new ProServerError('PRO_AUTH_REQUIRED', 401);
   if (status === 403 || error.code === '42501' || error.code === 'PGRST116') throw new ProServerError('PRO_ACCESS_DENIED', 403);
   throw new ProServerError('PRO_CONNECTION_ERROR', 503);
@@ -58,6 +61,18 @@ export function supabasePlanDependencies(): PlanDependencies {
       if(!access.data?.can_write)throw new ProServerError('PRO_SUBSCRIPTION_EXPIRED',403);
       return data as { answers:RealIntake; revision:number };
     },
+    async prepareGeneration(x, token) {
+      try {
+        return await call<Awaited<ReturnType<NonNullable<PlanDependencies['prepareGeneration']>>>>('pro_prepare_server_plan', {
+          p_org:x.org,p_record:x.record,p_revision:x.revision,p_actor:x.actor,p_key:x.key,p_request:x.request,
+        });
+      } catch (error) {
+        // During a rolling release, an older schema still uses its JWT/RLS path.
+        if (error instanceof ProServerError && error.code === 'PRO_MIGRATION_REQUIRED')
+          return this.readCase(token, x.org, x.record);
+        throw error;
+      }
+    },
     async loadNutrition(token) {
       // Called only after verifyToken + RLS readCase + current Pro entitlement.
       // Nutrition catalog is shared reference data, not a patient's B2C account.
@@ -67,7 +82,7 @@ export function supabasePlanDependencies(): PlanDependencies {
         const cached = catalogCache?.source === url ? catalogCache.context : undefined;
         const context = await readNutritionContext(admin, AbortSignal.timeout(12000), cached);
         catalogCache = { source: url, context };
-        return context;
+        return { ...context, cacheHit: context === cached };
       } catch (error) {
         if (error instanceof NutritionContextError) {
           if (error.status === 401 || error.status === 403) throw new ProServerError('PRO_SERVER_CREDENTIAL_INVALID', 503);

@@ -40,5 +40,5 @@ export default defineConfig({
   ],
   resolve: { alias: { "@": resolve(__dirname, "src") } },
   server: { port: 5175 },
-  build: { outDir: "dist-pro", emptyOutDir: true },
+  build: { outDir: "dist-pro", manifest: true, emptyOutDir: true },
 });

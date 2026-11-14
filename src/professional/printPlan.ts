@@ -1,4 +1,5 @@
-import { mealDescription, roundFa, type PrintedPlan } from './menuPlan.ts';
+import { mealDescription, roundFa } from './mealDisplay.ts';
+import type { PrintedPlan } from './menuPlan.ts';
 import { specialistHtml, type SpecialistIdentity } from './specialistProfile.ts';
 import { nutritionMealSections, nutritionTargetRows } from './nutritionPresentation.ts';
 import { showPrintLoading } from '../utils/printLoading.ts';

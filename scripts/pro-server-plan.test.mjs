@@ -14,13 +14,19 @@ const reject=async(fn,code)=>{await assert.rejects(fn,e=>e.code===code);checks++
 const org=randomUUID(),record=randomUUID(),actor=randomUUID();
 const body={action:'generate',org,record,revision:1,key:randomUUID(),date:'2026-10-21',count:4,notes:'متن مراجع'};
 let answers={...emptyRealIntake(),display_name:'مراجع سرور',birth_date:'1992-04-23',height_cm:165,weight_kg:75,safety_confirmed:true};
-const drafts=new Map(); let stageCalls=0, publishCalls=0, deny=false;
+const drafts=new Map(); let stageCalls=0, publishCalls=0, catalogCalls=0, deny=false;
 const failures=[];
 const deps={
  async reportFailure(x){failures.push(x);},
  async verifyToken(token){if(token!=='valid-token') throw new ProServerError('PRO_AUTH_REQUIRED',401);return actor;},
  async readCase(token,o,r){assert.equal(token,'valid-token');if(deny||o!==org||r!==record)throw new ProServerError('PRO_ACCESS_DENIED',403);return {revision:1,answers};},
- async loadNutrition(){return {catalog:TEST_NUTRITION_CATALOG,policy:DEFAULT_PROTEIN_ENGINE_POLICY};},
+ async prepareGeneration(input, token) {
+   const current = await deps.readCase(token, input.org, input.record);
+   if (input.revision !== current.revision) throw new ProServerError('PRO_STALE_REVISION',409);
+   const draft = drafts.get(input.key);
+   return draft ? {draft} : current;
+ },
+ async loadNutrition(){catalogCalls++;return {catalog:TEST_NUTRITION_CATALOG,policy:DEFAULT_PROTEIN_ENGINE_POLICY};},
  async stage(x){stageCalls++;assert.equal(x.actor,actor);const prior=drafts.get(x.key);if(prior)return prior;const d={draft_id:randomUUID(),plan:structuredClone(x.plan)};drafts.set(x.key,d);return d;},
  async publish(x){publishCalls++;if(deny)throw new ProServerError('PRO_ACCESS_DENIED',403);assert.equal(x.actor,actor);if(![...drafts.values()].some(d=>d.draft_id===x.draft))throw new ProServerError('PRO_INVALID_PLAN');return 'saved-id';},
 };
@@ -38,7 +44,7 @@ equal(generated.plan.display_name,answers.display_name);
 equal(generated.plan.intake_revision,1);
 for(const d of generated.plan.days)equal(menuCombinationsFeasible(d.slots,d.targets),true);
 equal((await processPlanRequest(body,'valid-token',deps)).draft_id,generated.draft_id);
-equal(drafts.size,1);
+equal(drafts.size,1);equal(stageCalls,1);equal(catalogCalls,1);
 const save={action:'save',org,record,revision:1,key:randomUUID(),draft:generated.draft_id};
 await reject(()=>processPlanRequest({...save,plan:{targetCalories:1}},'valid-token',deps),'PRO_INVALID_REQUEST');
 equal(publishCalls,0);
@@ -52,7 +58,7 @@ await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const url=`http://127.0.0.1:${server.address().port}/api/pro-plan`;
 async function http(payload,headers={},method='POST'){
  const response=await fetch(url,{method,headers:{'Content-Type':'application/json',Authorization:'Bearer valid-token',...headers},...(method==='GET'?{}:{body:typeof payload==='string'?payload:JSON.stringify(payload)})});
- return {status:response.status,body:await response.json(),cache:response.headers.get('cache-control')};
+ return {status:response.status,body:await response.json(),cache:response.headers.get('cache-control'), timing: response.headers.get('server-timing')};
 }
 try{
  equal((await http(null,{},'GET')).body,{ready:true,missing:[]});
@@ -62,6 +68,8 @@ try{
  equal((await http('{invalid')).status,400);
  equal((await http('x'.repeat(9000))).status,413);
  const result=await http(body);equal(result.status,200);equal(result.cache,'no-store');equal(result.body.draft_id,generated.draft_id);
+ assert.match(result.timing,/auth;dur=\d+, case;dur=\d+, total;dur=\d+/);
+ assert.doesNotMatch(result.timing,/solve|متن مراجع/);
  equal((await http({...save,plan:{totalKcal:999999}})).status,400);
  equal((await http(save)).body,{id:'saved-id'});
  answers={...answers,medical_conditions:['kidney_disease']};

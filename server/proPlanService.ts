@@ -11,16 +11,37 @@ export class ProServerError extends Error {
 }
 export interface DraftRequest { date: string; count: number; notes: string }
 export interface ServerDraft { draft_id: string; plan: PrintedPlan }
+type CurrentCase = { revision: number; answers: RealIntake };
+type GenerationRequest = { org: string; record: string; revision: number; actor: string; key: string; request: DraftRequest };
+type GenerationCase = CurrentCase | { draft: ServerDraft };
+export type PlanPhase = 'auth' | 'case' | 'catalog' | 'solve' | 'stage' | 'publish';
+
 export interface PlanDependencies {
   reportFailure?(input:{id:string;actor:string;org:string;operation:'generate'|'save';code:string}):Promise<void>;
   verifyToken(token: string): Promise<string>;
-  readCase(token: string, org: string, record: string): Promise<{ revision: number; answers: RealIntake }>;
-  loadNutrition(token: string): Promise<{ catalog: NutritionCatalog; policy: ProteinEnginePolicy; revision?: string }>;
+  readCase(token: string, org: string, record: string): Promise<CurrentCase>;
+  prepareGeneration?(input: GenerationRequest, token: string): Promise<GenerationCase>;
+  loadNutrition(token: string): Promise<{ catalog: NutritionCatalog; policy: ProteinEnginePolicy; revision?: string; cacheHit?: boolean }>;
   stage(input: { org: string; record: string; revision: number; actor: string; key: string; request: DraftRequest; plan: PrintedPlan }): Promise<ServerDraft>;
   publish(input: { org: string; record: string; revision: number; actor: string; draft: string; key: string }): Promise<string>;
 }
 const uuid = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
-export async function processPlanRequest(body: unknown, token: string, deps: PlanDependencies) {
+export async function processPlanRequest(
+  body: unknown, token: string, deps: PlanDependencies,
+  observe?: (phase: PlanPhase, milliseconds: number, details?: { cacheHit?: boolean }) => void,
+) {
+  async function measure<T>(phase: PlanPhase, work: () => T | Promise<T>): Promise<T> {
+    const start = performance.now();
+    let details: { cacheHit?: boolean } | undefined;
+    try {
+      const result = await work();
+      if (phase === 'catalog' && result && typeof result === 'object' && 'cacheHit' in result)
+        details = { cacheHit: result.cacheHit === true };
+      return result;
+    } finally {
+      observe?.(phase, Math.round(performance.now() - start), details);
+    }
+  }
   if (!token || token.length > 8192) throw new ProServerError('PRO_AUTH_REQUIRED', 401);
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new ProServerError('PRO_INVALID_REQUEST');
   const b = body as Record<string, unknown>;
@@ -38,30 +59,40 @@ export async function processPlanRequest(body: unknown, token: string, deps: Pla
         || typeof b.notes !== 'string' || b.notes.length > 2000)
       throw new ProServerError('PRO_INVALID_REQUEST');
   }
-  const actor = await deps.verifyToken(token);
+  const actor = await measure('auth', () => deps.verifyToken(token));
+  const identity = { org: b.org, record: b.record, revision: Number(b.revision), actor, key: b.key };
   if (b.action === 'save') {
-    // SQL rechecks current access under the org lock; an already-committed
-    // response-loss retry can succeed even if the intake has since changed.
-    return { id: await deps.publish({ org:b.org, record:b.record, revision:Number(b.revision), actor, key:b.key, draft:b.draft as string }) };
+    // SQL rechecks access, including retries of already committed writes.
+    return { id: await measure('publish', () => deps.publish({ ...identity, draft: b.draft as string })) };
   }
-  // Always use the user's JWT for RLS reads. Never accept answers/targets from the request.
-  const current = await deps.readCase(token, b.org, b.record);
-  if (current.revision !== b.revision) throw new ProServerError('PRO_STALE_REVISION', 409);
-  if(b.action==='catalog'){const {catalog}=await deps.loadNutrition(token);return {foods:catalog.foods};}
+  if (b.action === 'catalog') {
+    const current = await measure('case', () => deps.readCase(token, identity.org, identity.record));
+    if (current.revision !== b.revision) throw new ProServerError('PRO_STALE_REVISION', 409);
+    const { catalog } = await measure('catalog', () => deps.loadNutrition(token));
+    return { foods: catalog.foods };
+  }
   const request: DraftRequest = { date:b.date as string, count:b.count as number, notes:(b.notes as string).trim() };
+  const input = { ...identity, request };
+  const current = await measure('case', () => deps.prepareGeneration
+    ? deps.prepareGeneration(input, token)
+    : deps.readCase(token, identity.org, identity.record));
+  if ('draft' in current) return current.draft;
+  if (current.revision !== b.revision) throw new ProServerError('PRO_STALE_REVISION', 409);
   // A future program date must not make a currently ineligible client eligible.
   if (!proNutritionDraftAllowed(current.answers, new Date())
       || !proNutritionDraftAllowed(current.answers, new Date(request.date + 'T12:00:00Z')))
     throw new ProServerError('PRO_MEDICAL_STOP', 422);
-  const { catalog, policy, revision } = await deps.loadNutrition(token);
-  let plan: PrintedPlan;
-  try {
-    const engine = createMealPlanEngine(catalog, revision);
-    plan = generatePrintedPlan(current.answers, current.revision, request.count, policy, request.date, request.notes, engine);
-    if (revision) plan.catalog_revision = revision;
-  } catch (error) {
-    if(error instanceof ProMenuCountError) throw new ProServerError('PRO_MENU_COUNT_UNAVAILABLE',422);
-    throw new ProServerError('PRO_GENERATION_FAILED', 422);
-  }
-  return deps.stage({ org:b.org, record:b.record, revision:current.revision, actor, key:b.key, request, plan });
+  const { catalog, policy, revision } = await measure('catalog', () => deps.loadNutrition(token));
+  const plan = await measure('solve', () => {
+    try {
+      const engine = createMealPlanEngine(catalog, revision);
+      const result = generatePrintedPlan(current.answers, current.revision, request.count, policy, request.date, request.notes, engine);
+      if (revision) result.catalog_revision = revision;
+      return result;
+    } catch (error) {
+      if (error instanceof ProMenuCountError) throw new ProServerError('PRO_MENU_COUNT_UNAVAILABLE', 422);
+      throw new ProServerError('PRO_GENERATION_FAILED', 422);
+    }
+  });
+  return measure('stage', () => deps.stage({ ...input, plan }));
 }

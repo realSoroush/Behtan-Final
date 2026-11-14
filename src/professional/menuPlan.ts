@@ -4,6 +4,7 @@ import {
   professionalMenuIdentity as menuIdentity,
   professionalMenuVarietyPenalty,
   professionalRecipeAllowed,
+  rankProfessionalRecipeAddition,
 } from '../utils/professionalMenuPolicy.ts';
 import type {
   MacroTargets,
@@ -23,7 +24,6 @@ import {
   type NutritionCalculationTrace,
 } from "../utils/nutritionHelpers.ts";
 import { proNutritionDraftAllowed, type CaseIntake } from "./intake.ts";
-import { professionalFoodAmount } from './foodAmounts.ts';
 export interface RealIntake extends CaseIntake {
   display_name: string;
   phone: string;
@@ -48,30 +48,7 @@ export interface PrintedPlan {
   notes: string;
   days: MenuDay[];
 }
-export function emptyRealIntake(): RealIntake {
-  return {
-    display_name: "",
-    phone: "",
-    gender: "female",
-    birth_date: "",
-    height_cm: 0,
-    weight_kg: 0,
-    goal: "weight_loss",
-    activity_level: "sedentary",
-    workout_days: 0,
-    training_type: "none",
-    protein_budget: "economic",
-    vegetarian_status: "none",
-    allergies: [],
-    medical_conditions: [],
-    pregnancy_status: "not_pregnant",
-    eating_disorder_status: "none",
-    medications_present: false,
-    injuries_present: false,
-    safety_confirmed: false,
-    screening_version: 1,
-  };
-}
+export { emptyRealIntake } from './emptyRealIntake.ts';
 const fields = ["totalKcal", "totalProtein", "totalCarbs", "totalFat"] as const;
 /** Bounds cover EVERY independent combination of the printed options. */
 export function menuCombinationsFeasible(
@@ -110,13 +87,14 @@ export function selectProfessionalMenus(pools:MenuDay['slots'],targets:MacroTarg
       if (!byRecipe.has(identity) && professionalRecipeAllowed(meal.components.map(c => c.foodItem))) byRecipe.set(identity, meal);
     }
     const choices = [...byRecipe.values()];
+    const identities = new Map([...byRecipe].map(([id, meal]) => [meal, id]));
     const recipes = new Map(choices.map(meal => [meal, describeProfessionalRecipe(meal)]));
     const vectors = new Map(choices.map(meal => [meal, vector(meal)]));
     const anchorVector = pool.options[0] && vector(pool.options[0]);
     const variety = (meals: Meal[]) => professionalMenuVarietyPenalty(meals.map(meal => recipes.get(meal)!), pool.slot);
     const found=new Map<string,{meals:Meal[];min:number[];max:number[];variety:number}>();
     const addGroup = (meals: Meal[]) => {
-      const key = JSON.stringify(meals.map(menuIdentity).sort());
+      const key = JSON.stringify(meals.map(meal => identities.get(meal)!).sort());
       if (!found.has(key)) found.set(key, { meals, ...bounds(meals), variety: variety(meals) });
     };
     for(const anchor of choices.slice(0,80)) {
@@ -124,13 +102,14 @@ export function selectProfessionalMenus(pools:MenuDay['slots'],targets:MacroTarg
       while(meals.length<count) {
         let best:Meal|undefined,score=Infinity;
         const current = bounds(meals);
+        const rankAddition = rankProfessionalRecipeAddition(meals.map(meal => recipes.get(meal)!), pool.slot);
         for(const candidate of choices) {
           if(meals.includes(candidate))continue;
           const candidateVector = vectors.get(candidate)!;
           const cost = current.min.reduce((sum, min, i) => {
             const value = candidateVector[i];
             return sum + (Math.max(current.max[i], value) - Math.min(min, value)) / daily[i];
-          }, variety([...meals, candidate]));
+          }, rankAddition(recipes.get(candidate)!));
           if(cost<score){score=cost;best=candidate;}
         }
         if(!best)break;meals.push(best);
@@ -304,7 +283,4 @@ export function generatePrintedPlan(
     days,
   };
 }
-export const roundFa = (n: number) => Math.round(n).toLocaleString("fa-IR");
-export function mealDescription(m: Meal): string {
-  return m.components.map(component => `${component.foodItem.name} ${professionalFoodAmount(component)}`).join(' + ');
-}
+export { mealDescription, roundFa } from './mealDisplay.ts';

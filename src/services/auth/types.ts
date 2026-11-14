@@ -15,6 +15,7 @@ export type AuthErrorCode =
   | 'sms_delivery_failed'
   | 'profile_bootstrap_failed'
   | 'network_error'
+  | 'request_timeout'
   | 'captcha_required'
   | 'unknown';
 
