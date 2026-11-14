@@ -39,6 +39,8 @@ function userMessageForAuthError(error: unknown, fallback: string): string {
     switch (error.code) {
       case 'rate_limited':
         return 'درخواست‌های زیادی ارسال شده است. کمی صبر کنید و دوباره تلاش کنید.';
+      case 'invalid_phone':
+        return 'شماره موبایل را بررسی کنید و دوباره تلاش کنید.';
       case 'invalid_otp':
         return 'کد تأیید صحیح نیست یا منقضی شده است. دوباره بررسی کنید.';
       case 'sms_delivery_failed':
@@ -47,6 +49,8 @@ function userMessageForAuthError(error: unknown, fallback: string): string {
         return 'ورود انجام شد اما ساخت پروفایل با خطا مواجه شد. دوباره تلاش کنید.';
       case 'captcha_required':
         return 'تأیید امنیتی کامل نشد. دوباره تلاش کنید.';
+      case 'request_timeout':
+        return 'پاسخ ارسال کد طول کشید. اگر کد رسید آن را وارد کنید، در غیر این صورت پس از پایان شمارش دوباره درخواست بدهید.';
       case 'network_error':
         return 'ارتباط با سرویس ورود برقرار نشد. اتصال اینترنت را بررسی کنید.';
       default:
@@ -154,6 +158,7 @@ export function useAuth(): UseAuthReturn {
       const fallback = 'ارسال کد تأیید انجام نشد. اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.';
       const message = userMessageForAuthError(error, fallback);
       setState((current) => ({ ...current, loading: false, error: message }));
+      if (error instanceof AuthServiceError) throw new AuthServiceError(error.code, message);
       throw new Error(message);
     }
   };

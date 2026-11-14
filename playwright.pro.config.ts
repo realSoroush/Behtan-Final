@@ -29,6 +29,7 @@ export default defineConfig({
       VITE_SUPABASE_URL: "https://pro-test.supabase.co",
       VITE_SUPABASE_ANON_KEY: "synthetic-test-anon-key",
       VITE_AUTH_DRIVER: "supabase",
+      VITE_TURNSTILE_SITE_KEY: "synthetic-browser-test-site-key",
     },
   },
 });

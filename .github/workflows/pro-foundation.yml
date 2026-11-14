@@ -80,6 +80,8 @@ jobs:
           docker exec -i "$PRO_CONTAINER" pg_restore -U postgres --dbname=behtan_pro_restore_test --exit-on-error < /tmp/behtan-pro-ci.dump
           npm run test:pro:recovery
       - run: npm run build && npm run build:admin && VITE_PRO_SANDBOX_ENABLED=true npm run build:pro
+      - name: Check Pro and admin initial JavaScript budgets
+        run: node scripts/pro-bundle-budget.test.mjs
       - run: npx playwright install --with-deps chromium
       - name: Real PostgreSQL/PostgREST multi-context intake checks
         env:

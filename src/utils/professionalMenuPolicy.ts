@@ -42,15 +42,46 @@ export function describeProfessionalRecipe(meal: Meal): RecipeChoice {
   };
 }
 
+function varietyPenalty(count: number, powders: number, bases: number, proteinChoices: number, proteins: number, slot: MealSlot) {
+  if (count < 2) return 0;
+  const mainMeal = slot === 'breakfast' || slot === 'lunch' || slot === 'dinner';
+  return .025 * (count - bases) + .004 * powders + (powders === count ? .12 : 0) +
+    (slot === 'post_workout' && proteins < 2 ? .12 : 0) +
+    (mainMeal ? .035 * (Math.min(3, proteinChoices) - Math.min(3, proteins)) : 0);
+}
+
+function summarizeChoices(choices: RecipeChoice[]) {
+  let powders = 0, proteinChoices = 0;
+  const bases = new Set<string>(), proteins = new Set<string>();
+  for (const choice of choices) {
+    powders += Number(choice.usesPowder);
+    bases.add(choice.wholeFoods);
+    if (choice.primaryProtein) {
+      proteinChoices++;
+      proteins.add(choice.primaryProtein);
+    }
+  }
+  return { powders, bases, proteinChoices, proteins };
+}
+
 /** Preferences influence ranking only. The daily nutrition envelope is still mandatory. */
 export function professionalMenuVarietyPenalty(choices: RecipeChoice[], slot: MealSlot): number {
-  if (choices.length < 2) return 0;
-  const powders = choices.filter(choice => choice.usesPowder).length;
-  const repeatedBases = choices.length - new Set(choices.map(choice => choice.wholeFoods)).size;
-  const proteinChoices = choices.flatMap(choice => choice.primaryProtein ? [choice.primaryProtein] : []);
-  const proteins = new Set(proteinChoices).size;
-  const mainMeal = slot === 'breakfast' || slot === 'lunch' || slot === 'dinner';
-  return .025 * repeatedBases + .004 * powders + (powders === choices.length ? .12 : 0) +
-    (slot === 'post_workout' && proteins < 2 ? .12 : 0) +
-    (mainMeal ? .035 * (Math.min(3, proteinChoices.length) - Math.min(3, proteins)) : 0);
+  const { powders, bases, proteinChoices, proteins } = summarizeChoices(choices);
+  return varietyPenalty(choices.length, powders, bases.size, proteinChoices, proteins.size, slot);
+}
+
+/** Reuse the same selected recipes while scoring each possible addition. */
+export function rankProfessionalRecipeAddition(choices: RecipeChoice[], slot: MealSlot) {
+  const { powders, bases, proteinChoices, proteins } = summarizeChoices(choices);
+  return (candidate: RecipeChoice) => {
+    const protein = candidate.primaryProtein;
+    return varietyPenalty(
+      choices.length + 1,
+      powders + Number(candidate.usesPowder),
+      bases.size + Number(!bases.has(candidate.wholeFoods)),
+      proteinChoices + Number(Boolean(protein)),
+      proteins.size + Number(Boolean(protein && !proteins.has(protein))),
+      slot,
+    );
+  };
 }

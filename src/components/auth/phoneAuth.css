@@ -1,0 +1,14 @@
+@media (prefers-reduced-motion: no-preference) {
+  .phone-auth-card {
+    animation: phone-auth-enter 200ms ease-out both;
+  }
+
+  .phone-auth-error {
+    animation: phone-auth-enter 140ms ease-out both;
+  }
+
+  @keyframes phone-auth-enter {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}

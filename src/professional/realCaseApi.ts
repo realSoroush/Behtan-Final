@@ -30,17 +30,9 @@ export const realCaseApi = {
   archive: (org:string,record:string,expected:number,archived:boolean,key:string)=>rpc('pro_set_case_archived',{p_org:org,p_record:record,p_expected:expected,p_archived:archived,p_key:key}),
   duplicates:(org:string,phone:string)=>rpc<{id:string;display_name:string;archived_at:string|null}[]>('pro_duplicate_cases',{p_org:org,p_phone:phone}),
   status: (org: string) => rpc<WorkspaceStatus>('pro_workspace_status',{p_org:org}),
-  async get(org: string, id: string): Promise<RealCase> {
-    const { data, error, status } = await supabase
-      .from("pro_real_cases").select("*").eq("organization_id", org).eq("id", id).abortSignal(AbortSignal.timeout(10000)).retry(false).single();
-    if (error) {
-      if (status === 401 || status === 403 || error.code === '42501' || error.code === 'PGRST116')
-        throw new Error('PRO_ACCESS_DENIED');
-      throw new Error('PRO_CONNECTION_ERROR');
-    }
-    if (!data) throw new Error('PRO_ACCESS_DENIED');
-    return data;
-  },
+  get: (org: string, id: string) => readCase<RealCase>(org, id, '*'),
+  getRevision: (org: string, id: string) =>
+    readCase<Pick<RealCase, 'revision' | 'archived_at'>>(org, id, 'revision,archived_at'),
   history: async (org: string, id: string, page = 0) => rpc<{rows:RealRevision[];total:number}>('pro_browse_case_history',{p_org:org,p_record:id,p_kind:'intakes',p_page:page}),
   plans: async (org: string, id: string, page = 0) => rpc<{rows:SavedRealPlan[];total:number}>('pro_browse_case_history',{p_org:org,p_record:id,p_kind:'plans',p_page:page}),
   save: (
@@ -63,16 +55,30 @@ export const realCaseApi = {
   savePlan: async (org: string, id: string, revision: number, draft: string, key: string) =>
     (await planRequest<{id: string}>({action:'save',org,record:id,revision,draft,key})).id,
 };
+async function readCase<T>(org: string, id: string, columns: string): Promise<T> {
+  const { data, error, status } = await supabase
+    .from('pro_real_cases').select(columns).eq('organization_id', org).eq('id', id)
+    .abortSignal(AbortSignal.timeout(10_000)).retry(false).single();
+  if (error) {
+    if (status === 401 || status === 403 || error.code === '42501' || error.code === 'PGRST116')
+      throw new Error('PRO_ACCESS_DENIED');
+    throw new Error('PRO_CONNECTION_ERROR');
+  }
+  if (!data) throw new Error('PRO_ACCESS_DENIED');
+  return data as T;
+}
+
 async function planRequest<T>(body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.auth.getSession();
   if (error || !data.session) throw new Error('PRO_AUTH_REQUIRED');
+  const signal = AbortSignal.timeout(60_000);
   let response: Response;
   try {
     response = await fetch('/api/pro-plan', {
       method:'POST', headers:{'Content-Type':'application/json',Authorization:`Bearer ${data.session.access_token}`},
-      body:JSON.stringify(body), signal:AbortSignal.timeout(60000),
+      body:JSON.stringify(body), signal,
     });
-  } catch { throw new Error('PRO_CONNECTION_ERROR'); }
+  } catch { throw new Error(signal.aborted ? 'PRO_REQUEST_TIMEOUT' : 'PRO_CONNECTION_ERROR'); }
   let value: {error?: string};
   try { value = await response.json(); } catch {
     throw new Error(response.status === 404 || response.ok ? 'PRO_API_NOT_DEPLOYED' : 'PRO_API_UNAVAILABLE');

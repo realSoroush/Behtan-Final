@@ -11,7 +11,7 @@ import { ProSubscription } from "./ProSubscription";
 import { PanelSelect } from "@/components/ui/PanelSelect";
 import { ArrowUpLeft, FolderHeart, LifeBuoy, LogOut, ShieldCheck, Sparkles, LayoutDashboard, CreditCard, Settings } from "lucide-react";
 import { ProServiceCheck } from './ProServiceCheck';
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { PhoneAuth } from "@/components/PhoneAuth";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
@@ -21,7 +21,7 @@ import {
   type ProMembership,
   type ProOrganization,
 } from "./contracts";
-import { RealCaseWorkspace } from "./RealCaseWorkspace";
+const RealCaseWorkspace = lazy(() => import("./RealCaseWorkspace").then(m => ({ default: m.RealCaseWorkspace })));
 const navigation = [
   {id:'overview',label:'نمای کلی',icon:LayoutDashboard},{id:'cases',label:'مراجعان',icon:FolderHeart},
   {id:'subscription',label:'اشتراک و ظرفیت',icon:CreditCard},
@@ -232,7 +232,7 @@ function Workspace({userId,phone,view,caseVisit,navigate,onDirty}:{userId:string
       {orgs.length > 0 && (
         <>
           {view==='overview'&&<StudioOverview key={selected} org={selected} navigate={navigate}/>}
-          <div hidden={!['cases','training','nutrition','history'].includes(view)}><RealCaseWorkspace key={selected+':'+caseVisit} org={selected} roles={roles} view={view} onDirty={markDirty}/></div>
+          <div hidden={!['cases','training','nutrition','history'].includes(view)}><Suspense fallback={<AppLoading label="در حال بازکردن پرونده‌ها…" />}><RealCaseWorkspace key={selected+':'+caseVisit} org={selected} roles={roles} view={view} onDirty={markDirty}/></Suspense></div>
           {view==='subscription'&&<section className="studio-subscription"><h2>اشتراک و ظرفیت</h2><ProSubscription key={selected} org={selected}/><details><summary>انتخاب یا ارتقای اشتراک</summary><ProOnboarding existing profile={profile} onComplete={()=>void load()}/></details></section>}
           {view==='settings'&&<section className="pro-panel studio-settings"><h2>حساب و تنظیمات</h2><dl><div><dt>فضای کاری</dt><dd>{orgs.find(o=>o.id===selected)?.name}</dd></div><div><dt>شماره حساب</dt><dd dir="ltr">{phone||'ثبت نشده'}</dd></div><div><dt>نقش شما</dt><dd>{roles.map(r=>({owner:'مالک',practitioner:'کارشناس',assistant:'دستیار'}[r])).join('، ')}</dd></div><div><dt>منطقه زمانی</dt><dd>تهران</dd></div></dl><div className="studio-row"><span>ظاهر روشن / تیره</span><ThemeToggle/></div><details><summary>ویرایش مشخصات حرفه‌ای و اطلاعات PDF</summary><SpecialistProfileForm key={JSON.stringify(profile)} initial={profile} editing onSaved={saved=>{setProfile(saved);setProfileNotice("مشخصات حرفه‌ای ذخیره شد.");}} /></details>{profileNotice&&<p role="status" className="pro-success">{profileNotice}</p>}<a className="pro-nav-link" href="https://t.me/Behtan_Support" target="_blank" rel="noopener noreferrer"><LifeBuoy size={18}/>راهنمای استفاده</a></section>}
 

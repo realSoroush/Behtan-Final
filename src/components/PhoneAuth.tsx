@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/hooks/useAuth';
 import { APP_LOGO_PATH, APP_NAME_FA } from '@/constants/brand';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import './onboarding/onboarding.css';
+import './auth/phoneAuth.css';
 import { normalizeOnboardingDigits } from '@/utils/onboardingExperience';
 import { TurnstileWidget } from '@/components/auth/TurnstileWidget';
 import { AUTH_CONFIG } from '@/config/authConfig';
+import { AuthServiceError } from '@/services/auth/types';
 
 type AuthStep = 'phone' | 'otp';
 
@@ -26,19 +27,25 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const [captchaError, setCaptchaError] = useState(false);
+  const sending = useRef(false);
   const handleCaptchaToken = useCallback((token: string | null) => {
     setCaptchaToken(token);
     if (token) setCaptchaError(false);
   }, []);
   const handleCaptchaError = useCallback(() => setCaptchaError(true), []);
+  const retryCaptcha = () => {
+    setCaptchaError(false);
+    setCaptchaResetKey(value => value + 1);
+  };
 
+  const coolingDown = resendSeconds > 0;
   useEffect(() => {
-    if (resendSeconds <= 0) return;
+    if (!coolingDown) return;
     const timer = window.setInterval(() => {
       setResendSeconds((value) => Math.max(0, value - 1));
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [resendSeconds]);
+  }, [coolingDown]);
 
   const handlePhoneChange = (value: string) => {
     setPhone(normalizeOnboardingDigits(value).replace(/[^\d\s\-+]/g, ''));
@@ -50,32 +57,35 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
     if (error) clearError();
   };
 
-  const handleStartAuth = async () => {
+  const sendCode = async (targetPhone: string) => {
+    if (coolingDown || loading || sending.current) return;
+    if (!captchaToken) { setCaptchaError(true); return; }
+    sending.current = true;
     clearError();
     try {
-      if (!captchaToken) {
-        setCaptchaError(true);
-        return;
-      }
-      const result = await beginPhoneAuth(phone, captchaToken);
+      const result = await beginPhoneAuth(targetPhone, captchaToken);
       setNormalizedPhone(result.normalizedPhone);
-
-      if (result.status === 'authenticated') {
-        // Root App observes the shared Supabase session and decides whether
-        // this user belongs in onboarding or Dashboard after profile hydration.
-        return;
+      if (result.status === 'otp_required') {
+        setOtp('');
+        setStep('otp');
+        setResendSeconds(AUTH_CONFIG.otp.resendSeconds);
       }
-
-      setOtp('');
-      setStep('otp');
-      setResendSeconds(AUTH_CONFIG.otp.resendSeconds);
-    } catch {
-      // useAuth owns the user-facing error message.
+    } catch (failure) {
+      if (failure instanceof AuthServiceError && (failure.code === 'rate_limited' || failure.code === 'request_timeout')) {
+        setResendSeconds(AUTH_CONFIG.otp.resendSeconds);
+        if (failure.code === 'request_timeout') {
+          setNormalizedPhone(targetPhone);
+          setStep('otp');
+        }
+      }
     } finally {
+      sending.current = false;
       setCaptchaToken(null);
-      setCaptchaResetKey((value) => value + 1);
+      setCaptchaResetKey(value => value + 1);
     }
   };
+
+  const handleStartAuth = () => sendCode(phone);
 
   const handleVerifyOtp = async () => {
     clearError();
@@ -87,24 +97,7 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
     }
   };
 
-  const handleResend = async () => {
-    if (resendSeconds > 0 || loading) return;
-    clearError();
-    try {
-      if (!captchaToken) {
-        setCaptchaError(true);
-        return;
-      }
-      const result = await beginPhoneAuth(normalizedPhone || phone, captchaToken);
-      setNormalizedPhone(result.normalizedPhone);
-      setResendSeconds(AUTH_CONFIG.otp.resendSeconds);
-    } catch {
-      // useAuth owns the user-facing error message.
-    } finally {
-      setCaptchaToken(null);
-      setCaptchaResetKey((value) => value + 1);
-    }
-  };
+  const handleResend = () => sendCode(normalizedPhone || phone);
 
   const handleChangePhone = () => {
     clearError();
@@ -128,10 +121,7 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
         </button>
       )}
       <div className="onboarding-auth-intro flex-1 flex flex-col items-center justify-center px-6 text-center pb-8">
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+        <div
           className="w-24 h-24 rounded-3xl flex items-center justify-center mb-6 shadow-xl shadow-primary-200 dark:shadow-primary-900/40 overflow-hidden"
         >
           <img
@@ -139,12 +129,9 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
             alt={`لوگوی ${APP_NAME_FA}`}
             className="w-full h-full object-contain"
           />
-        </motion.div>
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
+        <div
         >
           <h1 className="text-3xl font-extrabold text-neutral-900 dark:text-neutral-100">
             {APP_NAME_FA}
@@ -152,12 +139,9 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
           <p className="text-neutral-500 dark:text-neutral-400 mt-2 leading-relaxed text-sm">
             برنامه تغذیه هوشمند و شخصی‌سازی‌شده
           </p>
-        </motion.div>
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
+        <div
           className="flex flex-wrap justify-center gap-2 mt-6"
         >
           {['کالری و ماکروها', 'وعده‌های روزانه', 'جایگزینی غذا'].map((feature) => (
@@ -168,14 +152,11 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
               {feature}
             </span>
           ))}
-        </motion.div>
+        </div>
       </div>
 
-      <motion.div
-        initial={{ y: 40, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.2, type: 'spring', stiffness: 200, damping: 25 }}
-        className="onboarding-auth-panel bg-white dark:bg-neutral-900 rounded-t-3xl px-6 pt-8 pb-10 border-t border-neutral-100 dark:border-neutral-800 shadow-2xl shadow-black/5"
+      <div
+        className="phone-auth-card onboarding-auth-panel bg-white dark:bg-neutral-900 rounded-t-3xl px-6 pt-8 pb-10 border-t border-neutral-100 dark:border-neutral-800 shadow-2xl shadow-black/5"
       >
         <h2 className="text-xl font-bold text-neutral-900 dark:text-neutral-100 mb-1">
           {step === 'phone' ? 'ورود به برنامه' : 'تأیید شماره موبایل'}
@@ -184,7 +165,7 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
         <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-6 leading-relaxed">
           {step === 'phone'
             ? 'شماره موبایل خود را وارد کنید تا کد تأیید یک‌بارمصرف برایتان ارسال شود.'
-            : `کد ۶ رقمی ارسال‌شده به ${normalizedPhone || phone} را وارد کنید.`}
+            : `کد ۶ رقمی شمارهٔ ${normalizedPhone || phone} را وارد کنید.`}
         </p>
 
         {step === 'phone' ? (
@@ -261,25 +242,26 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
             onError={handleCaptchaError}
           />
           {captchaError && !captchaToken && (
-            <p className="mt-1 text-xs leading-6 text-red-600 dark:text-red-400">
-              تأیید امنیتی آماده نیست. اتصال اینترنت و تنظیمات امنیتی سایت را بررسی کنید.
-            </p>
+            <button type="button" className="mt-1 text-sm underline" onClick={retryCaptcha}>
+              بارگذاری دوبارهٔ تأیید امنیتی
+            </button>
           )}
         </div>
 
         {error && (
-          <motion.div
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-start gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl px-4 py-3 mb-4"
+          <div role="alert"
+            className="phone-auth-error flex items-start gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl px-4 py-3 mb-4"
           >
             <span className="text-red-500 text-base flex-shrink-0 mt-0.5">⚠️</span>
             <p className="text-sm text-red-600 dark:text-red-400 leading-relaxed">{error}</p>
-          </motion.div>
+          </div>
         )}
 
+        {step === 'phone' && coolingDown && (
+          <p role="status" className="mb-2 text-sm">تلاش دوباره پس از {resendSeconds.toLocaleString('fa-IR')} ثانیه</p>
+        )}
         {step === 'phone' ? (
-          <Button onClick={handleStartAuth} loading={loading} disabled={!phone.trim() || !captchaToken}>
+          <Button onClick={handleStartAuth} loading={loading} disabled={!phone.trim() || !captchaToken || coolingDown}>
             {loading ? 'در حال ارسال...' : 'ارسال کد تأیید ←'}
           </Button>
         ) : (
@@ -312,7 +294,7 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
         <p className="text-xs text-center text-neutral-400 dark:text-neutral-600 mt-5 leading-relaxed">
           ورود به حساب فقط پس از تأیید مالکیت شماره موبایل انجام می‌شود.
         </p>
-      </motion.div>
+      </div>
     </div>
   );
 }

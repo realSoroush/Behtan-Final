@@ -1,12 +1,20 @@
 import { randomUUID } from 'node:crypto';
 import { proHealth } from './proHealth.ts';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { ProServerError, processPlanRequest, type PlanDependencies } from './proPlanService.ts';
+import { ProServerError, processPlanRequest, type PlanDependencies, type PlanPhase } from './proPlanService.ts';
 import { supabasePlanDependencies } from './proPlanSupabase.ts';
 export function createPlanHandler(dependencies: () => PlanDependencies = supabasePlanDependencies, health = proHealth) {
   return async (req: IncomingMessage & { body?: unknown }, res: ServerResponse) => {
     const requestId=randomUUID(),started=Date.now();
     let deps:PlanDependencies|undefined,actor:string|undefined,body:unknown;
+    let operation: 'generate' | 'catalog' | 'save' | undefined;
+    let menuCount: number | undefined;
+    let catalogCacheHit: boolean | undefined;
+    const timing: Partial<Record<PlanPhase, number>> = {};
+    const responseTiming = () => {
+      const phases = Object.entries(timing).map(([name, ms]) => `${name};dur=${ms}`);
+      res.setHeader('Server-Timing', [...phases, `total;dur=${Date.now()-started}`].join(', '));
+    };
     res.setHeader('X-Request-Id',requestId);
     res.setHeader('Cache-Control','no-store');
     res.setHeader('Referrer-Policy','no-referrer');
@@ -40,10 +48,21 @@ export function createPlanHandler(dependencies: () => PlanDependencies = supabas
         if (Buffer.byteLength(body) > 8192) throw new ProServerError('PRO_REQUEST_TOO_LARGE',413);
         try { body = JSON.parse(body); } catch { throw new ProServerError('PRO_INVALID_REQUEST'); }
       } else if (Buffer.byteLength(JSON.stringify(body) ?? '') > 8192) throw new ProServerError('PRO_REQUEST_TOO_LARGE',413);
+      const payload = body as Record<string, unknown> | null;
+      if (payload?.action === 'generate' || payload?.action === 'catalog' || payload?.action === 'save') operation = payload.action;
+      if (operation === 'generate' && typeof payload?.count === 'number' && Number.isInteger(payload.count) && payload.count >= 1 && payload.count <= 5) menuCount = payload.count;
       deps=dependencies();
       const originalVerify=deps.verifyToken;
       const requestDeps={...deps,verifyToken:async(token:string)=>{actor=await originalVerify(token);return actor;}};
-      const result = await processPlanRequest(body, auth.slice(7), requestDeps);
+      const result = await processPlanRequest(body, auth.slice(7), requestDeps, (phase, duration, details) => {
+        timing[phase] = duration;
+        if (phase === 'catalog') catalogCacheHit = details?.cacheHit;
+      });
+      responseTiming();
+      if (operation === 'generate') console.info(JSON.stringify({
+        event:'pro_plan_generated', request_id:requestId, menus:menuCount,
+        replayed:timing.solve === undefined, duration_ms:Date.now()-started, phases_ms:timing, catalog_cache_hit:catalogCacheHit,
+      }));
       res.statusCode = 200; res.end(JSON.stringify(result));
     } catch (e) {
       const code=e instanceof ProServerError?e.code:'PRO_CONNECTION_ERROR';
@@ -52,7 +71,8 @@ export function createPlanHandler(dependencies: () => PlanDependencies = supabas
         try {await deps.reportFailure({id:requestId,actor,org:b.org,operation:b.action,code});}catch{/* Logging must not change the original result. */}
       }
       // Metadata only. Never log the request, JWT, profile, notes or raw error.
-      console.error(JSON.stringify({event:'pro_request_failed',request_id:requestId,code,duration_ms:Date.now()-started}));
+      console.error(JSON.stringify({event:'pro_request_failed',request_id:requestId,code,duration_ms:Date.now()-started,operation,menus:menuCount,phases_ms:timing,catalog_cache_hit:catalogCacheHit}));
+      responseTiming();
       res.statusCode = e instanceof ProServerError ? e.status : 503;
       res.end(JSON.stringify({ error:e instanceof ProServerError ? e.code : 'PRO_CONNECTION_ERROR' }));
     }
