@@ -34,6 +34,7 @@
     "test:routing": "node scripts/routing-stability.smoke-test.mjs",
     "test:protein": "node --experimental-strip-types scripts/protein-engine-v3.smoke-test.mjs",
     "test:protein-policy": "node --experimental-strip-types scripts/protein-policy-supabase.smoke-test.mjs",
+    "review:protein-policy": "node --experimental-strip-types scripts/review-protein-policy.mjs",
     "test:protein-range": "node --experimental-strip-types scripts/protein-minimum-preferred.smoke-test.mjs",
     "test:protein-budget": "node --experimental-strip-types scripts/protein-budget-preference.smoke-test.mjs",
     "test:meal-progress": "node --experimental-strip-types scripts/daily-meal-progress.smoke-test.mjs",
