@@ -56,8 +56,9 @@ export interface ProteinEnginePolicyRow {
   updated_at?: string | null;
 }
 
-function numeric(value: number | string, field: string): number {
-  const parsed = typeof value === 'number' ? value : Number(value);
+function numeric(value: unknown, field: string): number {
+  const decimal = typeof value === 'string' && /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(value.trim());
+  const parsed = typeof value === 'number' || decimal ? Number(value) : NaN;
   if (!Number.isFinite(parsed)) {
     throw new Error(`[proteinPolicy] ${field} must be numeric.`);
   }

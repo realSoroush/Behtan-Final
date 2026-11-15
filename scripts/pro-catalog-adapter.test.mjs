@@ -85,7 +85,9 @@ const policy = {
 
 const actor=randomUUID(),org=randomUUID(),record=randomUUID();
 const answers={display_name:'Adapter fixture',phone:'',gender:'female',birth_date:'1992-04-23',height_cm:165,weight_kg:75,goal:'weight_loss',activity_level:'sedentary',workout_days:0,training_type:'none',protein_budget:'economic',vegetarian_status:'none',allergies:[],medical_conditions:[],pregnancy_status:'not_pregnant',eating_disorder_status:'none',medications_present:false,injuries_present:false,safety_confirmed:true,screening_version:1};
-const originalFetch=globalThis.fetch,environment={...process.env};let permitted=true,credential=true,missingPolicy=false,writable=true,nutrition=true,referenceReads=0,stageCalls=0;
+const originalFetch=globalThis.fetch,environment={...process.env};
+let permitted=true,credential=true,writable=true,nutrition=true,referenceReads=0,stageCalls=0;
+let policyRow=policy,legacyPrepare=false;
 let catalogRevision='12';
 const knownRevisions=[];
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json'}});
@@ -96,6 +98,16 @@ try{
  if(name==='user')return json({id:actor,phone:'989000000000',phone_confirmed_at:'2026-01-01',app_metadata:{},user_metadata:{},aud:'authenticated',created_at:'2026-01-01'});
  if(name==='pro_real_cases'){assert.equal(headers.get('Authorization'),'Bearer fixture-user');return permitted?json({answers,revision:1,archived_at:null}):json({code:'PGRST116',message:'not found'},406);}
  if(name==='pro_workspace_status')return json({can_write:writable,modules:{nutrition}});
+ if(name==='pro_prepare_server_plan'){
+  assert.equal(headers.get('Authorization'),'Bearer server-fixture');
+  const input=JSON.parse(init.body);
+  assert.deepEqual([input.p_actor,input.p_org,input.p_record,input.p_revision],[actor,org,record,1]);
+  if(legacyPrepare)return json({code:'PGRST202',message:'Function unavailable'},404);
+  if(!permitted)return json({code:'42501',message:'PRO_ACCESS_DENIED'},403);
+  if(!writable)return json({code:'P0001',message:'PRO_SUBSCRIPTION_EXPIRED'},400);
+  if(!nutrition)return json({code:'P0001',message:'PRO_MODULE_DISABLED'},400);
+  return json({answers,revision:1});
+ }
  if(name==='pro_stage_server_plan'){stageCalls++;return json({draft_id:randomUUID(),plan:JSON.parse(init.body).p_plan});}
  referenceReads++;assert.equal(headers.get('apikey'),'server-fixture','Pro reference reads must not use B2C user credentials');
  if(!credential)return json({code:'42501',message:'permission denied'},403);
@@ -105,15 +117,26 @@ try{
  if (known===catalogRevision) return json({schema_version:1,revision:catalogRevision});
  return json({schema_version:1,revision:catalogRevision,food_rows:foods,
    substitute_rows:f.FOOD_SUBSTITUTES.flatMap(g=>g.substituteIds.map(id=>({food_item_id:g.foodItemId,substitute_food_item_id:id,is_active:true}))),
-   template_rows:templates,slot_rows:slots,policy_row:missingPolicy?null:policy});
+   template_rows:templates,slot_rows:slots,policy_row:policyRow});
  };
  const body={action:'generate',org,record,revision:1,key:randomUUID(),date:'2026-10-26',count:1,notes:''};
  const result=await processPlanRequest(body,'fixture-user',supabasePlanDependencies());assert(result.plan.days.length);assert.equal(stageCalls,1);
  const catalog=await processPlanRequest({action:'catalog',org,record,revision:1,key:randomUUID()},'fixture-user',supabasePlanDependencies());assert.equal(catalog.foods.length,foods.length);
- permitted=false;const before=referenceReads;await assert.rejects(()=>processPlanRequest(body,'fixture-user',supabasePlanDependencies()),e=>e.code==='PRO_ACCESS_DENIED');assert.equal(referenceReads,before,'denied case never reads reference data');permitted=true;
+ permitted=false;const before=referenceReads;
+ await assert.rejects(()=>processPlanRequest(body,'fixture-user',supabasePlanDependencies()),e=>e.code==='PRO_ACCESS_DENIED');
+ legacyPrepare=true;
+ await assert.rejects(()=>processPlanRequest(body,'fixture-user',supabasePlanDependencies()),e=>e.code==='PRO_ACCESS_DENIED');
+ assert.equal(referenceReads,before,'denied case never reads reference data');
+ legacyPrepare=false;permitted=true;
  writable=false;let reads=referenceReads;await assert.rejects(()=>processPlanRequest(body,'fixture-user',supabasePlanDependencies()),e=>e.code==='PRO_SUBSCRIPTION_EXPIRED');assert.equal(referenceReads,reads);writable=true;
  nutrition=false;await assert.rejects(()=>processPlanRequest(body,'fixture-user',supabasePlanDependencies()),e=>e.code==='PRO_MODULE_DISABLED');assert.equal(referenceReads,reads);nutrition=true;
- missingPolicy=true;await assert.rejects(()=>processPlanRequest(body,'fixture-user',supabasePlanDependencies()),e=>e.code==='PRO_CATALOG_UNAVAILABLE');missingPolicy=false;
+ catalogRevision='13';
+ for(const invalid of [null,{...policy,excess_weight_fraction:null}]){
+  policyRow=invalid;
+  await assert.rejects(()=>processPlanRequest(body,'fixture-user',supabasePlanDependencies()),e=>e.code==='PRO_CATALOG_UNAVAILABLE');
+ }
+ assert.equal(stageCalls,1,'A missing or invalid policy must not stage a new draft');
+ policyRow=policy;catalogRevision='12';
  credential=false;await assert.rejects(()=>processPlanRequest(body,'fixture-user',supabasePlanDependencies()),e=>e.code==='PRO_SERVER_CREDENTIAL_INVALID');
  credential=true;
  knownRevisions.length=0;
@@ -127,6 +150,9 @@ try{
  assert.equal(updated.revision,'13');
  assert.notEqual(await loadMemberCatalog('second-project'),updated);
  assert.deepEqual(knownRevisions,[null,'12','12',null]);
+ catalogRevision='14';
+ policyRow={...policy,excess_weight_fraction:null};
+ await assert.rejects(()=>loadMemberCatalog('second-project'),e=>e.code==='NUTRITION_CONTEXT_INVALID');
  console.log('PASS warm member catalog: conditional revision RPC, revision rollover and source isolation');
- console.log('PASS real Supabase SDK adapter: Pro-only generation and catalog, user JWT case isolation, no reference reads after denial, missing policy and invalid server key classified correctly');
+ console.log('PASS Supabase SDK adapter: Pro 057 preflight and legacy fallback, no catalog read after denial, invalid policy blocks Pro drafts and member context, credential errors classified');
 }finally{globalThis.fetch=originalFetch;for(const key of Object.keys(process.env))if(!(key in environment))delete process.env[key];Object.assign(process.env,environment);}

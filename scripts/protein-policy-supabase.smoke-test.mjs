@@ -1,4 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { deepEqual, throws } from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -16,7 +19,7 @@ const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
-const custom = buildProteinEnginePolicy({
+const customRow = {
   id: 'default',
   maintenance_no_rt_min: 1.15,
   maintenance_rt_min: 1.35,
@@ -40,7 +43,19 @@ const custom = buildProteinEnginePolicy({
   max_protein_calorie_fraction: 0.30,
   fat_calorie_fraction: 0.28,
   updated_at: '2026-09-05T00:00:00Z',
-});
+};
+const custom = buildProteinEnginePolicy(customRow);
+
+for (const field of ['budget_economic_position', 'excess_weight_fraction']) {
+  for (const value of [null, false, true, '', '  ', [], [0], '0x0', NaN, Infinity]) {
+    throws(() => buildProteinEnginePolicy({ ...customRow, [field]: value }), /must be numeric/);
+  }
+}
+deepEqual(buildProteinEnginePolicy({
+  ...customRow,
+  budget_economic_position: '0.10',
+  excess_weight_fraction: '3e-1',
+}), custom);
 
 assert(Math.abs(resolveProteinFactorGPerKg('weight_loss', 'resistance', custom) - 1.835) < 0.001, 'Runtime RT factor/budget position not applied');
 assert(Math.abs(resolveProteinFactorGPerKg('maintenance', 'cardio', custom) - 1.34) < 0.001, 'Runtime no-RT factor/budget position not applied');
@@ -91,6 +106,31 @@ assert(invalidRejected, 'Invalid runtime policy must fail validation');
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
+const reviewDirectory = mkdtempSync(resolve(tmpdir(), 'behtan-protein-review-'));
+try {
+  const candidateFile = resolve(reviewDirectory, 'candidate.json');
+  writeFileSync(candidateFile, JSON.stringify(customRow));
+  const review = (...options) => JSON.parse(execFileSync(process.execPath, [
+    '--experimental-strip-types', resolve(here, 'review-protein-policy.mjs'), ...options,
+  ], { encoding: 'utf8' }));
+  const paired = review('--candidate', candidateFile);
+  assert(paired.baseline.source === 'repository_default' && paired.candidate.updatedAt === customRow.updated_at,
+    'Report must distinguish the checked-in baseline from a file');
+  deepEqual([...new Set(paired.boundaries.map(boundary => boundary.thresholdBmi))], [30, 32]);
+  const observedDrop = paired.boundaries.find(boundary =>
+    boundary.heightCm === 178 && boundary.scenario === 'loss-resistance' && boundary.thresholdBmi === 30);
+  // Record the current baseline for E07 review. Update the expectation when a revised curve ships.
+  deepEqual([observedDrop.belowKg, observedDrop.aboveKg, observedDrop.baseline.proteinDeltaGrams], [95, 95.1, -19]);
+  deepEqual([observedDrop.candidate.below.referenceWeightKg, observedDrop.candidate.above.referenceWeightKg], [95, 95.1],
+    'Both policies must be evaluated at the same weights');
+  const fromFile = review('--baseline', candidateFile);
+  deepEqual(fromFile.baseline, paired.candidate);
+  assert(fromFile.candidate === null && fromFile.boundaries.every(boundary => boundary.thresholdBmi === 32),
+    'A file baseline must use its own threshold without creating a candidate');
+} finally {
+  rmSync(reviewDirectory, { recursive: true, force: true });
+}
+
 const migration = readFileSync(
   resolve(root, 'supabase/migrations/20260905_008_protein_engine_runtime_policy.sql'),
   'utf8'
