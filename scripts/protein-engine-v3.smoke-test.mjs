@@ -8,6 +8,7 @@ import {
   resolveProteinFactorRangeGPerKg,
 } from '../src/utils/nutritionHelpers.ts';
 import { generateDailyMealPlan, MealPlanFeasibilityError } from '../src/utils/mealPlanEngine.ts';
+import { DEFAULT_PROTEIN_ENGINE_POLICY } from '../src/utils/proteinPolicy.ts';
 
 installTestNutritionCatalog();
 
@@ -57,8 +58,8 @@ assert(Math.abs(lossRt125.proteinGrams - 195) <= 1, `125kg loss+RT should be ~19
 const lossNoRt125 = calculateMacros(2600, 125, 'weight_loss', 178, 'cardio');
 assert(Math.abs(lossNoRt125.proteinGrams - 156) <= 1, `125kg loss no-RT should be ~156g, got ${lossNoRt125.proteinGrams}`);
 
-const lowCalHighProtein = calculateMacros(1500, 100, 'weight_loss', 175, 'resistance');
-assert(lowCalHighProtein.proteinCal <= 1500 * 0.35 + 4, '35% protein calorie cap failed');
+const lowCalHighProtein = calculateMacros(1504, 100, 'weight_loss', 175, 'resistance');
+assert(lowCalHighProtein.proteinGrams === 131, 'A fractional calorie cap must not round up');
 assert(lowCalHighProtein.proteinGrams <= 220, '220g absolute protein cap failed');
 assert(lowCalHighProtein.carbGrams >= 0 && lowCalHighProtein.fatGrams > 0, 'Macro redistribution produced invalid carbs/fat');
 
@@ -71,7 +72,7 @@ assert(Math.abs(sameCaloriesRt.fatGrams - sameCaloriesNoRt.fatGrams) <= 1, 'Prot
 // ---------------------------------------------------------------------------
 // 4) Full trace must explain the protein prescription
 // ---------------------------------------------------------------------------
-const traced = calculateFullNutritionPlanWithTrace({
+const traceInput = {
   weightKg: 125,
   heightCm: 178,
   birthDateISO: '2002-01-15',
@@ -82,7 +83,8 @@ const traced = calculateFullNutritionPlanWithTrace({
   trainingType: 'resistance',
   isWorkoutDay: false,
   referenceDate: new Date('2026-09-04T12:00:00Z'),
-});
+};
+const traced = calculateFullNutritionPlanWithTrace(traceInput);
 assert(traced.trace.resistanceTrainingUsedForProtein === true, 'Trace lost RT flag');
 assert(traced.trace.proteinMinimumFactorGPerKg === 1.6, 'Trace minimum protein factor mismatch');
 assert(traced.trace.proteinPreferredFactorGPerKg === 2.0, 'Trace preferred protein factor mismatch');
@@ -91,6 +93,23 @@ assert(Math.abs(traced.trace.proteinMinimumTargetGrams - 156) <= 1, 'Trace minim
 assert(Math.abs(traced.trace.proteinPreferredTargetGrams - 195) <= 1, 'Trace preferred protein target mismatch');
 assert(Math.abs(traced.trace.proteinReferenceWeightKg - 97.5) <= 0.2, 'Trace reference weight mismatch');
 assert(traced.trace.finalProteinTargetGrams === traced.targets.proteinGrams, 'Trace final protein mismatch');
+
+const policy = DEFAULT_PROTEIN_ENGINE_POLICY;
+const justBelowTarget = calculateFullNutritionPlanWithTrace({
+  ...traceInput, proteinPolicy: { ...policy, maxProteinGramsPerDay: 194.8 },
+});
+assert(justBelowTarget.targets.proteinGrams === 194, 'Fractional gram cap must not round up');
+assert(justBelowTarget.trace.proteinCappedByAbsoluteLimit && !justBelowTarget.trace.proteinCappedByCalories,
+  'Trace must identify the effective cap even when raw protein exceeds it by less than half a gram');
+const caloriePolicy = { ...policy, maxProteinCalorieFraction: .1, maxProteinGramsPerDay: 160 };
+const calorieBound = calculateFullNutritionPlanWithTrace({ ...traceInput, proteinPolicy: caloriePolicy });
+assert(calorieBound.trace.proteinCappedByCalories && !calorieBound.trace.proteinCappedByAbsoluteLimit,
+  'Only the binding cap should be reported when both can reduce the raw value');
+const tied = calculateFullNutritionPlanWithTrace({
+  ...traceInput, proteinPolicy: { ...caloriePolicy, maxProteinGramsPerDay: calorieBound.targets.proteinGrams },
+});
+assert(tied.trace.proteinCappedByCalories && tied.trace.proteinCappedByAbsoluteLimit,
+  'Both caps should be reported if they produce the same effective gram limit');
 
 // ---------------------------------------------------------------------------
 // 5) Meal-template protein audit under the higher RT targets

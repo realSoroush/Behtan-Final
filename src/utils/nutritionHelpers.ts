@@ -380,16 +380,16 @@ export function calculateMacros(
     proteinPolicy,
     proteinBudgetPreference
   );
-  const rawProteinGrams = referenceWeightKg * proteinFactor;
-  const calorieLimitedProteinGrams =
-    (targetCalories * proteinPolicy.maxProteinCalorieFraction) / KCAL_PER_GRAM_PROTEIN;
+  return allocateMacros(targetCalories, referenceWeightKg * proteinFactor, proteinPolicy).targets;
+}
 
-  const proteinGrams = Math.max(
-    1,
-    Math.round(
-      Math.min(rawProteinGrams, calorieLimitedProteinGrams, proteinPolicy.maxProteinGramsPerDay)
-    )
+function allocateMacros(targetCalories: number, rawProteinGrams: number, proteinPolicy: ProteinEnginePolicy) {
+  const calorieCap = Math.floor(
+    (targetCalories * proteinPolicy.maxProteinCalorieFraction) / KCAL_PER_GRAM_PROTEIN
   );
+  const absoluteCap = Math.floor(proteinPolicy.maxProteinGramsPerDay);
+  const uncappedProteinGrams = Math.max(1, Math.round(rawProteinGrams));
+  const proteinGrams = Math.min(uncappedProteinGrams, calorieCap, absoluteCap);
   const proteinCal = proteinGrams * KCAL_PER_GRAM_PROTEIN;
 
   // Keep fat close to 25%, but make sure protein + fat cannot consume the
@@ -409,13 +409,10 @@ export function calculateMacros(
   const carbCal = carbGrams * KCAL_PER_GRAM_CARB;
 
   return {
-    targetCalories,
-    proteinGrams,
-    fatGrams,
-    carbGrams,
-    proteinCal,
-    fatCal,
-    carbCal,
+    targets: { targetCalories, proteinGrams, fatGrams, carbGrams, proteinCal, fatCal, carbCal },
+    // More than one cap can bind when they allow the same whole-gram target.
+    proteinCappedByCalories: proteinGrams < uncappedProteinGrams && proteinGrams === calorieCap,
+    proteinCappedByAbsoluteLimit: proteinGrams < uncappedProteinGrams && proteinGrams === absoluteCap,
   };
 }
 
@@ -552,17 +549,8 @@ export function calculateFullNutritionPlanWithTrace(
   const proteinMinimumTargetRaw = proteinReferenceWeight * proteinFactorRange.minimum;
   const proteinPreferredTargetRaw = proteinReferenceWeight * proteinFactorRange.preferred;
   const rawProteinTargetGrams = proteinReferenceWeight * proteinFactorGPerKg;
-  const calorieProteinCapGrams =
-    (targetCalories * proteinPolicy.maxProteinCalorieFraction) / KCAL_PER_GRAM_PROTEIN;
-  const targets = calculateMacros(
-    targetCalories,
-    input.weightKg,
-    input.goal,
-    input.heightCm,
-    input.trainingType,
-    proteinPolicy,
-    proteinBudgetPreference
-  );
+  const { targets, proteinCappedByCalories, proteinCappedByAbsoluteLimit } =
+    allocateMacros(targetCalories, rawProteinTargetGrams, proteinPolicy);
   return {
     targets,
     trace: {
@@ -602,8 +590,8 @@ export function calculateFullNutritionPlanWithTrace(
       rawProteinTargetGrams: Number(rawProteinTargetGrams.toFixed(1)),
       finalProteinTargetGrams: targets.proteinGrams,
       proteinCalorieShare: Number((targets.proteinCal / Math.max(1, targetCalories)).toFixed(3)),
-      proteinCappedByCalories: rawProteinTargetGrams > calorieProteinCapGrams + 0.5,
-      proteinCappedByAbsoluteLimit: rawProteinTargetGrams > proteinPolicy.maxProteinGramsPerDay + 0.5,
+      proteinCappedByCalories,
+      proteinCappedByAbsoluteLimit,
     },
   };
 }

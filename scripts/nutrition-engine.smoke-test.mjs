@@ -51,7 +51,7 @@ for (const kcal of [1200, 1371, 1640, 1800, 2200, 3000, 4000, 5800]) {
       );
       assert(macros.proteinGrams <= 220, `Protein absolute cap exceeded: ${macros.proteinGrams}g`);
       assert(
-        macros.proteinCal <= macros.targetCalories * 0.35 + 4,
+        macros.proteinCal <= macros.targetCalories * 0.35,
         `Protein calorie share exceeded 35%: ${JSON.stringify(macros)}`
       );
       assert(macros.fatGrams > 0 && macros.carbGrams >= 0, 'Negative/zero macro invariant failed');
