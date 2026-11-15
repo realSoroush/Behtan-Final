@@ -1,4 +1,3 @@
-import { pilotTimingsEnabled, recordPilotTiming } from '@/utils/pilotTimings';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -29,8 +28,6 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const [captchaError, setCaptchaError] = useState(false);
   const sending = useRef(false);
-  const smsStarted = useRef<number>();
-  const [smsMarked, setSmsMarked] = useState(false);
   const handleCaptchaToken = useCallback((token: string | null) => {
     setCaptchaToken(token);
     if (token) setCaptchaError(false);
@@ -64,8 +61,6 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
     if (coolingDown || loading || sending.current) return;
     if (!captchaToken) { setCaptchaError(true); return; }
     sending.current = true;
-    smsStarted.current = pilotTimingsEnabled() ? performance.now() : undefined;
-    setSmsMarked(false);
     clearError();
     try {
       const result = await beginPhoneAuth(targetPhone, captchaToken);
@@ -103,13 +98,6 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
   };
 
   const handleResend = () => sendCode(normalizedPhone || phone);
-
-  const markSmsSeen = () => {
-    if (smsStarted.current === undefined) return;
-    recordPilotTiming({ event: 'sms_seen', elapsed_ms: performance.now() - smsStarted.current, status: 'ok' });
-    smsStarted.current = undefined;
-    setSmsMarked(true);
-  };
 
   const handleChangePhone = () => {
     clearError();
@@ -278,11 +266,6 @@ export function PhoneAuth({ onBack }: PhoneAuthProps) {
           </Button>
         ) : (
           <>
-            {pilotTimingsEnabled() && (
-              <button type="button" disabled={smsMarked} className="mb-3 block text-sm underline" onClick={markSmsSeen}>
-                {smsMarked ? 'زمان مشاهدهٔ پیامک ثبت شد' : 'پیامک رسید'}
-              </button>
-            )}
             <Button onClick={handleVerifyOtp} loading={loading} disabled={otp.length !== 6}>
               {loading ? 'در حال تأیید...' : 'تأیید و ورود ←'}
             </Button>

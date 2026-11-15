@@ -2,7 +2,7 @@ const phases = ['auth', 'case', 'catalog', 'solve', 'stage', 'publish', 'total']
 type TimingPhase = typeof phases[number];
 
 type PilotSample =
-  | { event: 'otp_send' | 'sms_seen'; elapsed_ms: number; status: 'ok' | 'failed'; code?: string }
+  | { event: 'otp_send'; elapsed_ms: number; status: 'ok' | 'failed'; code?: string }
   | { event: 'generate'; elapsed_ms: number; status: number; menus: number; request_id?: string; phases_ms?: Partial<Record<TimingPhase, number>> };
 
 const samples: (PilotSample & { at: string })[] = [];

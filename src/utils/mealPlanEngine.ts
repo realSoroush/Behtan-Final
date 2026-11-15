@@ -393,6 +393,10 @@ function resolveTemplate(engine: EngineCatalog, template: MealTemplate, slotTarg
   if (candidateSets.some(candidates => !candidates.length)) {
     throw new Error(`[mealPlanEngine] Could not resolve template ${template.id}`);
   }
+  const servings = candidateSets.map((units, index) => units.map(amount => ({
+    component: componentFromUnits(foods[index], amount),
+    penalty: portionRealismPenalty(engine, foods[index], amount),
+  })));
 
   type Bounds = { min: MacroVector; max: MacroVector };
   const remainingBounds: Bounds[] = Array.from({ length: foods.length + 1 }, () => ({
@@ -404,7 +408,7 @@ function resolveTemplate(engine: EngineCatalog, template: MealTemplate, slotTarg
   // available. This lets the beam keep states that can still reach the target
   // instead of greedily preferring whichever food appears first.
   for (let i = foods.length - 1; i >= 0; i--) {
-    const components = candidateSets[i].map((units) => componentFromUnits(foods[i], units));
+    const components = servings[i].map(serving => serving.component);
     const minComp: MacroVector = {
       kcal: Math.min(...components.map((c) => c.kcal)),
       protein: Math.min(...components.map((c) => c.protein)),
@@ -455,6 +459,7 @@ function resolveTemplate(engine: EngineCatalog, template: MealTemplate, slotTarg
     totals: MacroVector;
     grams: number;
     realismPenalty: number;
+    rank: number;
   };
   const BEAM_WIDTH = 120;
   const hardMealMass = mealMassLimitGrams(template.slot, slotTargets.kcal);
@@ -463,39 +468,39 @@ function resolveTemplate(engine: EngineCatalog, template: MealTemplate, slotTarg
     totals: { kcal: 0, protein: 0, carbs: 0, fat: 0 },
     grams: 0,
     realismPenalty: 0,
+    rank: 0,
   }];
 
   for (let index = 0; index < foods.length; index++) {
-    const food = foods[index];
     const expanded: BeamState[] = [];
+    const remaining = remainingBounds[index + 1];
+    const complete = index === foods.length - 1;
 
     for (const state of beam) {
-      for (const units of candidateSets[index]) {
-        const component = componentFromUnits(food, units);
+      for (const { component, penalty } of servings[index]) {
         const totals = addTotals(state.totals, component);
         const grams = state.grams + component.grams;
 
         // Remaining components only add calories and mass; branches already far
         // above either hard boundary cannot recover.
-        if (totals.kcal > slotTargets.kcal * 1.35 && index < foods.length - 1) continue;
-        const complete = index === foods.length - 1;
-        if (grams > hardMealMass || !isPracticalMeal(template.slot, [...state.components, component], complete)) continue;
+        if (totals.kcal > slotTargets.kcal * 1.35 && !complete) continue;
+        if (grams > hardMealMass) continue;
         if (complete && !fitsMealProtein(template.slot, totals.protein, slotTargets.protein)) continue;
 
+        const components = [...state.components, component];
+        if (!isPracticalMeal(template.slot, components, complete)) continue;
+        const realismPenalty = state.realismPenalty + penalty;
         expanded.push({
-          components: [...state.components, component],
+          components,
           totals,
           grams,
-          realismPenalty: state.realismPenalty + portionRealismPenalty(engine, food, units),
+          realismPenalty,
+          rank: lowerBoundScore(totals, remaining) + realismPenalty,
         });
       }
     }
 
-    const remaining = remainingBounds[index + 1];
-    expanded.sort((a, b) =>
-      (lowerBoundScore(a.totals, remaining) + a.realismPenalty) -
-      (lowerBoundScore(b.totals, remaining) + b.realismPenalty)
-    );
+    expanded.sort((a, b) => a.rank - b.rank);
     beam = expanded.slice(0, BEAM_WIDTH);
   }
 
@@ -1591,7 +1596,9 @@ function professionalCalorieCeiling(base:Meal,daily?:MacroTargets,referenceDayCa
  * protein-first score. Original fixed ingredients and serving caps stay fixed. */
 function fitProfessionalMeal(engine:EngineCatalog, meal:Meal, reference:Meal, daily:MacroTargets, limits?:{min:number[];max:number[]},ceiling=professionalCalorieCeiling(reference,daily)):Meal {
   const template=engine.templatesById.get(meal.templateId.split('~')[0]);
-  const target=menuNutrients.map((k,i)=>limits?(limits.min[i]<=limits.max[i]?Math.max(limits.min[i],Math.min(limits.max[i],reference[k])):(limits.min[i]+limits.max[i])/2):reference[k]),scale=menuTargetVector(daily);
+  const target=menuNutrients.map((k,i)=>limits?(limits.min[i]<=limits.max[i]?Math.max(limits.min[i],Math.min(limits.max[i],reference[k])):(limits.min[i]+limits.max[i])/2):reference[k]);
+  const scale=menuTargetVector(daily).map(value => Math.max(1, value));
+  const massLimit=mealMassLimitGrams(meal.slot,Math.max(reference.totalKcal,getSlotTargets(meal.slot,daily).kcal));
   const candidates=meal.components.map((c,index)=>{
     if(template&&fixedPortion(template,index,c.foodItem.id)!==undefined)return[c];
     const rule=portionRuleFor(engine,c.foodItem);
@@ -1601,20 +1608,28 @@ function fitProfessionalMeal(engine:EngineCatalog, meal:Meal, reference:Meal, da
     const nutrient=(['kcal','protein','carbs','fat'] as const)[k];
     return {min:candidates.slice(index+1).reduce((n,cs)=>n+Math.min(...cs.map(c=>c[nutrient])),0),max:candidates.slice(index+1).reduce((n,cs)=>n+Math.max(...cs.map(c=>c[nutrient])),0)};
   }));
-  type State={components:MealComponent[];totals:number[];cost:number};
-  let beam:State[]=[{components:[],totals:[0,0,0,0],cost:0}];
-  const cost=(totals:number[],remaining:{min:number;max:number}[])=>totals.reduce((sum,value,k)=>{
-    const low=value+remaining[k].min,high=value+remaining[k].max;
-    const distance=Math.max(0,low-target[k],target[k]-high)/Math.max(1,scale[k]);
-    const outside=limits?Math.max(0,low-limits.max[k],limits.min[k]-high)/Math.max(1,scale[k]):0;
-    return sum+distance*distance+100*outside;
-  },0);
+  type State={components:MealComponent[];totals:number[];grams:number;cost:number};
+  let beam:State[]=[{components:[],totals:[0,0,0,0],grams:0,cost:0}];
+  const cost=(totals:number[],remaining:{min:number;max:number}[])=>{
+    let sum=0;
+    for(let k=0;k<totals.length;k++){
+      const low=totals[k]+remaining[k].min,high=totals[k]+remaining[k].max;
+      const distance=Math.max(0,low-target[k],target[k]-high)/scale[k];
+      const outside=limits?Math.max(0,low-limits.max[k],limits.min[k]-high)/scale[k]:0;
+      sum=sum+distance*distance+100*outside;
+    }
+    return sum;
+  };
   for(let index=0;index<candidates.length;index++){
     const expanded:State[]=[];
+    const complete=index===candidates.length-1;
     for(const state of beam)for(const c of candidates[index]){
-      const components=[...state.components,c],totals=state.totals.map((n,k)=>n+c[(['kcal','protein','carbs','fat']as const)[k]]);
-      if(totals[0]>ceiling+1e-6||mealMassGrams(components)>mealMassLimitGrams(meal.slot,Math.max(reference.totalKcal,getSlotTargets(meal.slot,daily).kcal))||!isPracticalMeal(meal.slot,components,index===candidates.length-1))continue;
-      expanded.push({components,totals,cost:cost(totals,suffix[index])});
+      const kcal=state.totals[0]+c.kcal,grams=state.grams+c.grams;
+      if(kcal>ceiling+1e-6||grams>massLimit)continue;
+      const components=[...state.components,c];
+      if(!isPracticalMeal(meal.slot,components,complete))continue;
+      const totals=[kcal,state.totals[1]+c.protein,state.totals[2]+c.carbs,state.totals[3]+c.fat];
+      expanded.push({components,totals,grams,cost:cost(totals,suffix[index])});
     }
     beam=expanded.sort((a,b)=>a.cost-b.cost).slice(0,100);
     if(!beam.length)return meal;
