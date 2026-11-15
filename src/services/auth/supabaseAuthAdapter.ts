@@ -1,3 +1,4 @@
+import { recordPilotTiming } from '../../utils/pilotTimings';
 import { mapSupabaseAuthError } from './supabaseAuthError';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabaseClient';
@@ -36,6 +37,7 @@ export class SupabaseAuthAdapter implements AuthAdapter {
   }
 
   async startPhoneAuth(phone: string, captchaToken: string): Promise<PhoneAuthStartResult> {
+    const start = performance.now();
     const { error } = await supabase.auth.signInWithOtp({
       phone,
       options: {
@@ -46,9 +48,11 @@ export class SupabaseAuthAdapter implements AuthAdapter {
 
     if (error) {
       const failure = mapSupabaseAuthError(error, 'send');
+      recordPilotTiming({ event: 'otp_send', elapsed_ms: performance.now() - start, status: 'failed', code: failure.code });
       console.warn(JSON.stringify({ event: 'phone_otp_send_failed', code: failure.code, provider_status: error.status, at: new Date().toISOString() }));
       throw failure;
     }
+    recordPilotTiming({ event: 'otp_send', elapsed_ms: performance.now() - start, status: 'ok' });
     return { status: 'otp_required' };
   }
 
