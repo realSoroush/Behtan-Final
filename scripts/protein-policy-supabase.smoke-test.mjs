@@ -69,7 +69,7 @@ assert(customRef < defaultRef, 'Custom reference-weight curve did not affect out
 
 const customMacros = calculateMacros(2600, 125, 'weight_loss', 178, 'resistance', custom);
 assert(customMacros.proteinGrams <= 180, 'Runtime absolute protein cap not applied');
-assert(customMacros.proteinCal <= 2600 * 0.30 + 4, 'Runtime calorie-share cap not applied');
+assert(customMacros.proteinCal <= 2600 * 0.30, 'Runtime calorie-share cap not applied');
 const expectedFat = Math.round((2600 * 0.28) / 9);
 assert(Math.abs(customMacros.fatGrams - expectedFat) <= 1, 'Runtime fat fraction not applied');
 
