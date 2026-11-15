@@ -1,5 +1,8 @@
 import type { ProteinEnginePolicy } from '@/types';
 
+export const STEP_REFERENCE_WEIGHT_MODEL = 'step-v1';
+export const CONTINUOUS_REFERENCE_WEIGHT_MODEL = 'continuous-lower-envelope-v1';
+
 export const DEFAULT_PROTEIN_ENGINE_POLICY: ProteinEnginePolicy = {
   id: 'default',
   // Phase 2A practical floors. These are product targets for affordable,
@@ -32,6 +35,7 @@ export const DEFAULT_PROTEIN_ENGINE_POLICY: ProteinEnginePolicy = {
 
 export interface ProteinEnginePolicyRow {
   id: string;
+  reference_weight_model?: string;
   maintenance_no_rt_min: number | string;
   maintenance_rt_min: number | string;
   weight_loss_no_rt_min: number | string;
@@ -78,8 +82,14 @@ function inRange(value: number, min: number, max: number, field: string): number
  * malformed/mock row from silently changing nutrition output in the browser.
  */
 export function buildProteinEnginePolicy(row: ProteinEnginePolicyRow): ProteinEnginePolicy {
+  const referenceWeightModel = row.reference_weight_model;
+  if (referenceWeightModel !== undefined && referenceWeightModel !== STEP_REFERENCE_WEIGHT_MODEL &&
+      referenceWeightModel !== CONTINUOUS_REFERENCE_WEIGHT_MODEL) {
+    throw new Error('[proteinPolicy] Unsupported reference_weight_model.');
+  }
   const policy: ProteinEnginePolicy = {
     id: row.id,
+    ...(referenceWeightModel === CONTINUOUS_REFERENCE_WEIGHT_MODEL ? { referenceWeightModel } : {}),
     maintenanceNoResistanceTrainingMinimum: inRange(numeric(row.maintenance_no_rt_min, 'maintenance_no_rt_min'), 0.8, 3.5, 'maintenance_no_rt_min'),
     maintenanceResistanceTrainingMinimum: inRange(numeric(row.maintenance_rt_min, 'maintenance_rt_min'), 0.8, 3.5, 'maintenance_rt_min'),
     weightLossNoResistanceTrainingMinimum: inRange(numeric(row.weight_loss_no_rt_min, 'weight_loss_no_rt_min'), 0.8, 3.5, 'weight_loss_no_rt_min'),

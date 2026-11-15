@@ -121,6 +121,7 @@ try{
  };
  const body={action:'generate',org,record,revision:1,key:randomUUID(),date:'2026-10-26',count:1,notes:''};
  const result=await processPlanRequest(body,'fixture-user',supabasePlanDependencies());assert(result.plan.days.length);assert.equal(stageCalls,1);
+ assert.equal(result.plan.days[0].trace.proteinReferenceWeightModel,'step-v1');
  const catalog=await processPlanRequest({action:'catalog',org,record,revision:1,key:randomUUID()},'fixture-user',supabasePlanDependencies());assert.equal(catalog.foods.length,foods.length);
  permitted=false;const before=referenceReads;
  await assert.rejects(()=>processPlanRequest(body,'fixture-user',supabasePlanDependencies()),e=>e.code==='PRO_ACCESS_DENIED');
@@ -131,7 +132,7 @@ try{
  writable=false;let reads=referenceReads;await assert.rejects(()=>processPlanRequest(body,'fixture-user',supabasePlanDependencies()),e=>e.code==='PRO_SUBSCRIPTION_EXPIRED');assert.equal(referenceReads,reads);writable=true;
  nutrition=false;await assert.rejects(()=>processPlanRequest(body,'fixture-user',supabasePlanDependencies()),e=>e.code==='PRO_MODULE_DISABLED');assert.equal(referenceReads,reads);nutrition=true;
  catalogRevision='13';
- for(const invalid of [null,{...policy,excess_weight_fraction:null}]){
+ for(const invalid of [null,{...policy,excess_weight_fraction:null},{...policy,reference_weight_model:'unknown'}]){
   policyRow=invalid;
   await assert.rejects(()=>processPlanRequest(body,'fixture-user',supabasePlanDependencies()),e=>e.code==='PRO_CATALOG_UNAVAILABLE');
  }
@@ -153,6 +154,21 @@ try{
  catalogRevision='14';
  policyRow={...policy,excess_weight_fraction:null};
  await assert.rejects(()=>loadMemberCatalog('second-project'),e=>e.code==='NUTRITION_CONTEXT_INVALID');
+ catalogRevision='15';
+ policyRow={...policy,reference_weight_model:'continuous-lower-envelope-v1'};
+ const continuous=await loadMemberCatalog('second-project');
+ assert.equal(continuous.policy.referenceWeightModel,'continuous-lower-envelope-v1');
+ const createDraft=()=>processPlanRequest({...body,key:randomUUID()},'fixture-user',supabasePlanDependencies());
+ const continuousDraft=await createDraft();
+ assert.equal(continuousDraft.plan.catalog_revision,'15');
+ assert.equal(continuousDraft.plan.days[0].trace.proteinReferenceWeightModel,continuous.policy.referenceWeightModel);
+ catalogRevision='16';
+ policyRow={...policy,reference_weight_model:'step-v1'};
+ const reverted=await loadMemberCatalog('second-project');
+ assert.equal(reverted.revision,'16');
+ const revertedDraft=await createDraft();
+ assert.equal(revertedDraft.plan.days[0].trace.proteinReferenceWeightModel,'step-v1');
+ assert.equal(continuousDraft.plan.days[0].trace.proteinReferenceWeightModel,'continuous-lower-envelope-v1');
  console.log('PASS warm member catalog: conditional revision RPC, revision rollover and source isolation');
  console.log('PASS Supabase SDK adapter: Pro 057 preflight and legacy fallback, no catalog read after denial, invalid policy blocks Pro drafts and member context, credential errors classified');
 }finally{globalThis.fetch=originalFetch;for(const key of Object.keys(process.env))if(!(key in environment))delete process.env[key];Object.assign(process.env,environment);}

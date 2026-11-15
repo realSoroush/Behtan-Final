@@ -22,7 +22,9 @@ import type {
   ProteinBudgetPreference,
   ProteinEnginePolicy,
 } from '@/types';
-import { DEFAULT_PROTEIN_ENGINE_POLICY } from './proteinPolicy.ts';
+import {
+  CONTINUOUS_REFERENCE_WEIGHT_MODEL, DEFAULT_PROTEIN_ENGINE_POLICY, STEP_REFERENCE_WEIGHT_MODEL,
+} from './proteinPolicy.ts';
 
 // ============================================================================
 // CONSTANTS
@@ -350,6 +352,15 @@ export function calculateProteinReferenceWeightKg(
   if (!heightCm || !Number.isFinite(heightCm) || heightCm <= 0) return weightKg;
 
   const heightM = heightCm / 100;
+  if (policy.referenceWeightModel === CONTINUOUS_REFERENCE_WEIGHT_MODEL) {
+    const heightSquared = heightM * heightM;
+    const referenceWeight = policy.referenceBmi * heightSquared;
+    const thresholdWeight = policy.obesityBmiThreshold * heightSquared;
+    // Join the two branches with a continuous plateau below the threshold.
+    const adjustedWeight = referenceWeight
+      + policy.excessWeightFraction * (Math.max(weightKg, thresholdWeight) - referenceWeight);
+    return Math.min(weightKg, adjustedWeight);
+  }
   const bmi = weightKg / (heightM * heightM);
   if (bmi < policy.obesityBmiThreshold) return weightKg;
 
@@ -460,6 +471,7 @@ export interface NutritionCalculationTrace {
   trainingType: TrainingType | null;
   resistanceTrainingUsedForProtein: boolean;
   proteinPolicyId: string;
+  proteinReferenceWeightModel?: ProteinEnginePolicy['referenceWeightModel'];
   proteinPolicyUpdatedAt: string | null;
   proteinObesityBmiThreshold: number;
   proteinReferenceBmi: number;
@@ -494,8 +506,7 @@ export interface FullNutritionPlanWithTrace {
  * the prescription.
  */
 export function calculateFullNutritionPlanWithTrace(
-  input: FullNutritionCalcInput,
-  referenceWeight: typeof calculateProteinReferenceWeightKg = calculateProteinReferenceWeightKg
+  input: FullNutritionCalcInput
 ): FullNutritionPlanWithTrace {
   const age = calculateAge(input.birthDateISO, input.referenceDate ?? new Date());
   const bmrFormula = resolveBmrFormula({
@@ -526,7 +537,7 @@ export function calculateFullNutritionPlanWithTrace(
   const targetCalories = baseTargetCalories + workoutBonusKcal;
 
   const proteinPolicy = input.proteinPolicy ?? DEFAULT_PROTEIN_ENGINE_POLICY;
-  const proteinReferenceWeight = referenceWeight(
+  const proteinReferenceWeight = calculateProteinReferenceWeightKg(
     input.weightKg,
     input.heightCm,
     proteinPolicy
@@ -573,6 +584,7 @@ export function calculateFullNutritionPlanWithTrace(
       trainingType: input.trainingType ?? null,
       resistanceTrainingUsedForProtein: isResistanceTraining(input.trainingType),
       proteinPolicyId: proteinPolicy.id,
+      proteinReferenceWeightModel: proteinPolicy.referenceWeightModel ?? STEP_REFERENCE_WEIGHT_MODEL,
       proteinPolicyUpdatedAt: proteinPolicy.updatedAt,
       proteinObesityBmiThreshold: proteinPolicy.obesityBmiThreshold,
       proteinReferenceBmi: proteinPolicy.referenceBmi,

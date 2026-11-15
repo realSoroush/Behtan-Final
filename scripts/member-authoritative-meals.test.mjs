@@ -50,6 +50,7 @@ await assert.rejects(() => processMemberMealSchedule(user, { ...start, catalogRe
 assert.equal(writes, 0);
 const original = await processMemberMealSchedule(user, start, deps);
 assert.equal(original.p_plan.nutritionContext.revision, '8');
+assert.equal(original.p_plan.nutritionContext.proteinReferenceWeightModel, 'step-v1');
 assert(original.p_plan.meals.length >= 6);
 state.operation = { hash: original.p_request_hash, result: original };
 state.intake_revision = '1';

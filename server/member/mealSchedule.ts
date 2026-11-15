@@ -11,6 +11,7 @@ import { isMealSnapshot, isPrescriptionPlan, MEAL_SLOTS } from '../../src/utils/
 import { generateMemberPrescription } from '../../src/utils/memberPrescription.ts';
 import { memberProfileContext, memberScheduleContext } from '../../src/utils/memberScheduleContext.ts';
 import { readNutritionContext, type NutritionContext } from '../../src/utils/nutritionContext.ts';
+import { STEP_REFERENCE_WEIGHT_MODEL } from '../../src/utils/proteinPolicy.ts';
 
 // Only shared nutrition data and its immutable engine are reused in a warm runtime.
 let catalogCache: { source: string; context: NutritionContext } | undefined;
@@ -176,7 +177,9 @@ export async function processMemberMealSchedule(user: string, input: unknown, de
   return deps.commit({
     p_user: user, p_day: request.date, p_request_id: request.requestId, p_request_hash: hash,
     p_profile: profile, p_catalog_revision: revision, p_intake_revision: state.intake_revision,
-    p_expected_updated_at: request.expectedUpdatedAt, p_context: context, p_plan: plan,
+    p_expected_updated_at: request.expectedUpdatedAt, p_context: context,
+    p_plan: { ...plan, nutritionContext: { revision, engineVersion: MEAL_POLICY_VERSION,
+      proteinReferenceWeightModel: policy.referenceWeightModel ?? STEP_REFERENCE_WEIGHT_MODEL } },
     p_meal_edit: request.kind !== 'generate', p_server_context_key: serverContext,
   });
 }

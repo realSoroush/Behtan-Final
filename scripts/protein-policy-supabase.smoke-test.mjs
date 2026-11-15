@@ -45,6 +45,12 @@ const customRow = {
   updated_at: '2026-09-05T00:00:00Z',
 };
 const custom = buildProteinEnginePolicy(customRow);
+deepEqual(buildProteinEnginePolicy({ ...customRow, reference_weight_model: 'step-v1' }), custom);
+assert(buildProteinEnginePolicy({ ...customRow, reference_weight_model: 'continuous-lower-envelope-v1' }).referenceWeightModel
+  === 'continuous-lower-envelope-v1', 'Continuous version must survive policy mapping');
+for (const model of [null, '', 'unknown']) {
+  throws(() => buildProteinEnginePolicy({ ...customRow, reference_weight_model: model }), /Unsupported reference_weight_model/);
+}
 
 for (const field of ['budget_economic_position', 'excess_weight_fraction']) {
   for (const value of [null, false, true, '', '  ', [], [0], '0x0', NaN, Infinity]) {

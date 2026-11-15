@@ -23,6 +23,7 @@ export async function testMarketDatabase({ db }) {
     "20261105172329_049_authoritative_member_meals.sql",
     "20261105213810_050_member_meal_cutover.sql",
     "20261107195116_051_member_intake_transactions.sql",
+    "20261115234234_058_protein_reference_weight_model.sql",
   ])
     await db.exec(
       await readFile(
@@ -125,14 +126,33 @@ export async function testMarketDatabase({ db }) {
   await as(user);
   const paidSnapshot = await snapshot();
   assert.equal(paidSnapshot.policy_row.id, 'default');
+  assert.equal(paidSnapshot.policy_row.reference_weight_model, 'step-v1');
   assert(paidSnapshot.food_rows.length > 0);
   assert.deepEqual(await snapshot(paidSnapshot.revision), { schema_version: 1, revision: paidSnapshot.revision });
+  await assert.rejects(() => db.query("update nutrition_protein_policy set reference_weight_model='continuous-lower-envelope-v1' where id='default'"), /permission denied/);
   await as(other);
   await assert.rejects(() => snapshot(paidSnapshot.revision), /NUTRITION_CONTEXT_DENIED/);
   await db.exec('reset role; set role anon');
   await assert.rejects(() => snapshot(), /permission denied/);
   await db.exec('reset role; set role service_role');
   assert.deepEqual(await snapshot(), paidSnapshot, 'Member and server consume identical reference rows');
+  await db.exec('reset role');
+  await assert.rejects(() => db.query("update nutrition_protein_policy set reference_weight_model='unknown' where id='default'"), /nutrition_protein_policy_reference_weight_model_check/);
+  await db.exec('begin');
+  try {
+    await db.query("update nutrition_protein_policy set reference_weight_model='continuous-lower-envelope-v1' where id='default'");
+    await as(user);
+    const continuous = await snapshot(paidSnapshot.revision);
+    assert.notEqual(continuous.revision, paidSnapshot.revision);
+    assert.equal(continuous.policy_row.reference_weight_model, 'continuous-lower-envelope-v1');
+    await db.exec('reset role; set role service_role');
+    assert.deepEqual(await snapshot(paidSnapshot.revision), continuous);
+    await db.exec('reset role');
+    await db.query("update nutrition_protein_policy set reference_weight_model='step-v1' where id='default'");
+    const reverted = await snapshot(continuous.revision);
+    assert.notEqual(reverted.revision, continuous.revision);
+    assert.equal(reverted.policy_row.reference_weight_model, 'step-v1');
+  } finally { await db.exec('rollback'); }
   await db.exec('reset role; begin');
   try {
     const t = paidSnapshot.template_rows.find(t => t.id === paidSnapshot.slot_rows[0].template_id);
