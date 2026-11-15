@@ -33,7 +33,7 @@
     "test:allergies": "node --experimental-strip-types scripts/allergy-separation.smoke-test.mjs",
     "test:routing": "node scripts/routing-stability.smoke-test.mjs",
     "test:protein": "node --experimental-strip-types scripts/protein-engine-v3.smoke-test.mjs",
-    "test:protein-policy": "node --experimental-strip-types scripts/protein-policy-supabase.smoke-test.mjs",
+    "test:protein-policy": "node --experimental-strip-types scripts/protein-policy-supabase.smoke-test.mjs && node --experimental-strip-types scripts/e07-continuous-reference-weight.test.mjs",
     "review:protein-policy": "node --experimental-strip-types scripts/review-protein-policy.mjs",
     "test:protein-range": "node --experimental-strip-types scripts/protein-minimum-preferred.smoke-test.mjs",
     "test:protein-budget": "node --experimental-strip-types scripts/protein-budget-preference.smoke-test.mjs",

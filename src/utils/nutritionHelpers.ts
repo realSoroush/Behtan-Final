@@ -494,7 +494,8 @@ export interface FullNutritionPlanWithTrace {
  * the prescription.
  */
 export function calculateFullNutritionPlanWithTrace(
-  input: FullNutritionCalcInput
+  input: FullNutritionCalcInput,
+  referenceWeight: typeof calculateProteinReferenceWeightKg = calculateProteinReferenceWeightKg
 ): FullNutritionPlanWithTrace {
   const age = calculateAge(input.birthDateISO, input.referenceDate ?? new Date());
   const bmrFormula = resolveBmrFormula({
@@ -525,7 +526,7 @@ export function calculateFullNutritionPlanWithTrace(
   const targetCalories = baseTargetCalories + workoutBonusKcal;
 
   const proteinPolicy = input.proteinPolicy ?? DEFAULT_PROTEIN_ENGINE_POLICY;
-  const proteinReferenceWeight = calculateProteinReferenceWeightKg(
+  const proteinReferenceWeight = referenceWeight(
     input.weightKg,
     input.heightCm,
     proteinPolicy
