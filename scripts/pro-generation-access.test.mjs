@@ -43,6 +43,7 @@ export async function testGenerationAccess({ db, asUser, rpc, equal, denied }) {
     return rpc('pro_stage_server_plan',[...values,plan]);
   };
   await denied(() => rpc('pro_prepare_server_plan',args), /permission denied/);
+  await denied(() => prepare([null,null,null,assigned,null,null]), /PRO_ACCESS_DENIED/);
   equal(await prepare(), { revision:1, answers:intake });
   await denied(() => prepare([org,otherRecord,...args.slice(2)]));
   for (const actor of [colleague,reception,member,foreignOwner])

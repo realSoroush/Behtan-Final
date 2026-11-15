@@ -95,13 +95,24 @@ try{
   const path=new URL(String(input)).pathname;
   if(path.endsWith('/auth/v1/user'))return new Response(JSON.stringify(healthMode==='auth-denied'?{message:'denied'}:{id:actor,phone:'989000000000',phone_confirmed_at:'2026-01-01T00:00:00Z',aud:'authenticated',app_metadata:{},user_metadata:{},created_at:'2026-01-01T00:00:00Z'}),{status:healthMode==='auth-denied'?401:200,headers:{'Content-Type':'application/json'}});
   if(path.endsWith('/pro_pilot_status'))return new Response(JSON.stringify(healthMode!=='access-denied'),{headers:{'Content-Type':'application/json'}});
+  if(path.endsWith('/pro_prepare_server_plan')){
+   assert.equal(new Headers(init.headers).get('apikey'),'private-test-never-expose');
+   const body=JSON.parse(init.body);
+   equal(body,{p_org:null,p_record:null,p_revision:null,p_actor:actor,p_key:null,p_request:null});
+   if(healthMode==='legacy-057')return new Response(JSON.stringify({code:'PGRST202',message:'function not present'}),{status:404});
+   if(healthMode==='unchecked-057')return new Response(JSON.stringify({unexpected:true}),{headers:{'Content-Type':'application/json'}});
+   return new Response(JSON.stringify({code:'42501',message:'PRO_ACCESS_DENIED'}),{status:403});
+  }
   assert(path.endsWith('/pro_service_status'));
   assert.equal(new Headers(init.headers).get('apikey'),'private-test-never-expose');
   if(healthMode==='bad-key')return new Response(JSON.stringify({message:'invalid api key'}),{status:401});
   if(healthMode==='migration')return new Response(JSON.stringify({message:'missing function',code:'PGRST202'}),{status:404});
   return new Response(JSON.stringify('operations-v2'),{headers:{'Content-Type':'application/json'}});
  };
- const healthy=await proHealth('valid-token');equal(healthy.ready,true);equal(healthy.scope,'server-and-migration');equal(JSON.stringify(healthy).includes('private-test-never-expose'),false);
+ const healthy=await proHealth('valid-token');equal(healthy.ready,true);equal(healthy.scope,'server-and-migration');equal(healthy.generationAccess,'057');equal(JSON.stringify(healthy).includes('private-test-never-expose'),false);
+ healthMode='legacy-057';equal((await proHealth('valid-token')).generationAccess,'legacy');
+ healthMode='unchecked-057';await reject(()=>proHealth('valid-token'),'PRO_CONNECTION_ERROR');
+ healthMode='ready';
  process.env.PRO_SERVER_PLANS_ENABLED='false';equal((await proHealth('valid-token')).missing,['PRO_SERVER_PLANS_ENABLED']);process.env.PRO_SERVER_PLANS_ENABLED='true';
  delete process.env.SUPABASE_SERVICE_ROLE_KEY;equal((await proHealth('valid-token')).missing,['SUPABASE_SERVICE_ROLE_KEY']);process.env.SUPABASE_SERVICE_ROLE_KEY='private-test-never-expose';
  for(const [mode,code] of [['auth-denied','PRO_AUTH_REQUIRED'],['access-denied','PRO_ACCESS_DENIED'],['bad-key','PRO_SERVER_CREDENTIAL_INVALID'],['migration','PRO_MIGRATION_REQUIRED']]){healthMode=mode;await reject(()=>proHealth('valid-token'),code);}

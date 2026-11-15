@@ -1,3 +1,4 @@
+import { parsePilotServerTiming, recordPilotTiming } from '../utils/pilotTimings';
 import { supabase } from "@/lib/supabaseClient";
 import { rpc } from "./api";
 import type { PrintedPlan, RealIntake } from "./menuPlan";
@@ -69,6 +70,19 @@ async function readCase<T>(org: string, id: string, columns: string): Promise<T>
 }
 
 async function planRequest<T>(body: Record<string, unknown>): Promise<T> {
+  const start = performance.now();
+  const reportGeneration = (response?: Response) => {
+    if (body.action !== 'generate' || typeof body.count !== 'number') return;
+    const requestId = response?.headers.get('X-Request-Id');
+    recordPilotTiming({
+      event: 'generate',
+      elapsed_ms: performance.now() - start,
+      menus: body.count,
+      status: response?.status ?? 0,
+      ...(requestId && /^[a-f0-9-]{36}$/i.test(requestId) ? { request_id: requestId } : {}),
+      ...(response ? { phases_ms: parsePilotServerTiming(response.headers.get('Server-Timing')) } : {}),
+    });
+  };
   const { data, error } = await supabase.auth.getSession();
   if (error || !data.session) throw new Error('PRO_AUTH_REQUIRED');
   const signal = AbortSignal.timeout(60_000);
@@ -78,11 +92,16 @@ async function planRequest<T>(body: Record<string, unknown>): Promise<T> {
       method:'POST', headers:{'Content-Type':'application/json',Authorization:`Bearer ${data.session.access_token}`},
       body:JSON.stringify(body), signal,
     });
-  } catch { throw new Error(signal.aborted ? 'PRO_REQUEST_TIMEOUT' : 'PRO_CONNECTION_ERROR'); }
+  } catch {
+    reportGeneration();
+    throw new Error(signal.aborted ? 'PRO_REQUEST_TIMEOUT' : 'PRO_CONNECTION_ERROR');
+  }
   let value: {error?: string};
   try { value = await response.json(); } catch {
+    reportGeneration(response);
     throw new Error(response.status === 404 || response.ok ? 'PRO_API_NOT_DEPLOYED' : 'PRO_API_UNAVAILABLE');
   }
+  reportGeneration(response);
   if (!response.ok) {
     const id=response.headers.get('X-Request-Id');
     throw new Error((value.error || 'PRO_CONNECTION_ERROR') + (id ? ' ['+id+']' : ''));
