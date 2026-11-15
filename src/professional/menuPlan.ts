@@ -130,20 +130,34 @@ export function selectProfessionalMenus(pools:MenuDay['slots'],targets:MacroTarg
   });
   if(groups.some(g=>!g.length))return null;
   type State={chosen:number[];min:number[];max:number[];score:number;variety:number};
+  const minTarget=daily.map((value,i)=>value*(i===0?.94:.9));
+  const maxTarget=daily.map((value,i)=>value*(i===0?1.03:1.1));
+  const maxSpread=daily.map((value,i)=>value*(i===0?.09:.20)+1e-6);
   let beam:State[]=[{chosen:[],min:[0,0,0,0],max:[0,0,0,0],score:0,variety:0}];
+  // Retain bounds only for candidates that enter the beam.
+  const min=[0,0,0,0],max=[0,0,0,0];
   for(let slot=0;slot<groups.length;slot++) {
     const rest=pools.slice(slot+1).map(p=>vector(p.options[0]));
     const reference=fields.map((_,i)=>rest.reduce((s,v)=>s+v[i],0));
     const next:State[]=[];
     let cutoff = Infinity;
     for(const state of beam)for(const [index,group] of groups[slot].entries()) {
-      const min=state.min.map((n,i)=>n+group.min[i]),max=state.max.map((n,i)=>n+group.max[i]);
-      if(!repair && min.some((n,i)=>max[i]-n>daily[i]*(i===0?.09:.20)+1e-6))continue;
+      for(let i=0;i<daily.length;i++) {
+        min[i]=state.min[i]+group.min[i];
+        max[i]=state.max[i]+group.max[i];
+      }
+      if(!repair && min.some((value,i)=>max[i]-value>maxSpread[i]))continue;
       const variety = state.variety + group.variety;
-      const score=min.reduce((s,n,i)=>s+.2*(max[i]-n)/daily[i]+20*(Math.max(0,daily[i]*(i===0?.94:.9)-n-reference[i])+Math.max(0,max[i]+reference[i]-daily[i]*(i===0?1.03:1.1)))/daily[i]+Math.abs((max[i]+n)/2+reference[i]-daily[i])/daily[i],variety);
+      let score=variety;
+      for(let i=0;i<daily.length;i++) {
+        const below=Math.max(0,minTarget[i]-min[i]-reference[i]);
+        const above=Math.max(0,max[i]+reference[i]-maxTarget[i]);
+        const offset=Math.abs((max[i]+min[i])/2+reference[i]-daily[i]);
+        score=score+.2*(max[i]-min[i])/daily[i]+20*(below+above)/daily[i]+offset/daily[i];
+      }
       // Ties retain the earlier state under the existing stable sort.
       if (score >= cutoff) continue;
-      next.push({chosen:[...state.chosen,index],min,max,score,variety});
+      next.push({chosen:[...state.chosen,index],min:[...min],max:[...max],score,variety});
       if (next.length >= 5000) {
         next.sort((a, b) => a.score - b.score);
         next.length = 2500;
