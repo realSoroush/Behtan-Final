@@ -21,7 +21,6 @@ import {
 } from "../utils/mealPlanEngine.ts";
 import {
   calculateFullNutritionPlanWithTrace,
-  type calculateProteinReferenceWeightKg,
   type NutritionCalculationTrace,
 } from "../utils/nutritionHelpers.ts";
 import { proNutritionDraftAllowed, type CaseIntake } from "./intake.ts";
@@ -229,7 +228,6 @@ export function generatePrintedPlan(
   date: string,
   notes = "",
   engine: Pick<MealPlanEngine, 'generateDailyMealPlan' | 'getProfessionalMealOptions'> & Partial<Pick<MealPlanEngine, 'rebalanceProfessionalMenus' | 'canUseProfessionalMeal'>> = { generateDailyMealPlan, getProfessionalMealOptions, rebalanceProfessionalMenus, canUseProfessionalMeal },
-  referenceWeight?: typeof calculateProteinReferenceWeightKg,
 ): PrintedPlan {
   if (!Number.isInteger(count) || count < 1 || count > 5)
     throw new Error("تعداد منو باید بین ۱ تا ۵ باشد.");
@@ -258,7 +256,7 @@ export function generatePrintedPlan(
       proteinPolicy: policy,
       isWorkoutDay: workout,
       referenceDate,
-    }, referenceWeight);
+    });
     const base = engine.generateDailyMealPlan(
       targets,
       a.weight_kg,

@@ -335,7 +335,7 @@ export interface FoodSwapOption {
 }
 
 export interface DailyMealPlan {
-  nutritionContext?: { revision: string; engineVersion: string };
+  nutritionContext?: { revision: string; engineVersion: string; proteinReferenceWeightModel?: ProteinReferenceWeightModel };
   date: string;
   isWorkoutDay: boolean;
   targets: MacroTargets;
@@ -373,8 +373,11 @@ export interface MacroTargets {
 }
 
 /** Runtime-editable Protein Engine v3 policy loaded from Supabase in production. */
+export type ProteinReferenceWeightModel = 'step-v1' | 'continuous-lower-envelope-v1';
+
 export interface ProteinEnginePolicy {
   id: string;
+  referenceWeightModel?: ProteinReferenceWeightModel;
   /** Behtan practical floor. This is not the physiological RDA/minimum. */
   maintenanceNoResistanceTrainingMinimum: number;
   maintenanceResistanceTrainingMinimum: number;
