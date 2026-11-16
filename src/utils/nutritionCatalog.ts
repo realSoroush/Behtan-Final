@@ -2,6 +2,7 @@ import { ALLERGENS, ASSESSMENT_STATUSES } from './allergens.ts';
 import type {
   Allergy,
   FoodItem,
+  FoodReference,
   FoodRole,
   FoodQualityTag,
   FoodSubstituteGroup,
@@ -13,10 +14,16 @@ import type {
   VegetarianStatus,
 } from '@/types';
 import { finiteNonnegative } from './mealValidation.ts';
+import { foodPreparationState } from './foodReference.ts';
 
 export interface FoodItemRow {
   preparation_state?: 'ready'|'cooked'|'dry'|'raw';
   id: string;
+  source_name?: string | null;
+  source_url?: string | null;
+  recipe_reference_version?: string | null;
+  recipe_batch_yield_grams?: number | string | null;
+  recipe_batch_servings?: number | string | null;
   name: string;
   role: FoodRole;
   emoji: string | null;
@@ -82,6 +89,30 @@ const toNumber = (value: number | string, label: string): number => {
   return parsed;
 };
 
+function catalogReference(row: FoodItemRow): { reference?: FoodReference } {
+  const name = row.source_name?.trim();
+  const url = row.source_url?.trim();
+  const version = row.recipe_reference_version;
+  const yieldValue = row.recipe_batch_yield_grams;
+  const servingsValue = row.recipe_batch_servings;
+  const hasBatch = yieldValue != null || servingsValue != null;
+  if (version == null && !hasBatch) return name || url ? { reference: { ...(name ? { name } : {}), ...(url ? { url } : {}) } } : {};
+  if (typeof version !== 'string' || !/^[a-z0-9][a-z0-9.-]{0,63}$/.test(version) ||
+      !name || !url || !/^https:\/\/\S+$/.test(url)) {
+    throw new Error(`[nutritionCatalog] Invalid recipe reference for ${row.id}.`);
+  }
+  if (!hasBatch) return { reference: { name, url, recipe: { version } } };
+  const whole = (value: unknown) => typeof value === 'number' || (typeof value === 'string' && /^\d+$/.test(value))
+    ? Number(value) : NaN;
+  const cookedGrams = whole(yieldValue);
+  const servings = whole(servingsValue);
+  if (row.preparation_state !== 'cooked' || !Number.isSafeInteger(cookedGrams) || cookedGrams <= 0 ||
+      !Number.isSafeInteger(servings) || servings <= 0) {
+    throw new Error(`[nutritionCatalog] Invalid recipe batch yield for ${row.id}.`);
+  }
+  return { reference: { name, url, recipe: { version, batch: { cookedGrams, servings } } } };
+}
+
 export function buildNutritionCatalog(input: {
   foodRows: FoodItemRow[];
   substituteRows: FoodSubstituteRow[];
@@ -94,7 +125,8 @@ export function buildNutritionCatalog(input: {
     .map((row) => ({
       id: row.id,
       name: row.name,
-      preparationState: row.preparation_state ?? (['soy_chunks','oats_dry','whey_protein','pea_protein'].includes(row.id)?'dry':row.id.includes('cooked')?'cooked':'ready'),
+      preparationState: foodPreparationState({ id: row.id, preparationState: row.preparation_state }) ?? 'ready',
+      ...catalogReference(row),
       role: row.role,
       emoji: row.emoji ?? '',
       unitLabel: row.unit_label,

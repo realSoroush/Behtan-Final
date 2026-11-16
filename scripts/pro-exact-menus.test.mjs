@@ -97,6 +97,16 @@ assert.equal(selectProfessionalMenus(overBudget,day.targets,4,()=>{repairCalls++
 assert(repairCalls>0,'Even a macro-feasible repair cannot return duplicate menus');
 
 const pdfHtml=printedPlanHtml(pdfCase,'https://example.com');
+const withReference=structuredClone(pdfCase);
+for (const meal of withReference.days[0].slots[0].options) {
+  const item=meal.components[0].foodItem;
+  item.reference={name:'<source>',url:'https://example.com/recipe',recipe:{version:'synthetic-v1',batch:{cookedGrams:1000,servings:5}}};
+  item.name='Synthetic reference';
+}
+const referencedHtml=printedPlanHtml(withReference,'https://example.com');
+assert.equal((referencedHtml.match(/synthetic-v1/g)||[]).length,1,'Repeated recipe references appear once in print');
+assert(referencedHtml.includes('&lt;source&gt;')&&!referencedHtml.includes('<source>'));
+assert(!pdfHtml.includes('مرجع دستورهای پخت'),'Legacy plans print without source placeholders');
 const sections=nutritionMealSections(pdfCase);
 assert.equal(sections.length,7);
 assert(sections.filter(section=>section.groups.some(group=>!group.label)).length>=3,'Routine meals are shared where feasible');

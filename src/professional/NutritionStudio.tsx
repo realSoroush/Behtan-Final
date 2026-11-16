@@ -7,8 +7,9 @@ import type { FoodItem } from '@/types';
 import type { AuthoredContent } from './authoredPlan';
 import { dayLabel, fa, foodLine, foodTotals, lineDescription, moveItem, normalizedSearch, nutritionTotals, nutritionMenuSummary, sectionMenus, nutritionRange } from './studioModel';
 import type { RealIntake } from './menuPlan';
+import { foodWeightBasis } from './foodAmounts';
+import { recipeReferenceLabel } from '../utils/foodReference';
 const roles: Record<string, string> = { protein: 'پروتئین', starch: 'غلات و کربوهیدرات', fat: 'چربی و مغزها', fruit: 'میوه', vegetable: 'سبزی', dairy: 'لبنیات', legume: 'حبوبات' };
-const basis = { raw: 'خام', cooked: 'پخته', dry: 'خشک', ready: 'آماده مصرف' };
 function useProFoods(org:string,record:string,revision:number) {
   const [foods, setFoods] = useState<FoodItem[]>([]), [busy, setBusy] = useState(true), [error, setError] = useState(''), [attempt, setAttempt] = useState(0);
   useEffect(() => {
@@ -62,7 +63,8 @@ export function NutritionStudio({ content, mutate, intake, org, record, revision
         {busy && <AppLoading label="در حال دریافت بانک غذایی…" />}
         <div className="studio-bank-list">{matchingFoods.map(f => {
           const conflict = intake && (f.allergyFlags.some(a => intake.allergies.includes(a)) || f.excludedForVegetarian.includes(intake.vegetarian_status));
-          return <button type="button" key={f.id} aria-label={'افزودن ' + f.name} disabled={selectedMenu.lines.length >= 30} draggable onDragStart={e => { drag.current = { type: 'food', id: f.id }; e.dataTransfer.setData('text/plain', f.id); }} onDragEnd={() => { drag.current = null; }} onClick={() => add(f)}><span><strong>{f.name}</strong><small>{basis[f.preparationState || 'ready']} · {fa(f.kcalPerUnit / f.gramsPerUnit * 100)} کالری / ۱۰۰ گرم</small>{conflict && <small className="studio-allergy">با حساسیت یا ترجیح پرونده تطبیق دهید</small>}</span><Plus size={16} /></button>;
+          const reference = recipeReferenceLabel(f.reference);
+          return <button type="button" key={f.id} aria-label={'افزودن ' + f.name} disabled={selectedMenu.lines.length >= 30} draggable onDragStart={e => { drag.current = { type: 'food', id: f.id }; e.dataTransfer.setData('text/plain', f.id); }} onDragEnd={() => { drag.current = null; }} onClick={() => add(f)}><span><strong>{f.name}</strong><small>{foodWeightBasis(f) ?? 'آماده مصرف'} · {fa(f.kcalPerUnit / f.gramsPerUnit * 100)} کالری / ۱۰۰ گرم</small>{reference && <small>{reference}</small>}{conflict && <small className="studio-allergy">با حساسیت یا ترجیح پرونده تطبیق دهید</small>}</span><Plus size={16} /></button>;
         })}{!busy && !error && !matchingFoods.length && <p role="status">{foods.length ? 'ماده‌ای با این جستجو پیدا نشد؛ نام یا دسته را تغییر دهید.' : 'کاتالوگ مادهٔ فعالی ندارد.'}</p>}</div>
       </aside>
       <section className="studio-editor"><div className="studio-row"><h4>وعده‌های برنامه</h4><button type="button" disabled={content.sections.length >= 28} onClick={() => { mutate(d => { d.sections.push({ title: 'وعده جدید', nutritionDay: currentDay, lines: [] }); }); setMeal(content.sections.length); }}><Plus size={16} />وعده</button></div>

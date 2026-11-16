@@ -3,12 +3,20 @@ import type { PrintedPlan } from './menuPlan.ts';
 import { specialistHtml, type SpecialistIdentity } from './specialistProfile.ts';
 import { nutritionMealSections, nutritionTargetRows } from './nutritionPresentation.ts';
 import { showPrintLoading } from '../utils/printLoading.ts';
+import { recipeReferenceLabel } from '../utils/foodReference.ts';
 
 const escape = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
 );
 
 export function printedPlanHtml(p: PrintedPlan, origin: string, specialist?: SpecialistIdentity): string {
+  const references = new Set<string>();
+  for (const day of p.days) for (const slot of day.slots) for (const meal of slot.options) {
+    for (const { foodItem } of meal.components) {
+      const reference = recipeReferenceLabel(foodItem.reference);
+      if (reference) references.add(foodItem.name + ' · ' + reference);
+    }
+  }
   const targetRows = nutritionTargetRows(p.days).map(({ label, targets }) => `
     <p class="targets">${label ? label + ' · ' : ''}هدف روزانه: ${roundFa(targets.targetCalories)} کیلوکالری · پروتئین ${roundFa(targets.proteinGrams)} گرم · کربوهیدرات ${roundFa(targets.carbGrams)} گرم · چربی ${roundFa(targets.fatGrams)} گرم</p>`).join('');
   const meals = nutritionMealSections(p).map(section => `
@@ -57,6 +65,7 @@ export function printedPlanHtml(p: PrintedPlan, origin: string, specialist?: Spe
       </header>${specialistHtml(specialist)}
       <p>برای هر وعده یک منو انتخاب کنید. اگر نوع روز مشخص شده، از گزینه‌های همان روز استفاده کنید.</p>
       ${targetRows}${meals}
+      ${references.size ? '<h2>مرجع دستورهای پخت</h2>' + [...references].map(reference => '<p class="meta">' + escape(reference) + '</p>').join('') : ''}
       ${p.notes ? '<h2>توضیحات برنامه</h2><p class="notes">' + escape(p.notes) + '</p>' : ''}
       <p class="footer">این برنامه با موتور تغذیه به‌تن و بر اساس اطلاعات ثبت‌شده ساخته شده است.</p>
     </body></html>`;
