@@ -44,11 +44,11 @@ export function changeMemberMeal(
   for (let offset = 1; offset <= options.length; offset++) {
     const replacement = options[(currentIndex + offset) % options.length];
     if (memberMealSignature(replacement) === signature) continue;
-    const updated = engine.rebalanceMemberDay(plan, index, replacement, preferences, intake);
+    const updated = engine.rebalanceMemberDay(plan, index, replacement, preferences, intake, true);
     if (updated) return {
       ...updated,
       mealRotationAnchors: saved.mealRotationAnchors ?? baseline,
-      swapBaselineMeals: baseline.map(m => m.slot === original.slot ? replacement : m),
+      swapBaselineMeals: baseline.map(m => m.slot === original.slot ? updated.meals[index] : m),
     };
   }
   throw new MealChangeUnavailableError('با ثبت‌ها و محدودیت‌های فعلی، منوی دیگری که با هدف روز سازگار باشد پیدا نشد.');

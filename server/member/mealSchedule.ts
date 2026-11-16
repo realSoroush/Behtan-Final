@@ -91,6 +91,13 @@ function serverContextKey(profile: UserProfile, revision: string) {
   return createHash('sha256').update(JSON.stringify([profile, revision, MEAL_POLICY_VERSION])).digest('hex');
 }
 
+export function memberMealSearchCode(error: unknown) {
+  if (error instanceof MealPlanGenerationError)
+    return error.reason === 'no-eligible-options' ? 'NO_FEASIBLE_PLAN' : 'MEAL_SEARCH_LIMIT';
+  if (error instanceof MealPlanFeasibilityError) return 'MEAL_SEARCH_LIMIT';
+  return undefined;
+}
+
 export async function processMemberMealSchedule(user: string, input: unknown, deps: MealScheduleDependencies) {
   const request = parseRequest(input);
   const state = await deps.read(user, request.date, request.kind === 'read' ? null : request.requestId);
@@ -162,15 +169,18 @@ export async function processMemberMealSchedule(user: string, input: unknown, de
         : engine.getMemberSwapOptions(active, mealIndex, request.componentIndex, preferences, intake,
             swapBaselineComponent(active, request.slot, request.componentIndex) ?? undefined)
           .find(option => option.foodItem.id === request.foodId && option.replacementComponent.units === request.units)?.plan;
-      if (!updated) throw Error('NO_FEASIBLE_PLAN');
+      if (!updated) throw Error('MEAL_ALTERNATIVE_UNAVAILABLE');
       // A calculation may use facts from checkins. Persist only the underlying
       // recipe for those slots, including any previously approved edits.
       plan = { ...updated, meals: updated.meals.map(meal => checkins[meal.slot]
         ? base.meals.find(original => original.slot === meal.slot)! : meal) };
     }
   } catch (error) {
-    if (error instanceof MealPlanFeasibilityError || error instanceof MealPlanGenerationError ||
-        error instanceof MealChangeUnavailableError) throw Error('NO_FEASIBLE_PLAN');
+    if (error instanceof MealChangeUnavailableError ||
+        (request.kind !== 'generate' && error instanceof MealPlanGenerationError))
+      throw Error('MEAL_ALTERNATIVE_UNAVAILABLE');
+    const code = memberMealSearchCode(error);
+    if (code) throw Error(code);
     throw error;
   }
   if (!isPrescriptionPlan(plan)) throw Error('INVALID_PLAN');

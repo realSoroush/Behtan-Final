@@ -2,11 +2,14 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { once } from "node:events";
 import { memberHandler } from "../server/member/http.ts";
+import { MealPlanGenerationError } from "../src/utils/mealPlanEngine.ts";
 let calls = 0;
 const server = createServer(
   memberHandler(() => async (token, action, input) => {
     calls++;
     assert.equal(token, "synthetic");
+    if (action === "preflight" && input?.syntheticFailure)
+      throw new MealPlanGenerationError('breakfast', 'synthetic internal details', input.syntheticFailure);
     if (action === "meal_intake" && input.kind === "skip") throw Error("STALE_INTAKE");
     if (action === "training") throw Error("TRAINING_LOCKED");
     if (action === "meal_schedule" && input.kind === "rotate") throw Error("STALE_INTAKE");
@@ -50,6 +53,11 @@ try {
   const r = await post(JSON.stringify({ action: "preflight" }));
   assert.equal(r.status, 200);
   assert.equal(r.headers.get("cache-control"), "no-store");
+  for (const [syntheticFailure, error] of [['no-eligible-options','NO_FEASIBLE_PLAN'],['search-limit','MEAL_SEARCH_LIMIT']]) {
+    const response = await post(JSON.stringify({action:'preflight',input:{syntheticFailure}}));
+    assert.equal(response.status,422);
+    assert.deepEqual(await response.json(),{error});
+  }
   assert.equal(
     (await post(JSON.stringify({ action: "training" }))).status,
     403,

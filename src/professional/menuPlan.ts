@@ -1,4 +1,5 @@
 import {professionalMenusFeasible} from '../utils/professionalMenuEnvelope.ts';
+import { exhaustiveMenuSearch } from '../utils/exhaustiveMenuSearch.ts';
 import {
   describeProfessionalRecipe,
   professionalMenuIdentity as menuIdentity,
@@ -16,6 +17,7 @@ import {
   canUseProfessionalMeal,
   generateDailyMealPlan,
   getProfessionalMealOptions,
+  MealPlanFeasibilityError,
   rebalanceProfessionalMenus,
   type MealPlanEngine,
 } from "../utils/mealPlanEngine.ts";
@@ -70,8 +72,10 @@ function hasExactMenus(slots: MenuDay['slots'], pools: MenuDay['slots'], count: 
 export class ProMenuCountError extends Error {
   requested:number;
   shortages:{slot:MealSlot;label:string;available:number}[];
-  constructor(requested:number,shortages:{slot:MealSlot;label:string;available:number}[]) {
+  readonly reason: 'pool-infeasible' | 'search-limit';
+  constructor(requested:number,shortages:{slot:MealSlot;label:string;available:number}[], reason: 'pool-infeasible' | 'search-limit' = 'pool-infeasible') {
     super('PRO_MENU_COUNT_UNAVAILABLE');this.requested=requested;this.shortages=shortages;
+    this.reason = reason;
   }
 }
 /** Select whole option groups together. Greedy per-slot appends can exhaust
@@ -169,7 +173,7 @@ export function selectProfessionalMenus(pools:MenuDay['slots'],targets:MacroTarg
   }
   for(const state of beam) {
     const slots=pools.map((p,i)=>({...p,options:groups[i][state.chosen[i]].meals}));
-    if(menuCombinationsFeasible(slots,targets))return slots;
+    if(menuCombinationsFeasible(slots,targets)&&hasExactMenus(slots,pools,count))return slots;
   }
   const repairStates=beam.slice(0,3),seen=new Set<string>();
   for(const state of beam){const key=[state.chosen[0],state.chosen[state.chosen.length-1],...pools.flatMap((p,i)=>p.slot==='post_workout'?[state.chosen[i]]:[])].join(':');if(!seen.has(key)){seen.add(key);repairStates.push(state);}if(repairStates.length>=30)break;}
@@ -266,7 +270,13 @@ export function generatePrintedPlan(
       { proteinBudgetPreference: a.protein_budget },
     );
     if (base.remainingTargetsUnmet)
-      throw new Error("موتور نتوانست برنامه کامل و معتبر بسازد.");
+      throw new MealPlanFeasibilityError(
+        { kcal: targets.targetCalories, protein: targets.proteinGrams, carbs: targets.carbGrams, fat: targets.fatGrams },
+        base.meals.reduce((total, meal) => ({
+          kcal: total.kcal + meal.totalKcal, protein: total.protein + meal.totalProtein,
+          carbs: total.carbs + meal.totalCarbs, fat: total.fat + meal.totalFat,
+        }), { kcal: 0, protein: 0, carbs: 0, fat: 0 }),
+      );
     const referenceCalories = base.meals.reduce((total, meal) => total + meal.totalKcal, 0);
     const eligible = (meal: Meal) =>
       (engine.canUseProfessionalMeal?.(meal, workout) ?? true) &&
@@ -277,10 +287,15 @@ export function generatePrintedPlan(
         ? [meal] : [meal, ...engine.getProfessionalMealOptions(meal, preferences, workout, targets, referenceCalories)])
         .filter(eligible),
     }));
-    const slots = count === 1 && pools.every(pool => pool.options.length === 1) ? pools
+    let slots = count === 1 && pools.every(pool => pool.options.length === 1) ? pools
       : selectProfessionalMenus(pools,targets,count,engine.rebalanceProfessionalMenus?slots=>engine.rebalanceProfessionalMenus!(slots,targets,base.meals,pools):undefined);
-    if(!slots || !hasExactMenus(slots,pools,count) || slots.some(slot => slot.options.some(meal => !eligible(meal))))
-      throw new ProMenuCountError(count,pools.map(slot=>({slot:slot.slot,label:slot.label,available:new Set(slot.options.map(menuIdentity)).size})));
+    if(!slots || !hasExactMenus(slots,pools,count) || slots.some(slot => slot.options.some(meal => !eligible(meal))) || !menuCombinationsFeasible(slots,targets)) {
+      const exact = exhaustiveMenuSearch(pools, targets, count);
+      if (exact.kind !== 'found') {
+        throw new ProMenuCountError(count,pools.map(slot=>({slot:slot.slot,label:slot.label,available:new Set(slot.options.map(menuIdentity)).size})),exact.kind);
+      }
+      slots = exact.slots;
+    }
     if(!menuCombinationsFeasible(slots,targets))throw new Error('مجموع منوها با اهداف موتور سازگار نیست.');
     days.push({ workout, targets, trace, slots });
   }

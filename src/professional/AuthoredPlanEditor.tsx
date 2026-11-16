@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { FileDown, Copy, Save, Sparkles, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { rpc } from './api';
+import { proErrorMessage } from './contracts';
 import { type AuthoredContent, type AuthoredSnapshot, printAuthored } from './authoredPlan';
 import { lineDescription, prepareContent, trainingLine, validateAuthored } from './studioModel';
 import type { RealIntake } from './menuPlan';
@@ -21,7 +22,7 @@ const message = (e: unknown) => {
     const s = e instanceof Error ? e.message : '';
     return s.includes('PRO_SERVER_CREDENTIAL_INVALID') ? 'کلید سروری Supabase نامعتبر یا بدون مجوز است؛ SUPABASE_SERVICE_ROLE_KEY را در محیط سرور بررسی کنید.'
       : s.includes('PRO_SERVER_NOT_CONFIGURED') ? 'تنظیمات سرور ساخت برنامه کامل نیست؛ PRO_SERVER_PLANS_ENABLED و کلیدهای سروری را بررسی کنید.'
-      : s.includes('PRO_MENU_COUNT_UNAVAILABLE') ? 'به تعداد انتخاب‌شده برای همهٔ وعده‌ها منوی معتبر پیدا نشد؛ تعداد منو را کاهش دهید یا محدودیت‌ها را بررسی کنید.'
+      : /PRO_MENU_COUNT_UNAVAILABLE|PRO_MENU_SEARCH_LIMIT|PRO_NO_ELIGIBLE_MEAL/.test(s) ? proErrorMessage(e)
       : s.includes('PRO_CATALOG_UNAVAILABLE') ? 'کاتالوگ یا سیاست محاسبات تغذیه در دسترس نیست؛ بررسی سرویس را اجرا کنید.'
       : s.includes('PRO_STALE_REVISION') ? 'نسخه پرونده تغییر کرده است؛ اطلاعات را دوباره دریافت کنید.'
       : s.includes('PRO_MODULE_DISABLED') ? 'ساخت در این ماژول فعال نیست؛ سوابق همچنان در دسترس‌اند.'
