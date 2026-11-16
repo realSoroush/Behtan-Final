@@ -3,6 +3,7 @@ import {readFile} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
 import {buildNutritionCatalog} from '../src/utils/nutritionCatalog.ts';
+import {foodLine,lineDescription} from '../src/professional/studioModel.ts';
 import {TEST_NUTRITION_CATALOG} from './setup-test-nutrition-catalog.mjs';
 const db=new PGlite();
 await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;
@@ -43,11 +44,33 @@ for (const [migration, foodId, templateId] of [
   assert.equal(foodRows.length, 1);
   assert.equal(templateRows.length, 1);
   assert.equal(slotRows.length, 1);
-  assert.deepEqual(catalog.foods[0], TEST_NUTRITION_CATALOG.foods.find(f => f.id === foodId));
+  const {reference,...food} = catalog.foods[0];
+  assert.deepEqual(food, TEST_NUTRITION_CATALOG.foods.find(f => f.id === foodId));
+  assert.equal(reference.url, foodRows[0].source_url);
+  assert.equal(reference.recipe, undefined, 'A historical source alone is not a versioned recipe');
   assert.deepEqual(catalog.portionRules[foodId], TEST_NUTRITION_CATALOG.portionRules[foodId]);
   assert.deepEqual(JSON.parse(JSON.stringify(catalog.mealTemplates[0])),
     TEST_NUTRITION_CATALOG.mealTemplates.find(t => t.id === templateId));
   assert.match(foodRows[0].source_url, /^https:\/\/theicn\.org\/cnrb\//);
+}
+await db.exec(await read('migrations/20261116095903_059_catalog_recipe_provenance.sql'));
+for (const [id, templateId, version, cookedGrams] of [
+  ['whole_wheat_beef_pasta_cooked','ln_whole_wheat_beef_pasta','usda-cacfp-spaghetti-2019-v1',4990],
+  ['chicken_curry_brown_rice_cooked','ln_chicken_curry_brown_rice','usda-cacfp-d55r-v1',4763],
+]) {
+  const foodRows = (await db.query('select * from food_items where id=$1', [id])).rows;
+  const templateRows = (await db.query('select * from meal_templates where id=$1', [templateId])).rows;
+  const slotRows = (await db.query('select * from meal_template_slots where template_id=$1', [templateId])).rows;
+  const input = {foodRows, templateRows, slotRows, substituteRows: []};
+  const catalog = buildNutritionCatalog(input);
+  const {reference,...food} = catalog.foods[0];
+  assert.deepEqual(food, TEST_NUTRITION_CATALOG.foods.find(f => f.id === id));
+  assert.deepEqual(reference.recipe, {version, batch: {cookedGrams, servings: 25}});
+  const line = JSON.parse(JSON.stringify(foodLine(catalog.foods[0])));
+  assert(lineDescription(line).includes(version), 'Recipe metadata survives authored snapshot serialization');
+  assert.throws(() => buildNutritionCatalog({...input, foodRows: [{...foodRows[0], recipe_batch_servings: null}]}),
+    /Invalid recipe batch yield/);
+  await assert.rejects(() => db.query('update food_items set recipe_batch_servings=null where id=$1',[id]), /food_items_recipe_reference_check/);
 }
 
 const user=randomUUID(),other=randomUUID(),admin=randomUUID();

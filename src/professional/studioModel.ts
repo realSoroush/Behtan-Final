@@ -1,14 +1,15 @@
 import type { AuthoredContent, AuthoredLine, AuthoredSection, AuthoredMenu } from './authoredPlan.ts';
-import type { FoodItem } from '../types/index.ts';
+import type { FoodItem, FoodReference } from '../types/index.ts';
 import type { PrintedPlan } from './menuPlan.ts';
 import {validTrainingDate} from './training/trainingDate.ts';
 import { foodWeightBasis } from './foodAmounts.ts';
+import { recipeReferenceLabel } from '../utils/foodReference.ts';
 
 export type GroupKind = 1 | 2 | 3;
 export interface TrainingPrescription { group: string; kind: GroupKind; sets: number; reps: number; rest: number; seconds?:number }
 export interface NutritionTotals { kcal: number; protein: number; carbs: number; fat: number }
 /** A per-unit catalog snapshot: historical plans must not change when the catalog changes. */
-export interface FoodSnapshot extends NutritionTotals { id: string; grams: number; gramsPerUnit: number; basis: string }
+export interface FoodSnapshot extends NutritionTotals { id: string; grams: number; gramsPerUnit: number; basis: string; reference?: FoodReference }
 export const groupLabel = (kind: number) => ['', 'تک‌حرکت', 'سوپرست', 'تریپل‌ست'][kind] || 'تک‌حرکت';
 export const dayLabel = (key: string) => ({ daily: 'برنامه روزانه', rest: 'روز استراحت', workout: 'روز تمرین' }[key] || key);
 export const normalizedSearch = (s: string) => s.normalize('NFKC').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/[\u200c\sـ]+/g, '').toLowerCase();
@@ -16,7 +17,8 @@ export const fa = (n: number) => Number.isFinite(n) ? Number(n.toFixed(1)).toLoc
 export function lineDescription(line: AuthoredLine): string {
   if (line.food) {
     const f = line.food, t = foodTotals(f);
-    return `${fa(f.grams)} گرم · ${f.basis}\n${fa(t.kcal)} کالری · پروتئین ${fa(t.protein)} · کربوهیدرات ${fa(t.carbs)} · چربی ${fa(t.fat)} گرم${line.details ? '\n' + line.details : ''}`;
+    const reference = recipeReferenceLabel(f.reference);
+    return `${fa(f.grams)} گرم · ${f.basis}\n${fa(t.kcal)} کالری · پروتئین ${fa(t.protein)} · کربوهیدرات ${fa(t.carbs)} · چربی ${fa(t.fat)} گرم${reference ? '\n' + reference : ''}${line.details ? '\n' + line.details : ''}`;
   }
   if (line.training) {
     const t = line.training;
@@ -54,6 +56,7 @@ export function nutritionMenuSummary(lines: AuthoredLine[]): string {
 export function foodLine(food: FoodItem, grams = 100): AuthoredLine {
   return { name: food.name, details: '', food: {
     id: food.id, grams, gramsPerUnit: food.gramsPerUnit,
+    ...(food.reference ? { reference: food.reference } : {}),
     basis: foodWeightBasis(food) ?? 'آماده مصرف',
     kcal: food.kcalPerUnit, protein: food.proteinPerUnit, carbs: food.carbsPerUnit, fat: food.fatPerUnit,
   } };

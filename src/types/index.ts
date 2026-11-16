@@ -175,8 +175,18 @@ export type FoodQualityTag =
  * Every food a user ever sees traces back to one of these rows — never
  * an invented number.
  */
+export interface FoodReference {
+  name?: string;
+  url?: string;
+  recipe?: {
+    version: string;
+    batch?: { cookedGrams: number; servings: number };
+  };
+}
+
 export interface FoodItem {
   preparationState?: 'ready'|'cooked'|'dry'|'raw';
+  reference?: FoodReference;
   id: string;
   name: string;              // "سینه مرغ پخته"
   role: FoodRole;

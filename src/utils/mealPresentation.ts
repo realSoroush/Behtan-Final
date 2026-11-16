@@ -4,6 +4,7 @@ import type {
   Meal,
   MealComponent,
 } from "../types/index.ts";
+import { foodPreparationState } from './foodReference.ts';
 export type FoodVisual =
   | "egg"
   | "chicken"
@@ -65,12 +66,13 @@ const VISUALS: Record<string, FoodVisual> = {
 export const foodVisual = (food: Pick<FoodItem, "id">): FoodVisual =>
   VISUALS[food.id] ?? "generic";
 export function componentAmount(c: MealComponent) {
+  const state = foodPreparationState(c.foodItem);
   const basis =
-    c.foodItem.preparationState === "dry"
+    state === "dry"
       ? " · وزن خشک، پیش از آماده‌سازی"
-      : c.foodItem.preparationState === "cooked"
+      : state === "cooked"
         ? " · وزن پس از پخت"
-        : c.foodItem.preparationState === "raw"
+        : state === "raw"
           ? " · وزن خام"
           : "";
   return baseComponentAmount(c) + basis;
