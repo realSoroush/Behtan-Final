@@ -40,7 +40,7 @@ for (const [index, anchor] of initial.meals.entries()) {
     const selected = plan.meals[index];
     assert.notEqual(memberMealSignature(selected), memberMealSignature(before));
     for (let i = 0; i < plan.meals.length; i++) {
-      if (i !== index) assert.equal(memberMealSignature(plan.meals[i]), memberMealSignature(initial.meals[i]));
+      if (i !== index) assert.deepEqual(plan.meals[i], initial.meals[i]);
     }
     assert(isPracticalMeal(selected.slot, selected.components));
     assert.equal(selected.totalKcal, selected.components.reduce((sum, c) => sum + c.kcal, 0));
@@ -82,22 +82,27 @@ for (const plan of [initial, rest, heavy]) {
   }
 }
 
-// A swap the old per-ingredient equivalence check blocked is feasible with
-// small portion changes in the rest of the day.
+// This swap previously needed portion changes outside breakfast.
 const egg = breakfast.components.findIndex(c => c.foodItem.id === 'egg_whole');
 assert(egg >= 0);
 assert.equal(getSwapOptionsForMeal(breakfast, egg, preferences).find(o => o.foodItem.id === 'egg_white')?.isEquivalent, false);
-const swap = getMemberSwapOptions(rest, 0, egg, preferences, emptyIntake).find(o => o.foodItem.id === 'egg_white');
-assert(swap);
+assert(!getMemberSwapOptions(rest, 0, egg, preferences, emptyIntake).some(o => o.foodItem.id === 'egg_white'));
+const feasible = rest.meals.flatMap((meal, mealIndex) => meal.components.flatMap((component, componentIndex) =>
+  getMemberSwapOptions(rest, mealIndex, componentIndex, preferences, emptyIntake).map(option => ({mealIndex, componentIndex, option}))));
+assert(feasible.length > 0);
+const {mealIndex, componentIndex, option: swap} = feasible[0];
+const swappedSlot = rest.meals[mealIndex].slot;
+const originalFoodId = rest.meals[mealIndex].components[componentIndex].foodItem.id;
 assertFeasible(swap.plan);
-assert(swap.plan.meals.slice(1).some((m, i) => m !== rest.meals[i + 1]));
-assert.equal(swap.plan.meals[0].components[egg], swap.replacementComponent);
+assert.deepEqual(swap.plan.meals.filter(m => m.slot !== swappedSlot), rest.meals.filter(m => m.slot !== swappedSlot));
+assert.equal(swap.plan.meals[mealIndex].components[componentIndex], swap.replacementComponent);
 const savedSwap = JSON.parse(JSON.stringify(withSwapBaseline(swap.plan, rest)));
-assert.equal(swapBaselineComponent(savedSwap, 'breakfast', egg).foodItem.id, 'egg_whole');
-const restore = getMemberSwapOptions(savedSwap, 0, egg, preferences, emptyIntake,
-  swapBaselineComponent(savedSwap, 'breakfast', egg)).find(o => o.foodItem.id === 'egg_whole');
+assert.equal(swapBaselineComponent(savedSwap, swappedSlot, componentIndex).foodItem.id, originalFoodId);
+const restore = getMemberSwapOptions(savedSwap, mealIndex, componentIndex, preferences, emptyIntake,
+  swapBaselineComponent(savedSwap, swappedSlot, componentIndex)).find(o => o.foodItem.id === originalFoodId);
 assert(restore);
 assertFeasible(restore.plan);
+assert.deepEqual(restore.plan.meals, rest.meals);
 
 // Check-ins stay frozen, a skipped slot stays unchanged, and equivalent
 // extra intake is counted in the day instead of being written as a new slot.
@@ -105,7 +110,7 @@ const recorded = { ...rest.meals[2], consumed: true };
 const locked = { ...rest, meals: rest.meals.map((m, i) => i === 2 ? recorded : m) };
 const skipped = rest.meals[3];
 const intake = { skippedSlots: [skipped.slot], extraMeals: [skipped] };
-const edited = rebalanceMemberDay(locked, 0, swap.plan.meals[0], preferences, intake);
+const edited = rebalanceMemberDay(locked, 0, rest.meals[0], preferences, intake);
 assert(edited);
 assert.equal(edited.meals[2], recorded);
 assert.equal(edited.meals[3], skipped);

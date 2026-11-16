@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { memberService } from "./service.ts";
+import { memberMealSearchCode } from "./mealSchedule.ts";
 export function memberHandler(factory = memberService) {
   return async (
     req: IncomingMessage & { body?: unknown },
@@ -55,12 +56,13 @@ export function memberHandler(factory = memberService) {
       res.statusCode = 200;
       res.end(JSON.stringify(result));
     } catch (e) {
-      const message = e instanceof Error ? e.message : "";
+      const message = memberMealSearchCode(e) ?? (e instanceof Error ? e.message : "");
       const status: Record<string, number> = {
         AUTH_REQUIRED: 401, TOO_LARGE: 413, TRAINING_LOCKED: 403,
         ACCESS_DENIED: 403, INTAKE_NOT_FOUND: 409, INTAKE_LIMIT: 422, STALE_CONTEXT: 409, STALE_INTAKE: 409,
         STALE_PLAN: 409, REQUEST_CONFLICT: 409, MEAL_NOT_EDITABLE: 409,
-        NO_FEASIBLE_PLAN: 422, MEDICAL_REVIEW_REQUIRED: 422, INVALID_INTAKE: 422,
+        NO_FEASIBLE_PLAN: 422, MEAL_SEARCH_LIMIT: 422, MEAL_ALTERNATIVE_UNAVAILABLE: 422,
+        MEDICAL_REVIEW_REQUIRED: 422, INVALID_INTAKE: 422,
         RATE_LIMITED: 429, MEAL_SCHEDULE_MIGRATION_REQUIRED: 503, TIMEOUT: 504,
       };
       const allowed = ["PROFILE_CHANGED", "INVALID_REQUEST", "INVALID_MEAL_DATE", "INVALID_PLAN"];

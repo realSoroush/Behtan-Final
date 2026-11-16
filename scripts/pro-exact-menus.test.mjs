@@ -10,6 +10,7 @@ import {authoredHtml} from '../src/professional/authoredPlan.ts';
 import {printedPlanHtml} from '../src/professional/printPlan.ts';
 import {nutritionMealSections,nutritionTargetRows} from '../src/professional/nutritionPresentation.ts';
 import {describeProfessionalRecipe,professionalRecipeAllowed} from '../src/utils/professionalMenuPolicy.ts';
+import {exhaustiveMenuSearch} from '../src/utils/exhaustiveMenuSearch.ts';
 const catalog=installTestNutritionCatalog();
 const templates=new Map(catalog.mealTemplates.map(template=>[template.id,template]));
 const base={...emptyRealIntake(),display_name:'Synthetic exact-menu case',birth_date:'1992-04-23',weight_kg:75,height_cm:165,safety_confirmed:true};
@@ -81,6 +82,26 @@ assert(new Set(postWorkout.options.map(m=>describeProfessionalRecipe(m).primaryP
   'Post-workout alternatives vary the whole-food protein');
 
 const day=pdfCase.days[0];
+// Independent small Cartesian reference for the bounded menu frontier.
+const tiny=day.slots.slice(0,2).map(slot=>({...slot,options:slot.options.slice(0,2)}));
+const [left,right]=tiny.map(slot=>slot.options);
+const targetFor=(first,second)=>({
+ targetCalories:first.totalKcal+second.totalKcal, proteinGrams:first.totalProtein+second.totalProtein,
+ carbGrams:first.totalCarbs+second.totalCarbs, fatGrams:first.totalFat+second.totalFat,
+});
+const choose=(slot,meal)=>({...slot,options:[meal]});
+for (const target of [...left.flatMap(a=>right.map(b=>targetFor(a,b))), {...targetFor(left[0],right[0]),targetCalories:10000}]) {
+ const combinations=left.flatMap(a=>right.map(b=>[choose(tiny[0],a),choose(tiny[1],b)]));
+ const expected=combinations.find(choices=>menuCombinationsFeasible(choices,target));
+ const search=exhaustiveMenuSearch(tiny,target,1,20);
+ assert.equal(search.kind,expected?'found':'pool-infeasible');
+ if(expected)assert.deepEqual(search.slots,expected);
+ assert.equal(Boolean(selectProfessionalMenus(tiny,target,1)),Boolean(expected));
+}
+assert.equal(exhaustiveMenuSearch(tiny,targetFor(left[0],right[0]),1,1).kind,'search-limit');
+assert.equal(exhaustiveMenuSearch(tiny,targetFor(left[0],right[0]),3,1).kind,'pool-infeasible');
+const exactPairs=day.slots.map(slot=>({...slot,options:slot.options.slice(0,2)}));
+assert.deepEqual(exhaustiveMenuSearch(exactPairs,day.targets,2),{kind:'found',slots:exactPairs});
 const first=day.slots[0].options[0];
 const alias=structuredClone(first);
 alias.components.reverse().forEach((component,index)=>{

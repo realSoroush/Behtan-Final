@@ -169,11 +169,13 @@ function isTemplateEligible(
 
 export class MealPlanGenerationError extends Error {
   slot: MealSlot;
+  readonly reason: 'no-eligible-options' | 'search-limit';
 
-  constructor(slot: MealSlot, message: string) {
+  constructor(slot: MealSlot, message: string, reason: 'no-eligible-options' | 'search-limit' = 'search-limit') {
     super(message);
     this.name = 'MealPlanGenerationError';
     this.slot = slot;
+    this.reason = reason;
   }
 }
 
@@ -183,7 +185,7 @@ export class MealPlanFeasibilityError extends Error {
 
   constructor(target: MacroVector, actual: MacroVector) {
     super(
-      'با مواد غذایی و محدودیت‌های فعلی، ساخت برنامه‌ای با حجم واقعی و نزدیک به اهداف تغذیه‌ای شما ممکن نیست. لطفاً محدودیت‌های غذایی را بررسی کنید یا بعداً دوباره تلاش کنید.'
+      'موتور در محدودهٔ جست‌وجو برنامه‌ای با حجم واقعی و نزدیک به اهداف تغذیه‌ای پیدا نکرد.'
     );
     this.name = 'MealPlanFeasibilityError';
     this.target = target;
@@ -1144,7 +1146,7 @@ function generateDailyMealPlanWithCatalog(
     const prefs = context.proteinBudgetPreference ?? 'performance';
     const preferred = prefs === 'performance' ? ['pw_whey_water','pw_chicken_potato','pw_plant_bowl','pw_pea_water'] : ['pw_chicken_potato','pw_plant_bowl','pw_pea_water'];
     const template = preferred.map(id=>engine.templatesById.get(id)).find(t=>t && isTemplateEligible(engine, t,preferences,true));
-    if (!postLocked && !template) throw new MealPlanGenerationError('post_workout','گزینهٔ مجاز پس از تمرین در کاتالوگ موجود نیست.');
+    if (!postLocked && !template) throw new MealPlanGenerationError('post_workout','گزینهٔ مجاز پس از تمرین در کاتالوگ موجود نیست.', 'no-eligible-options');
     const components = template?.slots.map(s=>componentFromUnits(foodById(engine, s.primaryFoodItemId),s.fixedUnits ?? 1)) ?? [];
     const totals = components.reduce(addTotals,{kcal:0,protein:0,carbs:0,fat:0});
     const post = postLocked ?? buildMeal({slot:'post_workout',template:template!,resolved:{components,totals,score:0,kcalDeviation:0}});
@@ -1180,7 +1182,8 @@ function generateDailyMealPlanWithCatalog(
     if (eligible.length === 0) {
       throw new MealPlanGenerationError(
         slot,
-        `هیچ ترکیب غذایی امنی برای ${MEAL_SLOT_LABELS[slot]} با محدودیت‌های انتخاب‌شده پیدا نشد.`
+        `هیچ ترکیب غذایی امنی برای ${MEAL_SLOT_LABELS[slot]} با محدودیت‌های انتخاب‌شده پیدا نشد.`,
+        'no-eligible-options'
       );
     }
 
@@ -1450,7 +1453,7 @@ export type MemberDayIntake = {
 };
 
 function mealOption(engine: EngineCatalog, meal: Meal, locked: boolean): ResolvedOption {
-  const template = engine.templatesById.get(meal.templateId)
+  const template = engine.templatesById.get(meal.templateId.split('~')[0])
     ?? { id: meal.templateId, slot: meal.slot, displayName: meal.templateName, slots: [], isWorkoutDayOnly: false, isRestDayOnly: false, goalTags: [] };
   return {
     slot: meal.slot, template, locked: locked ? meal : undefined,
@@ -1474,9 +1477,11 @@ function memberAllocationTargets(plan: DailyMealPlan, replacement: Meal): MacroT
   };
 }
 
-/** The selected serving and intake facts are locked. Only other planned portions may move. */
+/** Intake and every other meal are immutable during an edit. Rotation can
+ * fit the new recipe's portions. An explicit component swap keeps its serving. */
 function rebalanceMemberDayWithCatalog(
   engine: EngineCatalog, plan: DailyMealPlan, index: number, replacement: Meal, preferences: DietaryPreferencesJson, intake: MemberDayIntake,
+  fitReplacement = false,
 ): DailyMealPlan | null {
   const current = plan.meals[index];
   if (!current || current.slot !== replacement.slot || current.consumed || intake.skippedSlots.includes(current.slot)) return null;
@@ -1500,22 +1505,16 @@ function rebalanceMemberDayWithCatalog(
     })) return null;
   }
   const options = [
-    ...included.map(meal => mealOption(engine, meal, meal === replacement || meal.consumed || meal.slot === 'post_workout')),
+    ...included.map(meal => mealOption(engine, meal, meal !== replacement || !fitReplacement || meal.slot === 'post_workout')),
     ...intake.extraMeals.map(meal => mealOption(engine, meal, true)),
   ];
   if (isDailyPlanFeasible(options, plan.targets)) return { ...plan, meals, remainingTargetsUnmet: false };
-  const refined = refineDailyPortions(engine, options, plan.targets, true, true, allocation);
+  if (!fitReplacement || replacement.slot === 'post_workout') return null;
+  const refined = refineDailyPortions(engine, options, plan.targets, true, false, allocation);
   if (!isDailyPlanFeasible(refined, plan.targets)) return null;
-
-  const adjusted = new Map(included.map((meal, i) => {
-    const option = refined[i];
-    if (option.locked || meal.components.every((component, j) => component.units === option.resolved.components[j].units)) {
-      return [meal.slot, meal] as const;
-    }
-    const { components, totalKcal, totalProtein, totalCarbs, totalFat, totalFiber } = buildMeal(option);
-    return [meal.slot, { ...meal, components, totalKcal, totalProtein, totalCarbs, totalFat, totalFiber }] as const;
-  }));
-  return { ...plan, meals: meals.map(meal => adjusted.get(meal.slot) ?? meal), remainingTargetsUnmet: false };
+  const { components, totalKcal, totalProtein, totalCarbs, totalFat, totalFiber } = buildMeal(refined[included.indexOf(replacement)]);
+  meals[index] = { ...replacement, components, totalKcal, totalProtein, totalCarbs, totalFat, totalFiber };
+  return { ...plan, meals, remainingTargetsUnmet: false };
 }
 
 export type MemberSwapOption = Pick<FoodSwapOption, 'foodItem' | 'replacementComponent'> & {

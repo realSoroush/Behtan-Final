@@ -38,7 +38,9 @@ export function proErrorMessage(error: unknown): string {
   if (code.includes('PRO_CONNECTION_ERROR')) return 'ارتباط موقتاً برقرار نیست؛ اطلاعات شما حفظ شده است. دوباره تلاش کنید.';
   if (code.includes('PRO_DRAFT_EXPIRED')) return 'زمان پیش‌نمایش تمام شده است؛ برنامه را دوباره تولید کنید.';
   if (code.includes('PRO_GENERATION_LIMIT')) return 'تعداد درخواست‌های ساخت برنامه زیاد شده است؛ کمی بعد دوباره تلاش کنید.';
-  if (code.includes('PRO_MENU_COUNT_UNAVAILABLE')) return 'با کاتالوگ و محدودیت‌های فعلی، ساخت دقیقِ تعداد منوی انتخاب‌شده ممکن نشد. برای بررسی پرونده با پشتیبانی تماس بگیرید یا از تدوین اختصاصی استفاده کنید.';
+  if (code.includes('PRO_NO_ELIGIBLE_MEAL')) return 'در کاتالوگ فعلی برای یکی از وعده‌ها گزینهٔ سازگار با محدودیت‌های ثبت‌شده وجود ندارد. پرونده را بازبینی کنید یا از تدوین اختصاصی استفاده کنید.';
+  if (code.includes('PRO_MENU_SEARCH_LIMIT')) return 'موتور در محدودهٔ جست‌وجو به تعداد درخواستی منوی سازگار پیدا نکرد. تعداد منوها را کمتر کنید یا از تدوین اختصاصی استفاده کنید.';
+  if (code.includes('PRO_MENU_COUNT_UNAVAILABLE')) return 'ترکیب گزینه‌های بررسی‌شده برای تعداد منوی درخواستی کافی نبود. تعداد منوها را کمتر کنید یا از تدوین اختصاصی استفاده کنید.';
   if (code.includes('PRO_MEDICAL_STOP')) return 'این سناریو به تدوین اختصاصی متخصص نیاز دارد؛ از ابزار تدوین اختصاصی برنامه استفاده کنید.';
   if (code.includes('PRO_GENERATION_FAILED')) return 'موتور نتوانست برنامه سازگار بسازد؛ اطلاعات و محدودیت‌های غذایی را بررسی کنید.';
   if (code.includes("PRO_STALE_REVISION"))

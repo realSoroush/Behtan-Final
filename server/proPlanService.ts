@@ -1,6 +1,6 @@
 import type { PrintedPlan, RealIntake } from '../src/professional/menuPlan.ts';
 import { generatePrintedPlan, ProMenuCountError } from '../src/professional/menuPlan.ts';
-import { createMealPlanEngine } from '../src/utils/mealPlanEngine.ts';
+import { createMealPlanEngine, MealPlanFeasibilityError, MealPlanGenerationError } from '../src/utils/mealPlanEngine.ts';
 import type { NutritionCatalog, ProteinEnginePolicy } from '../src/types/index.ts';
 import { proNutritionDraftAllowed } from '../src/professional/intake.ts';
 
@@ -90,7 +90,11 @@ export async function processPlanRequest(
       if (revision) result.catalog_revision = revision;
       return result;
     } catch (error) {
-      if (error instanceof ProMenuCountError) throw new ProServerError('PRO_MENU_COUNT_UNAVAILABLE', 422);
+      if (error instanceof ProMenuCountError)
+        throw new ProServerError(error.reason === 'search-limit' ? 'PRO_MENU_SEARCH_LIMIT' : 'PRO_MENU_COUNT_UNAVAILABLE', 422);
+      if (error instanceof MealPlanGenerationError)
+        throw new ProServerError(error.reason === 'no-eligible-options' ? 'PRO_NO_ELIGIBLE_MEAL' : 'PRO_MENU_SEARCH_LIMIT', 422);
+      if (error instanceof MealPlanFeasibilityError) throw new ProServerError('PRO_MENU_SEARCH_LIMIT', 422);
       throw new ProServerError('PRO_GENERATION_FAILED', 422);
     }
   });

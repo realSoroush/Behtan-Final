@@ -27,6 +27,7 @@ console.log(`✅ ${total} rest/workout/budget plans; breakfast+swap caps, fixed 
 
 // A composite recipe scales as a whole and goes through the normal menu gates.
 const omnivore = { vegetarianStatus: 'none', allergies: [] };
+const noIntake = { skippedSlots: [], extraMeals: [] };
 const pastaId = 'ln_whole_wheat_beef_pasta';
 const pilot = generateDailyMealPlan(calculateMacros(2050, 85, 'weight_loss', 178), 85, omnivore, false, 'verified-pasta');
 const lunchIndex = pilot.meals.findIndex(m => m.slot === 'lunch');
@@ -38,7 +39,7 @@ assert.equal(pasta.components[0].grams, pasta.components[0].units * 200);
 assert.equal(pasta.totalKcal, Math.round(pasta.components[0].units * 270));
 assert(pasta.components[0].grams >= 200 && pasta.components[0].grams <= 400);
 assert.deepEqual(getSwapOptionsForMeal(pasta, 0, omnivore), []);
-assert(rebalanceMemberDay(pilot, lunchIndex, pasta, omnivore, { skippedSlots: [], extraMeals: [] }));
+assert(rebalanceMemberDay(pilot, lunchIndex, pasta, omnivore, noIntake, true));
 for (const prefs of [
   { ...omnivore, allergies: ['gluten'] },
   ...['vegan', 'lacto_ovo', 'pescatarian', 'raw'].map(vegetarianStatus => ({ ...omnivore, vegetarianStatus })),
@@ -51,7 +52,19 @@ const curry = getProfessionalMealOptions(lunch, omnivore, false).find(m => m.tem
 assert(curry);
 assert(curry.components[0].grams >= 285 && curry.components[0].grams <= 475);
 assert.equal(curry.totalKcal, Math.round(curry.components[0].units * 220.32));
-assert(rebalanceMemberDay(pilot, lunchIndex, curry, omnivore, { skippedSlots: [], extraMeals: [] }));
+// This recipe is allowed by the catalog but does not fit this day's fixed meals.
+assert.equal(rebalanceMemberDay(pilot, lunchIndex, curry, omnivore, noIntake, true), null);
+
+const curryDay = generateDailyMealPlan(calculateMacros(2200, 85, 'weight_loss', 178), 85, omnivore, false, 'verified-curry-1');
+const curryLunchIndex = curryDay.meals.findIndex(m => m.slot === 'lunch');
+assert.notEqual(curryDay.meals[curryLunchIndex].templateId, curryId);
+const curryAlternative = memberMealAlternatives(curryDay, curryLunchIndex, omnivore).find(m => m.templateId === curryId);
+assert(curryAlternative);
+const updatedCurryDay = rebalanceMemberDay(curryDay, curryLunchIndex, curryAlternative, omnivore, noIntake, true);
+assert(updatedCurryDay);
+assert.equal(updatedCurryDay.meals[curryLunchIndex].templateId, curryId);
+assert.deepEqual(updatedCurryDay.meals.filter(m => m.slot !== 'lunch'), curryDay.meals.filter(m => m.slot !== 'lunch'));
+
 for (const prefs of [{ ...omnivore, allergies: ['dairy'] }, { ...omnivore, allergies: ['celery'] }, { ...omnivore, vegetarianStatus: 'lacto_ovo' }]) {
   assert(!getProfessionalMealOptions(lunch, prefs, false).some(m => m.templateId === curryId));
 }

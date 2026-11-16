@@ -300,7 +300,7 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
     catch (error) {
       if (generationRef.current === generationKey) {
         if (intent.kind !== 'generate') {
-          track(error instanceof MemberRequestError && error.code === 'NO_FEASIBLE_PLAN'
+          track(error instanceof MemberRequestError && ['NO_FEASIBLE_PLAN', 'MEAL_ALTERNATIVE_UNAVAILABLE'].includes(error.code)
             ? 'meal_change_unavailable' : 'meal_change_save_failed');
         }
         setViewError(error instanceof Error ? error.message : 'تغییر برنامه انجام نشد.');
@@ -450,7 +450,7 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
         foodId: option.foodItem.id, units: option.replacementComponent.units });
     } catch (error) {
       if (generationRef.current !== generationKey) throw error;
-      track(error instanceof MemberRequestError && error.code === 'NO_FEASIBLE_PLAN'
+      track(error instanceof MemberRequestError && ['NO_FEASIBLE_PLAN', 'MEAL_ALTERNATIVE_UNAVAILABLE'].includes(error.code)
         ? 'meal_change_unavailable' : 'meal_change_save_failed');
       if (error instanceof MemberRequestError && error.status === 409) {
         setSwapMealIndex(null);

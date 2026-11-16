@@ -45,6 +45,16 @@ equal(generated.plan.intake_revision,1);
 for(const d of generated.plan.days)equal(menuCombinationsFeasible(d.slots,d.targets),true);
 equal((await processPlanRequest(body,'valid-token',deps)).draft_id,generated.draft_id);
 equal(drafts.size,1);equal(stageCalls,1);equal(catalogCalls,1);
+const withoutBreakfast={...TEST_NUTRITION_CATALOG,mealTemplates:TEST_NUTRITION_CATALOG.mealTemplates.filter(t=>t.slot!=='breakfast')};
+await reject(()=>processPlanRequest({...body,key:randomUUID()},'valid-token',{
+ ...deps,loadNutrition:async()=>({catalog:withoutBreakfast,policy:DEFAULT_PROTEIN_ENGINE_POLICY}),
+}),'PRO_NO_ELIGIBLE_MEAL');
+const highEnergyCatalog={...TEST_NUTRITION_CATALOG,
+ foods:TEST_NUTRITION_CATALOG.foods.map(f=>({...f,kcalPerUnit:f.kcalPerUnit*100}))};
+await reject(()=>processPlanRequest({...body,key:randomUUID()},'valid-token',{
+ ...deps,loadNutrition:async()=>({catalog:highEnergyCatalog,policy:DEFAULT_PROTEIN_ENGINE_POLICY}),
+}),'PRO_MENU_SEARCH_LIMIT');
+equal(stageCalls,1);
 const save={action:'save',org,record,revision:1,key:randomUUID(),draft:generated.draft_id};
 await reject(()=>processPlanRequest({...save,plan:{targetCalories:1}},'valid-token',deps),'PRO_INVALID_REQUEST');
 equal(publishCalls,0);

@@ -48,6 +48,11 @@ await assert.rejects(() => processMemberMealSchedule(user, { ...start, intakeRev
 await assert.rejects(() => processMemberMealSchedule(user, { ...start, expectedUpdatedAt: '2026-11-04T09:00:00Z' }, deps), /STALE_PLAN/);
 await assert.rejects(() => processMemberMealSchedule(user, { ...start, catalogRevision: '7' }, deps), /STALE_CONTEXT/);
 assert.equal(writes, 0);
+await assert.rejects(() => processMemberMealSchedule(user, start, {
+  ...deps, loadContext: async () => ({revision:'8',policy,catalog:{...catalog,
+    foods:catalog.foods.map(f=>({...f,kcalPerUnit:f.kcalPerUnit*100}))}}),
+}), /MEAL_SEARCH_LIMIT/);
+assert.equal(writes, 0);
 const original = await processMemberMealSchedule(user, start, deps);
 assert.equal(original.p_plan.nutritionContext.revision, '8');
 assert.equal(original.p_plan.nutritionContext.proteinReferenceWeightModel, 'step-v1');
@@ -91,9 +96,11 @@ for (const [mealIndex, meal] of base.meals.entries()) {
   if (swap) break;
 }
 assert(swap, 'fixture must provide a real option');
-await assert.rejects(() => processMemberMealSchedule(user, { ...swap, units: swap.units * 100 }, deps), /NO_FEASIBLE_PLAN/);
+await assert.rejects(() => processMemberMealSchedule(user, { ...swap, units: swap.units * 100 }, deps), /MEAL_ALTERNATIVE_UNAVAILABLE/);
+assert.equal(writes, 1, 'An unavailable swap must not write the day');
 const changed = await processMemberMealSchedule(user, swap, deps);
 assert.equal(changed.p_plan.meals.find(m => m.slot === swap.slot).components[swap.componentIndex].foodItem.id, swap.foodId);
+assert.deepEqual(changed.p_plan.meals.filter(m => m.slot !== swap.slot), base.meals.filter(m => m.slot !== swap.slot));
 const recorded = base.meals.find(m => m.slot === swap.slot);
 state.checkins[swap.slot] = { ...recorded, consumed: true };
 await assert.rejects(() => processMemberMealSchedule(user, { ...swap, requestId: randomUUID() }, deps), /MEAL_NOT_EDITABLE/);
@@ -103,9 +110,10 @@ for (const meal of base.meals) {
   try {
     rotated = await processMemberMealSchedule(user, { ...edit, kind: 'rotate', slot: meal.slot }, deps);
     assert.notEqual(rotated.p_plan.meals.find(m => m.slot === meal.slot).templateId, meal.templateId);
+    assert.deepEqual(rotated.p_plan.meals.filter(m => m.slot !== meal.slot), base.meals.filter(m => m.slot !== meal.slot));
     break;
   } catch (error) {
-    if (error.message !== 'NO_FEASIBLE_PLAN') throw error;
+    if (error.message !== 'MEAL_ALTERNATIVE_UNAVAILABLE') throw error;
   }
 }
 assert(rotated, 'fixture must allow a real rotation');
