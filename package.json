@@ -6,7 +6,7 @@
   "scripts": {
     "test:pro:profile": "node --experimental-strip-types scripts/pro-specialist-profile.test.mjs",
     "test:pro:ux": "node --experimental-strip-types scripts/pro-ux.test.mjs && node scripts/pro-ux-followup.test.mjs && node scripts/pro-home-training.test.mjs && node scripts/pro-training-navigation.test.mjs && node --experimental-strip-types scripts/pro-exact-menus.test.mjs",
-    "test:pro:studio": "node --experimental-strip-types scripts/pro-studio.test.mjs && node --experimental-strip-types scripts/pro-catalog-adapter.test.mjs",
+    "test:pro:studio": "node --experimental-strip-types scripts/pro-studio.test.mjs && node --experimental-strip-types scripts/pro-catalog-adapter.test.mjs && node --experimental-strip-types scripts/nutrition-catalog-review.test.mjs",
     "test:onboarding:lifecycle": "node scripts/onboarding-lifecycle.test.mjs",
     "test:companion": "node --experimental-strip-types scripts/companion-state.test.mjs",
     "export:companion-preview": "node scripts/package-companion-preview.mjs",
@@ -34,6 +34,7 @@
     "test:routing": "node scripts/routing-stability.smoke-test.mjs",
     "test:protein": "node --experimental-strip-types scripts/protein-engine-v3.smoke-test.mjs",
     "test:protein-policy": "node --experimental-strip-types scripts/protein-policy-supabase.smoke-test.mjs && node --experimental-strip-types scripts/e07-continuous-reference-weight.test.mjs",
+    "review:nutrition-catalog": "node --experimental-strip-types scripts/review-nutrition-catalog.mjs",
     "review:protein-policy": "node --experimental-strip-types scripts/review-protein-policy.mjs",
     "test:protein-range": "node --experimental-strip-types scripts/protein-minimum-preferred.smoke-test.mjs",
     "test:protein-budget": "node --experimental-strip-types scripts/protein-budget-preference.smoke-test.mjs",
