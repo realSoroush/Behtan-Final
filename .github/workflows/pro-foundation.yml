@@ -28,8 +28,12 @@ jobs:
         run: npm run lint
       - name: Type-check browser tests and fixtures
         run: npm run typecheck:tests
+      - name: Verify patched build dependency and bounded exploit regressions
+        run: npm run test:build-dependencies
       - name: Audit runtime dependencies
         run: npm audit --omit=dev --audit-level=moderate
+      - name: Audit all dependencies, including build tools
+        run: npm audit --audit-level=moderate
       - run: npm run test:pro:ux
       - run: npm run test:member:intake
       - run: npm run test:engine:safety
@@ -113,7 +117,3 @@ jobs:
       - run: npm run test:market
       - run: npm run test:security:hardening
       - run: npm run test:production && npm run test:admin && npm run test:medical-safety && npm run test:nutrition && npm run test:meal-progress && npm run test:onboarding && npm run test:routing && npm run test:mobile-meals && npm run test:diagnostics && npm run test:feasibility && npm run test:protein && npm run test:progress
-      # Keep this a blocking gate, after collecting functional verification.
-      # An upstream dev-tool advisory must not hide database/browser regressions.
-      - name: Audit all dependencies, including build tools
-        run: npm audit --audit-level=moderate
