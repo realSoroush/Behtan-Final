@@ -1,3 +1,4 @@
+import type { MealExperienceContext } from '../utils/mealExperience.ts';
 import {professionalMenusFeasible} from '../utils/professionalMenuEnvelope.ts';
 import { exhaustiveMenuSearch } from '../utils/exhaustiveMenuSearch.ts';
 import {
@@ -39,6 +40,7 @@ export interface MenuDay {
   slots: { slot: MealSlot; label: string; options: Meal[] }[];
 }
 export interface PrintedPlan {
+  meal_settings?: import('../utils/mealSettings.ts').MealSettings;
   menu_contract?:'exact-v2';
   catalog_revision?: string;
   version: 1;
@@ -232,6 +234,7 @@ export function generatePrintedPlan(
   date: string,
   notes = "",
   engine: Pick<MealPlanEngine, 'generateDailyMealPlan' | 'getProfessionalMealOptions'> & Partial<Pick<MealPlanEngine, 'rebalanceProfessionalMenus' | 'canUseProfessionalMeal'>> = { generateDailyMealPlan, getProfessionalMealOptions, rebalanceProfessionalMenus, canUseProfessionalMeal },
+  context: Pick<MealExperienceContext, 'mealStructure' | 'proteinPrices'> = {},
 ): PrintedPlan {
   if (!Number.isInteger(count) || count < 1 || count > 5)
     throw new Error("تعداد منو باید بین ۱ تا ۵ باشد.");
@@ -267,7 +270,7 @@ export function generatePrintedPlan(
       preferences,
       workout,
       date,
-      { proteinBudgetPreference: a.protein_budget },
+      { ...context, proteinBudgetPreference: a.protein_budget },
     );
     if (base.remainingTargetsUnmet)
       throw new MealPlanFeasibilityError(

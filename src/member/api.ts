@@ -28,6 +28,7 @@ export async function memberRequest<T>(
     .catch(() => ({ error: "ارتباط با سرویس برقرار نشد." }));
   if (!res.ok) {
     const messages: Record<string, string> = {
+      WEEKLY_MEAL_LIMIT: 'سقف تکرار یکی از غذاها در هفته پر شده یا برنامه در دستگاه دیگری تغییر کرده است. هفته را تازه کن و دوباره بساز.',
       PROFILE_CHANGED:"اطلاعات پروفایل تغییر کرد؛ اطلاعات تازه را بررسی کن و دوباره برنامه را بساز.",
       TRAINING_LOCKED: "برای دریافت تمرین، اشتراکت را ارتقا بده.",
       TRAINING_REVIEW_REQUIRED:

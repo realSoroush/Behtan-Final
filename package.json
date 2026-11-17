@@ -48,7 +48,7 @@
     "build:admin": "tsc -b && vite build --config vite.admin.config.ts",
     "test:admin": "node scripts/admin-database.test.mjs && node --experimental-strip-types scripts/admin-test-scenarios.test.mjs",
     "test:experience": "node --experimental-strip-types scripts/meal-experience.test.mjs",
-    "test:progress": "node --experimental-strip-types scripts/progress-journal.test.mjs && node --experimental-strip-types scripts/progress-database.test.mjs",
+    "test:progress": "node --experimental-strip-types scripts/progress-journal.test.mjs && node --experimental-strip-types scripts/progress-database.test.mjs && node --experimental-strip-types scripts/meal-settings-weight-review.test.mjs",
     "test:mobile-meals": "node --experimental-strip-types scripts/mobile-meals.test.mjs && node --experimental-strip-types scripts/flexible-meal-structure.test.mjs && npm run test:menus",
     "dev:pro": "vite --config vite.pro.config.ts",
     "build:pro": "npm run typecheck:pro:server && tsc -b && vite build --config vite.pro.config.ts",
@@ -77,7 +77,8 @@
     "backup:full:verify": "node scripts/verify-full-backup.mjs",
     "dev:prepare": "node scripts/prepare-local-dev.mjs",
     "test:billing:recovery": "node --experimental-strip-types scripts/billing-recovery.test.mjs && node scripts/payment-rollout.test.mjs",
-    "test:engine:safety": "node --experimental-strip-types scripts/engine-wave1.test.mjs"
+    "test:engine:safety": "node --experimental-strip-types scripts/engine-wave1.test.mjs",
+    "prepare:reviewed-recipe": "node --experimental-strip-types scripts/prepare-reviewed-recipe.mjs"
   },
   "dependencies": {
     "@rive-app/canvas": "2.44.2",

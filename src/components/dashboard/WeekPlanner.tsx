@@ -52,14 +52,16 @@ export function WeekPlanner({
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addPlanDays(today, i)), [today]);
   const current = selected === today ? plan : schedule.plans[selected];
+  const latestSchedule = useRef(schedule);
+  latestSchedule.current = schedule;
   const generate = async () => {
     setError("");
     setBuilding(true);
     try {
       for (const date of days.slice(1)) {
         if (!alive.current) return;
-        if (schedule.plans[date]) continue;
-        await schedule.submit(date, {
+        if (latestSchedule.current.plans[date]) continue;
+        await latestSchedule.current.submit(date, {
           kind: 'generate', regenerate: false,
           workout: workoutForDate(date, profile.workout_weekdays, profile.workout_days ?? 0),
         });

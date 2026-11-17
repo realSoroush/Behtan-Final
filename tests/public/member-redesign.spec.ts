@@ -470,8 +470,8 @@ test("swapping previews a selection before applying it to the plate",async({page
  await expect(page.locator('#today-panel .food-piece[data-food-id="'+selectedId+'"]')).toHaveCount(1);
 });
 
-test("three-day selection never records a future meal",async({page})=>{
- await expect(page.locator('.companion-days button')).toHaveCount(3);
+test("seven-day selection never records a future meal",async({page})=>{
+ await expect(page.locator('.companion-days button')).toHaveCount(7);
  await page.locator('.companion-days button').nth(1).click();
  await expect(page.locator('#today-panel .member-meal-card')).toHaveCount(1);
  await expect(page.getByRole('heading',{name:'انرژی این روز'})).toBeVisible();

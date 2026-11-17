@@ -478,6 +478,7 @@ export async function testMarketDatabase({ db }) {
   await import('./pro-training-ux-database.mjs').then(m=>m.testProTrainingUx(db));
   await import('./pro-allergy-notes-database.mjs').then(m=>m.testProAllergyNotes(db));
   await import('./member-intake-database.mjs').then(m=>m.testMemberIntake(db));
+  await import('./meal-settings-weight-review-database.mjs').then(m=>m.testMealSettingsAndWeightReview(db));
   console.log(
     "PASS market SQL: migrations, admin gates, RPC privilege boundaries, catalog/profile-bound preflight, forged prices, half-price, single-use trial, verified/idempotent settlement, dynamic upgrade with original expiry, Pro trial provisioning, analytics minimization",
   );

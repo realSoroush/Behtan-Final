@@ -1,3 +1,4 @@
+import { prepareReviewedRecipe } from './prepare-reviewed-recipe.mjs';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -81,3 +82,10 @@ try {
   rmSync(temp, { force: true, recursive: true });
 }
 console.log('PASS catalog evidence gaps, review provenance, cross-contact, cooked yield, unknown micronutrients and stale approvals');
+
+const config = {role:'protein',emoji:'',excluded_for_vegetarian:[],swap_allowed_meals:['lunch'],swap_group:'reviewed_dish',portion_min_units:1,portion_typical_units:1.5,portion_soft_max_units:2,portion_hard_max_units:3,portion_step:0.25,quality_tags:[],fruit_veg_grams_per_unit:0,slot:'lunch',max_per_week:2};
+assert.match(prepareReviewedRecipe(recipe,approval,config),/insert into public.nutrition_recipe_reviews/);
+assert.throws(()=>prepareReviewedRecipe(recipe,null,config),/specialist decision/);
+assert.throws(()=>prepareReviewedRecipe({...recipe,version:'different'},approval,config),/specialist decision/);
+assert.throws(()=>prepareReviewedRecipe(recipe,approval,{...config,max_per_week:null}),/repetition cap/);
+console.log('PASS reviewed recipe staging requires matching complete evidence, immutable version IDs and explicit pilot configuration');
