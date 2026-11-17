@@ -17,7 +17,7 @@ export async function testMealSettingsAndWeightReview(db) {
   await db.query('insert into user_profiles(id,weight,height,onboarding_completed)values($1,85,178,true)',[id]);
  }
  const day=(await db.query("select ((now() at time zone 'Asia/Tehran')::date)::text as d")).rows[0].d;
- const rpc=async(name,args=[])=>(await db.query(`select public.${name}(${args.map((_,i)=>'$'+(i+1)).join(',')}) result`,args)).rows[0].result;
+ const rpc=async(name,args=[])=>(await db.query(`select public.${name}(${args.map((_,i)=>'$'+(i+1)).join(',')}) result`,args.map(value=>Array.isArray(value)?JSON.stringify(value):value))).rows[0].result;
  const as=async(id,role='authenticated')=>{await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id]);await db.exec('set role '+role);};
  await as(user);
  await rpc('member_set_meal_settings',[null,{regularMeals:3,includePostWorkout:false}]);
