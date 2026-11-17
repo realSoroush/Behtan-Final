@@ -1,3 +1,4 @@
+import { APP_LOGO_PATH } from '@/constants/brand';
 import { useRef, useState, type FormEvent } from 'react';
 import { ArrowUpLeft, MapPin, ShieldCheck } from 'lucide-react';
 import { PanelSelect } from '@/components/ui/PanelSelect';
@@ -27,7 +28,7 @@ export function SpecialistProfileForm({ initial, onSaved, editing = false }: {
   }
   return <section className="specialist-profile pro-panel" aria-labelledby={editing ? 'specialist-edit-title' : 'specialist-title'}>
     <header className="specialist-profile-heading">
-      <img src="/behtan-logo.png" width="43" height="52" alt="به‌تن" />
+      <img src={APP_LOGO_PATH} width="43" height="52" alt="به‌تن" />
       <div><p className="pro-eyebrow">به‌تن حرفه‌ای · مشخصات متخصص</p><h1 id={editing ? 'specialist-edit-title' : 'specialist-title'}>{editing ? 'ویرایش مشخصات حرفه‌ای' : 'آشنایی کوتاه، شروع حرفه‌ای.'}</h1></div>
     </header>
     <p className="specialist-profile-intro">{editing ? 'مشخصات تماس در خروجی‌های بعدی برنامه‌ها استفاده می‌شود.' : 'برای آماده‌سازی پنل، مشخصات حرفه‌ای خود را یک بار کامل کنید.'} نام، شماره تماس و آدرس شما در PDF برنامهٔ مراجع نمایش داده می‌شود.</p>

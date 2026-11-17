@@ -1,5 +1,7 @@
 # نصب نسخهٔ نهایی اپ اعضای به‌تن
 
+> سابقهٔ بستهٔ اولیه. برای نصب و انتشار نسخهٔ فعلی از [README مخزن](../README.md) استفاده کنید.
+
 این بسته روی main با شناسهٔ `425fb376c9dae5c663f46358c1548813d7d952fc` ساخته شده است؛ همان نسخه‌ای که لندینگ Relay در آن ادغام شده است. همهٔ تغییرات اپ از پیش‌نمایش‌های قبلی داخل همین پچ هستند. پچ‌های قبلی اپ را قبل از این بسته اجرا نکن.
 
 ## چه چیزی اضافه شده؟
@@ -110,20 +112,6 @@ npm run dev
 npx playwright install chromium
 npm run test:public:browser
 ```
-
-## ۶. تغییرات را برای انتشار آماده کن
-
-پس از موفقیت دیتابیس، تابع و بررسی محلی:
-
-```powershell
-git diff --check
-git add --pathspec-from-file=MEMBER_APP_CHANGED_FILES.txt
-git diff --cached --stat
-git commit -m "Polish member app and confirm meal recording"
-git push -u origin feature/member-app-final
-```
-
-سپس PR همین شاخه را به main باز کن و بعد از موفقیت CI ادغام کن. اگر انتشار سایت به main متصل است، ادغام PR همان مسیر معمول انتشار را فعال می‌کند؛ قبل از ادغام، migrationها و تابع باید آماده باشند. Build اپ اعضا همان `npm run build` و خروجی آن `dist` است.
 
 ## وضعیت بررسی این بسته
 

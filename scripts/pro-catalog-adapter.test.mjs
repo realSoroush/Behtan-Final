@@ -5,6 +5,7 @@ import {supabasePlanDependencies} from '../server/proPlanSupabase.ts';
 import {createClient} from '@supabase/supabase-js';
 import {mealScheduleDependencies} from '../server/member/mealSchedule.ts';
 import {processPlanRequest} from '../server/proPlanService.ts';
+import {buildNutritionCatalog} from '../src/utils/nutritionCatalog.ts';
 const fixture=JSON.parse(readFileSync(new URL('./fixtures/nutrition-catalog.fixture.json',import.meta.url),'utf8'));
 const f = fixture;
 const foods = f.FOOD_ITEMS.map((x) => {
@@ -58,6 +59,11 @@ const slots = f.MEAL_TEMPLATES.flatMap((t) =>
     fixed_units: s.fixedUnits ?? null,
   })),
 );
+const catalogFromRows = foodRows => buildNutritionCatalog({ foodRows, substituteRows: [], templateRows: templates, slotRows: slots });
+for (const missing of [null, false, '', ' ']) {
+  assert.throws(() => catalogFromRows([{ ...foods[0], kcal_per_unit: missing }, ...foods.slice(1)]), /Invalid numeric value.*kcal_per_unit/);
+}
+assert.equal(catalogFromRows([{ ...foods[0], kcal_per_unit: '0' }, ...foods.slice(1)]).foods.find(food => food.id === foods[0].id).kcalPerUnit, 0);
 const policy = {
   id: "default",
   maintenance_no_rt_min: 1.2,

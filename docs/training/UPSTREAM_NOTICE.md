@@ -12,7 +12,7 @@ Per the rights holder's permission, the media is included under the following te
 - **Resolution:** distributed at **180×180** only.
 - **Attribution:** every use must carry the copyright indication
   **© Gym visual — https://gymvisual.com/**. Each record in
-  [`data/exercises.json`](data/exercises.json) also carries an `attribution`
+  `data/exercises.json` in the upstream dataset also carries an `attribution`
   field with this notice.
 
 If you use this media, keep the attribution intact and respect the 180×180
@@ -36,4 +36,4 @@ allow** — cloning this repo is not a license.
 
 The exercise **data** (names, categories, body parts, equipment, targets,
 muscle groups, and multilingual instructions) is separate from the media and
-is released under the MIT License — see [`LICENSE`](LICENSE).
+is released under the MIT License — see [UPSTREAM_LICENSE.txt](UPSTREAM_LICENSE.txt).
