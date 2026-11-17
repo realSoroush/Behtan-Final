@@ -38,7 +38,7 @@ import {
   evaluateFoodQualityFromComponents,
   foodQualityPenalty,
 } from './nutritionQuality.ts';
-import { MEAL_POLICY_VERSION, MEAL_SHARES, mealExperiencePenalty, type MealExperienceContext } from './mealExperience.ts';
+import { historyOfMeals, MEAL_POLICY_VERSION, MEAL_SHARES, mealExperiencePenalty, pricedProteinCost, type MealExperienceContext, type MealHistoryItem } from './mealExperience.ts';
 // ============================================================================
 // RUNTIME NUTRITION CATALOG
 // ============================================================================
@@ -112,17 +112,6 @@ function getSubstitutesForWithCatalog(engine: EngineCatalog, foodItemId: string)
 // 4 - SLOT DISTRIBUTION
 // ============================================================================
 
-interface SlotShare {
-  kcal: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-}
-
-const SLOT_DISTRIBUTION = Object.fromEntries(Object.entries(MEAL_SHARES).map(
-  ([slot, share]) => [slot, {kcal: share, protein: share, carbs: share, fat: share}]
-)) as Record<MealSlot, SlotShare>;
-
 const MEAL_SLOT_LABELS: Record<MealSlot, string> = {
   breakfast: 'صبحانه',
   morning_snack: 'میان‌وعده صبح',
@@ -133,7 +122,7 @@ const MEAL_SLOT_LABELS: Record<MealSlot, string> = {
   post_workout: 'پس از تمرین',
 };
 
-const SLOT_ORDER: MealSlot[] = [
+const SLOT_ORDER: readonly MealSlot[] = [
   'breakfast', 'morning_snack', 'lunch', 'afternoon_snack', 'dinner', 'night_snack',
 ];
 
@@ -169,9 +158,9 @@ function isTemplateEligible(
 
 export class MealPlanGenerationError extends Error {
   slot: MealSlot;
-  readonly reason: 'no-eligible-options' | 'search-limit';
+  readonly reason: 'no-eligible-options' | 'search-limit' | 'weekly-limit';
 
-  constructor(slot: MealSlot, message: string, reason: 'no-eligible-options' | 'search-limit' = 'search-limit') {
+  constructor(slot: MealSlot, message: string, reason: MealPlanGenerationError['reason'] = 'search-limit') {
     super(message);
     this.name = 'MealPlanGenerationError';
     this.slot = slot;
@@ -761,6 +750,7 @@ function refineDailyPortions(
   feasibilityFirst = false,
   preservePortions = false,
   allocationTargets = targets,
+  regularSlots: readonly MealSlot[] = chosen.map(option => option.slot).filter(slot => slot !== 'post_workout'),
 ): ResolvedOption[] {
   const dailyTarget: MacroVector = {
     kcal: targets.targetCalories,
@@ -811,7 +801,7 @@ function refineDailyPortions(
 
     for (const [optionIndex, option] of refined.entries()) {
       if (option.locked) continue;
-      const slotTarget = getSlotTargets(option.slot, allocationTargets);
+      const slotTarget = getSlotTargets(option.slot, allocationTargets, regularSlots);
 
       for (let index = 0; index < option.resolved.components.length; index++) {
         const current = option.resolved.components[index];
@@ -1094,7 +1084,7 @@ function assertDailyPlanFeasible(options: ResolvedOption[], targets: MacroTarget
 
 function repairMealExperience(
   engine: EngineCatalog, initial: ResolvedOption[], optionsBySlot: ResolvedOption[][],
-  targets: MacroTargets, context: MealExperienceContext, seed: number
+  targets: MacroTargets, context: MealExperienceContext, date: string, seed: number
 ): ResolvedOption[] {
   const asMeals = (options: ResolvedOption[]) => options.map(o => ({slot: o.slot, components: o.resolved.components}));
   let best = initial;
@@ -1120,7 +1110,14 @@ function repairMealExperience(
             deviation.fat > initialDeviation.fat + .03) continue;
         if (qualityPenaltyForResolvedDay(candidate, targets) > qualityLimit) continue;
         const penalty = mealExperiencePenalty(asMeals(candidate), context);
-        if (penalty < slotPenalty - 0.01) { slotBest = candidate; slotPenalty = penalty; }
+        const comparesCost = context.proteinBudgetPreference === 'economic' && context.proteinPrices &&
+          Math.abs(penalty - slotPenalty) < 1e-9;
+        const cost = comparesCost ? pricedProteinCost(asMeals(candidate), date, context.proteinPrices) : undefined;
+        const currentCost = cost === undefined ? undefined : pricedProteinCost(asMeals(slotBest), date, context.proteinPrices);
+        if (penalty < slotPenalty - 0.01 || (cost !== undefined && currentCost !== undefined && cost < currentCost)) {
+          slotBest = candidate;
+          slotPenalty = penalty;
+        }
       }
       if (slotBest !== best) { best = slotBest; bestPenalty = slotPenalty; changed = true; }
     }
@@ -1139,14 +1136,28 @@ function generateDailyMealPlanWithCatalog(
   preferences: DietaryPreferencesJson,
   isWorkoutDay: boolean,
   date: string = new Date().toISOString().slice(0, 10),
-  context: MealExperienceContext = {}
+  context: MealExperienceContext = {},
 ): DailyMealPlan {
+  const structure = context.mealStructure;
+  const regularSlots: readonly MealSlot[] = structure?.regularSlots ?? SLOT_ORDER;
+  if (structure && (typeof structure.includePostWorkout !== 'boolean' || new Set(regularSlots).size !== regularSlots.length ||
+    regularSlots.some(slot => !SLOT_ORDER.includes(slot)) || !(['breakfast', 'lunch', 'dinner'] as const).every(slot => regularSlots.includes(slot)))) {
+    throw new TypeError('چیدمان وعده‌ها باید صبحانه، ناهار و شام و میان‌وعده‌های بدون تکرار داشته باشد.');
+  }
+  const excludedLock = context.lockedMeals?.find(meal => meal.slot !== 'post_workout' && !regularSlots.includes(meal.slot));
+  if (excludedLock) throw new MealPlanGenerationError(excludedLock.slot, 'چیدمان انتخاب‌شده باید وعدهٔ ثبت‌شده را حفظ کند.');
+  const belowWeeklyLimit = (template: MealTemplate) => context.templateUsesThisWeek === undefined ||
+    template.maxPerWeek === undefined || (context.templateUsesThisWeek.get(template.id) ?? 0) < template.maxPerWeek;
   const postLocked = context.lockedMeals?.find(m=>m.slot==='post_workout');
-  if (isWorkoutDay || postLocked) {
+  if ((isWorkoutDay && (structure?.includePostWorkout ?? true)) || postLocked) {
     const prefs = context.proteinBudgetPreference ?? 'performance';
     const preferred = prefs === 'performance' ? ['pw_whey_water','pw_chicken_potato','pw_plant_bowl','pw_pea_water'] : ['pw_chicken_potato','pw_plant_bowl','pw_pea_water'];
-    const template = preferred.map(id=>engine.templatesById.get(id)).find(t=>t && isTemplateEligible(engine, t,preferences,true));
-    if (!postLocked && !template) throw new MealPlanGenerationError('post_workout','گزینهٔ مجاز پس از تمرین در کاتالوگ موجود نیست.', 'no-eligible-options');
+    const eligible = preferred.map(id=>engine.templatesById.get(id)).filter(t=>t && t.slot === 'post_workout' && isTemplateEligible(engine, t,preferences,true));
+    const template = eligible.find(t => t && belowWeeklyLimit(t));
+    if (!postLocked && !template) {
+      if (eligible.length) throw new MealPlanGenerationError('post_workout', 'سقف تکرار هفتگی گزینه‌های پس از تمرین پر شده است.', 'weekly-limit');
+      throw new MealPlanGenerationError('post_workout','گزینهٔ مجاز پس از تمرین در کاتالوگ موجود نیست.', 'no-eligible-options');
+    }
     const components = template?.slots.map(s=>componentFromUnits(foodById(engine, s.primaryFoodItemId),s.fixedUnits ?? 1)) ?? [];
     const totals = components.reduce(addTotals,{kcal:0,protein:0,carbs:0,fat:0});
     const post = postLocked ?? buildMeal({slot:'post_workout',template:template!,resolved:{components,totals,score:0,kcalDeviation:0}});
@@ -1155,25 +1166,28 @@ function generateDailyMealPlanWithCatalog(
     remaining.carbCal = remaining.carbGrams * 4;
     remaining.fatCal = remaining.fatGrams * 9;
     if (Object.values(remaining).some(v=>typeof v==='number'&&v<0)) throw new MealPlanGenerationError('post_workout','هدف روزانه برای این ترکیب کافی نیست.');
-    const rest = generateDailyMealPlanWithCatalog(engine, remaining,_weightKg,preferences,false,date,{...context,lockedMeals:context.lockedMeals?.filter(m=>m.slot!=='post_workout')});
-    const meals = [...rest.meals.slice(0,4),post,...rest.meals.slice(4)];
+    const rest = generateRegularMealPlan(engine, remaining, preferences, Boolean(structure && isWorkoutDay), date,
+      {...context,lockedMeals:context.lockedMeals?.filter(m=>m.slot!=='post_workout')}, regularSlots, belowWeeklyLimit);
+    const dinnerIndex = rest.meals.findIndex(meal => meal.slot === 'dinner');
+    const meals = [...rest.meals.slice(0,dinnerIndex),post,...rest.meals.slice(dinnerIndex)];
     return {...rest,targets,isWorkoutDay:true,meals};
   }
+  return generateRegularMealPlan(engine, targets, preferences, isWorkoutDay, date, context, regularSlots, belowWeeklyLimit);
+}
+
+function generateRegularMealPlan(
+  engine: EngineCatalog, targets: MacroTargets, preferences: DietaryPreferencesJson, isWorkoutDay: boolean, date: string,
+  context: MealExperienceContext, regularSlots: readonly MealSlot[], belowWeeklyLimit: (template: MealTemplate) => boolean,
+): DailyMealPlan {
   const seed = dateSeed(date);
 
-  const optionsBySlot: ResolvedOption[][] = SLOT_ORDER.map((slot) => {
+  const optionsBySlot: ResolvedOption[][] = regularSlots.map((slot) => {
     const locked = context.lockedMeals?.find(m => m.slot === slot);
     if (locked) return [{slot, locked,
       template: {id:locked.templateId,slot,displayName:locked.templateName,slots:[],isWorkoutDayOnly:false,isRestDayOnly:false,goalTags:[]},
       resolved: {components:locked.components,totals:{kcal:locked.totalKcal,protein:locked.totalProtein,carbs:locked.totalCarbs,fat:locked.totalFat},score:0,kcalDeviation:0}
     }];
-    const share = SLOT_DISTRIBUTION[slot];
-    const slotTargets: MacroVector = {
-      kcal: targets.targetCalories * share.kcal,
-      protein: targets.proteinGrams * share.protein,
-      carbs: targets.carbGrams * share.carbs,
-      fat: targets.fatGrams * share.fat,
-    };
+    const slotTargets = getSlotTargets(slot, targets, regularSlots);
 
     const eligible = engine.catalog.mealTemplates.filter(
       (template) => template.slot === slot && isTemplateEligible(engine, template, preferences, isWorkoutDay)
@@ -1186,8 +1200,9 @@ function generateDailyMealPlanWithCatalog(
         'no-eligible-options'
       );
     }
-
-    return getResolvedOptions(engine, slot, eligible, slotTargets);
+    const withinLimit = eligible.filter(belowWeeklyLimit);
+    if (!withinLimit.length) throw new MealPlanGenerationError(slot, 'سقف تکرار هفتگی گزینه‌های مجاز این وعده پر شده است.', 'weekly-limit');
+    return getResolvedOptions(engine, slot, withinLimit, slotTargets);
   });
 
   const chosen = chooseDailyCombination(optionsBySlot, targets, seed);
@@ -1199,7 +1214,7 @@ function generateDailyMealPlanWithCatalog(
     macroRefined = refineDailyTemplates(engine, macroRefined, optionsBySlot, targets, true);
   }
   const qualityRefined = repairDailyQuality(engine, macroRefined, optionsBySlot, targets);
-  const refined = repairMealExperience(engine, qualityRefined, optionsBySlot, targets, context, seed);
+  const refined = repairMealExperience(engine, qualityRefined, optionsBySlot, targets, context, date, seed);
   const remainingTargetsUnmet = !isDailyPlanFeasible(refined, targets);
   if (!context.lockedMeals?.length) assertDailyPlanFeasible(refined, targets);
   const meals = refined.map(option => option.locked ? {...option.locked, consumed:true} : buildMeal(option));
@@ -1487,8 +1502,9 @@ function rebalanceMemberDayWithCatalog(
   if (!current || current.slot !== replacement.slot || current.consumed || intake.skippedSlots.includes(current.slot)) return null;
 
   const allocation = memberAllocationTargets(plan, replacement);
+  const regularSlots = plan.meals.filter(meal => meal.slot !== 'post_workout').map(meal => meal.slot);
   if (replacement.slot !== 'post_workout') {
-    const slotTarget = getSlotTargets(replacement.slot, allocation);
+    const slotTarget = getSlotTargets(replacement.slot, allocation, regularSlots);
     if (replacement.totalKcal > slotTarget.kcal * 1.35 ||
       !fitsMealProtein(replacement.slot, replacement.totalProtein, slotTarget.protein) ||
       mealMassGrams(replacement.components) > mealMassLimitGrams(replacement.slot, slotTarget.kcal)) return null;
@@ -1510,7 +1526,7 @@ function rebalanceMemberDayWithCatalog(
   ];
   if (isDailyPlanFeasible(options, plan.targets)) return { ...plan, meals, remainingTargetsUnmet: false };
   if (!fitReplacement || replacement.slot === 'post_workout') return null;
-  const refined = refineDailyPortions(engine, options, plan.targets, true, false, allocation);
+  const refined = refineDailyPortions(engine, options, plan.targets, true, false, allocation, regularSlots);
   if (!isDailyPlanFeasible(refined, plan.targets)) return null;
   const { components, totalKcal, totalProtein, totalCarbs, totalFat, totalFiber } = buildMeal(refined[included.indexOf(replacement)]);
   meals[index] = { ...replacement, components, totalKcal, totalProtein, totalCarbs, totalFat, totalFiber };
@@ -1564,13 +1580,14 @@ function swapComponentInMealWithCatalog(
   return option.isEquivalent ? option.updatedMeal : meal;
 }
 
-export function getSlotTargets(slot: MealSlot, targets: MacroTargets): MacroVector {
-  const share = SLOT_DISTRIBUTION[slot];
+export function getSlotTargets(slot: MealSlot, targets: MacroTargets, regularSlots: readonly MealSlot[] = SLOT_ORDER): MacroVector {
+  const total = regularSlots.length === SLOT_ORDER.length ? 1 : regularSlots.reduce((sum, key) => sum + MEAL_SHARES[key], 0);
+  const share = total > 0 && regularSlots.includes(slot) ? MEAL_SHARES[slot] / total : 0;
   return {
-    kcal: targets.targetCalories * share.kcal,
-    protein: targets.proteinGrams * share.protein,
-    carbs: targets.carbGrams * share.carbs,
-    fat: targets.fatGrams * share.fat,
+    kcal: targets.targetCalories * share,
+    protein: targets.proteinGrams * share,
+    carbs: targets.carbGrams * share,
+    fat: targets.fatGrams * share,
   };
 }
 
@@ -1809,6 +1826,49 @@ function getProfessionalMealOptionsWithCatalog(engine: EngineCatalog, base: Meal
 // can change another engine's foods, portion rules or approved substitutions.
 type OmitEngine<T> = T extends (engine: EngineCatalog, ...args: infer P) => infer R ? (...args: P) => R : never;
 
+interface WeeklyMealDay {
+  date: string;
+  targets: MacroTargets;
+  isWorkoutDay: boolean;
+  lockedMeals?: Meal[];
+}
+
+type WeeklyMealContext = Pick<MealExperienceContext, 'mealStructure' | 'proteinBudgetPreference' | 'proteinPrices'>;
+
+function generateMealWeek(
+  generate: OmitEngine<typeof generateDailyMealPlanWithCatalog>, days: readonly WeeklyMealDay[], weightKg: number,
+  preferences: DietaryPreferencesJson, context: WeeklyMealContext,
+): DailyMealPlan[] {
+  const timestamps = days.map(day => Date.parse(day.date + 'T00:00:00Z'));
+  if (days.length < 1 || days.length > 7 || days.some((day, index) => !Number.isFinite(timestamps[index]) ||
+    new Date(timestamps[index]).toISOString().slice(0, 10) !== day.date ||
+    (index > 0 && timestamps[index] - timestamps[index - 1] !== 86_400_000))) {
+    throw new RangeError('برنامهٔ هفتگی باید بین یک تا هفت تاریخ پیاپی داشته باشد.');
+  }
+  const previousWeek: MealHistoryItem[] = [];
+  const templateUsesThisWeek = new Map<string, number>();
+  // Count recorded meals across the entire horizon before selecting proposals.
+  for (const { lockedMeals } of days) {
+    for (const meal of lockedMeals ?? []) {
+      const id = meal.templateId.split('~')[0];
+      templateUsesThisWeek.set(id, (templateUsesThisWeek.get(id) ?? 0) + 1);
+    }
+  }
+  return days.map(({ date, targets, isWorkoutDay, lockedMeals }) => {
+    const plan = generate(targets, weightKg, preferences, isWorkoutDay, date, {
+      ...context, lockedMeals, previousWeek, templateUsesThisWeek,
+    });
+    const lockedSlots = new Set(lockedMeals?.map(meal => meal.slot));
+    for (const meal of plan.meals) {
+      if (lockedSlots.has(meal.slot)) continue;
+      const id = meal.templateId.split('~')[0];
+      templateUsesThisWeek.set(id, (templateUsesThisWeek.get(id) ?? 0) + 1);
+    }
+    previousWeek.push(...historyOfMeals(plan.meals));
+    return plan;
+  });
+}
+
 export function createMealPlanEngine(source: NutritionCatalog, revision?: string | null) {
   const catalog = structuredClone(source);
   function freeze(value: object) {
@@ -1833,6 +1893,10 @@ export function createMealPlanEngine(source: NutritionCatalog, revision?: string
     foodsById: new Map(catalog.foods.map(food => [food.id, food])),
     templatesById: new Map(catalog.mealTemplates.map(template => [template.id, template])),
   };
+  const generateDailyMealPlan: OmitEngine<typeof generateDailyMealPlanWithCatalog> = (...args) => {
+    const plan = generateDailyMealPlanWithCatalog(engine, ...args);
+    return revision ? { ...plan, nutritionContext: { revision, engineVersion: MEAL_POLICY_VERSION } } : plan;
+  };
   return {
     getSubstitutesFor: getSubstitutesForWithCatalog.bind(null, engine),
     canUseProfessionalMeal(meal: Meal, workout: boolean): boolean {
@@ -1840,9 +1904,10 @@ export function createMealPlanEngine(source: NutritionCatalog, revision?: string
       return Boolean(template && template.slot === meal.slot &&
         (workout ? !template.isRestDayOnly : meal.slot !== 'post_workout' && !template.isWorkoutDayOnly));
     },
-    generateDailyMealPlan(...args: Parameters<OmitEngine<typeof generateDailyMealPlanWithCatalog>>): DailyMealPlan {
-      const plan = generateDailyMealPlanWithCatalog(engine, ...args);
-      return revision ? { ...plan, nutritionContext: { revision, engineVersion: MEAL_POLICY_VERSION } } : plan;
+    generateDailyMealPlan,
+    generateWeeklyMealPlans(days: readonly WeeklyMealDay[], weightKg: number, preferences: DietaryPreferencesJson,
+      context: WeeklyMealContext = {}) {
+      return generateMealWeek(generateDailyMealPlan, days, weightKg, preferences, context);
     },
     getSwapCandidatesForComponent: getSwapCandidatesForComponentWithCatalog.bind(null, engine),
     getSwapOptionsForMeal: getSwapOptionsForMealWithCatalog.bind(null, engine),
