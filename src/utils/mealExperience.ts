@@ -8,16 +8,54 @@ export const MEAL_SHARES: Record<MealSlot, number> = {
   afternoon_snack: .10, dinner: .25, night_snack: .05, post_workout: 0,
 };
 export interface MealHistoryItem { slot: MealSlot; foodIds: string[] }
+export interface MealStructure {
+  regularSlots: readonly Exclude<MealSlot, 'post_workout'>[];
+  includePostWorkout: boolean;
+}
+
+export interface ProteinPriceSnapshot {
+  region: string;
+  observedOn: string;
+  validThrough: string;
+  quotes: Readonly<Partial<Record<string, {
+    tomanPerKg: number;
+    preparationState: NonNullable<MealComponent['foodItem']['preparationState']>;
+    source: string;
+  }>>>;
+}
 export interface MealExperienceContext {
   previousDay?: MealHistoryItem[];
+  previousWeek?: readonly MealHistoryItem[];
+  templateUsesThisWeek?: ReadonlyMap<string, number>;
   avoidMeals?: MealHistoryItem[];
   lockedMeals?: Meal[];
   proteinBudgetPreference?: ProteinBudgetPreference;
+  mealStructure?: MealStructure;
+  proteinPrices?: ProteinPriceSnapshot;
 }
 interface ExperienceMeal { slot: MealSlot; components: MealComponent[] }
 export const mealFingerprint = (ids: string[]) => [...new Set(ids)].sort().join('|');
 export const historyOfMeals = (meals: ExperienceMeal[]): MealHistoryItem[] =>
   meals.map(m => ({slot: m.slot, foodIds: m.components.map(c => c.foodItem.id)}));
+
+/** Compare the cost of purchased protein ingredients only with complete, same-basis quotes. */
+export function pricedProteinCost(meals: ExperienceMeal[], date: string, snapshot?: ProteinPriceSnapshot): number | undefined {
+  const day = date.slice(0, 10);
+  const validDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) &&
+    new Date(value).toISOString().slice(0, 10) === value;
+  if (typeof snapshot?.region !== 'string' || !snapshot.region.trim() || ![day, snapshot.observedOn, snapshot.validThrough].every(validDate) ||
+    day < snapshot.observedOn || day > snapshot.validThrough) return undefined;
+  const proteins = meals.flatMap(m => m.components.filter(c => c.foodItem.role === 'protein'));
+  if (!proteins.length) return undefined;
+  let total = 0;
+  for (const component of proteins) {
+    const quote = snapshot.quotes[component.foodItem.id];
+    if (typeof quote?.source !== 'string' || !quote.source.trim() || !Number.isFinite(quote.tomanPerKg) || quote.tomanPerKg <= 0 ||
+      !component.foodItem.preparationState || quote.preparationState !== component.foodItem.preparationState) return undefined;
+    total += component.grams * quote.tomanPerKg / 1000;
+  }
+  return Number.isFinite(total) ? total : undefined;
+}
 
 /** Lower is better. Never bypasses eligibility, portions or macro feasibility. */
 export function mealExperiencePenalty(meals: ExperienceMeal[], context: MealExperienceContext = {}): number {
@@ -36,6 +74,9 @@ export function mealExperiencePenalty(meals: ExperienceMeal[], context: MealExpe
     if (previous && mealFingerprint(previous.foodIds) === signatures[i]) penalty += 2;
     const avoided = context.avoidMeals?.find(m => m.slot === meal.slot);
     if (avoided && mealFingerprint(avoided.foodIds) === signatures[i]) penalty += 4;
+    for (const earlier of context.previousWeek ?? []) {
+      if (earlier.slot === meal.slot && mealFingerprint(earlier.foodIds) === signatures[i]) penalty += 2;
+    }
     if (meal.slot === 'morning_snack' || meal.slot === 'afternoon_snack') {
       // Whole fruit with a meaningful portion; dates alone should not crowd out
       // fresh fruit. Uses catalog metadata, not invented nutrient values.
