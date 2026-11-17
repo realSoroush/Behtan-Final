@@ -1,3 +1,4 @@
+import { APP_LOGO_PATH } from '@/constants/brand';
 import { AppLoading } from '@/components/ui/AppLoading';
 import {StudioOverview,type ProView} from './StudioOverview';
 import './studio-shell.css';
@@ -61,7 +62,7 @@ export function ProApp() {
       <a className="pro-skip" href="#pro-workspace">رفتن به فضای کاری</a>
       <aside className="pro-sidebar" aria-label="راهنمای پنل">
         <a href="#pro-workspace" className="pro-wordmark" aria-label="به‌تن حرفه‌ای، فضای کاری">
-          <img src="/behtan-logo.png" width="36" height="44" alt="" />
+          <img src={APP_LOGO_PATH} width="36" height="44" alt="" />
           <span><strong>به‌تن</strong><small>PROFESSIONAL</small></span>
         </a>
         <div className="pro-sidebar-section">پنل برنامه‌دهی</div>
@@ -78,7 +79,7 @@ export function ProApp() {
       </aside>
       <div className="pro-content">
         <header className="pro-header">
-          <div className="pro-brand"><span className="pro-mobile-logo"><img src="/behtan-logo.png" alt="" /></span><strong>به‌تن حرفه‌ای</strong><span className="pro-header-divider">/</span><span className="pro-header-caption">پنل برنامه‌دهی</span></div>
+          <div className="pro-brand"><span className="pro-mobile-logo"><img src={APP_LOGO_PATH} alt="" /></span><strong>به‌تن حرفه‌ای</strong><span className="pro-header-divider">/</span><span className="pro-header-caption">پنل برنامه‌دهی</span></div>
           <div className="pro-actions">
             <a className="pro-help-link" href="https://t.me/Behtan_Support" target="_blank" rel="noopener noreferrer" aria-label="راهنمای استفاده"><LifeBuoy size={18} /></a>
             <ThemeToggle className="pro-theme" />

@@ -82,8 +82,8 @@ export interface MealTemplateSlotRow {
 }
 
 const toNumber = (value: number | string, label: string): number => {
-  const parsed = typeof value === 'number' ? value : Number(value);
-  if (!Number.isFinite(parsed)) {
+  const parsed = typeof value === 'string' && value.trim() ? Number(value) : value;
+  if (typeof parsed !== 'number' || !Number.isFinite(parsed)) {
     throw new Error(`[nutritionCatalog] Invalid numeric value for ${label}.`);
   }
   return parsed;
@@ -221,14 +221,16 @@ export function assertValidNutritionCatalog(catalog: NutritionCatalog): void {
     throw new Error('[nutritionCatalog] Catalog contains no active meal templates.');
   }
 
-  const foodIds = new Set<string>();
+  const foodsById = new Map<string, FoodItem>();
   for (const food of catalog.foods) {
-    if (foodIds.has(food.id)) {
+    if (foodsById.has(food.id)) {
       throw new Error(`[nutritionCatalog] Duplicate food id: ${food.id}`);
     }
-    foodIds.add(food.id);
+    foodsById.set(food.id, food);
 
-    if (![food.gramsPerUnit, food.kcalPerUnit, food.proteinPerUnit, food.carbsPerUnit, food.fatPerUnit, food.fiberPerUnit, food.fruitVegGramsPerUnit].every(finiteNonnegative) || food.gramsPerUnit <= 0 || food.kcalPerUnit < 0 || food.proteinPerUnit < 0 || food.carbsPerUnit < 0 || food.fatPerUnit < 0 || food.fiberPerUnit < 0 || food.fruitVegGramsPerUnit < 0) {
+    const amounts = [food.gramsPerUnit, food.kcalPerUnit, food.proteinPerUnit, food.carbsPerUnit,
+      food.fatPerUnit, food.fiberPerUnit, food.fruitVegGramsPerUnit];
+    if (!amounts.every(finiteNonnegative) || food.gramsPerUnit <= 0) {
       throw new Error(`[nutritionCatalog] Invalid macros/units for food: ${food.id}`);
     }
     if (food.fruitVegGramsPerUnit > food.gramsPerUnit + 1e-9) {
@@ -268,11 +270,11 @@ export function assertValidNutritionCatalog(catalog: NutritionCatalog): void {
   }
 
   for (const group of catalog.substitutes) {
-    if (!foodIds.has(group.foodItemId)) {
+    if (!foodsById.has(group.foodItemId)) {
       throw new Error(`[nutritionCatalog] Substitute source food missing: ${group.foodItemId}`);
     }
     for (const substituteId of group.substituteIds) {
-      if (!foodIds.has(substituteId)) {
+      if (!foodsById.has(substituteId)) {
         throw new Error(`[nutritionCatalog] Substitute target food missing: ${substituteId}`);
       }
       if (substituteId === group.foodItemId) {
@@ -292,12 +294,12 @@ export function assertValidNutritionCatalog(catalog: NutritionCatalog): void {
     }
     for (const slot of template.slots) {
       if (!slot.dynamicUnits && (typeof slot.fixedUnits !== 'number' || !Number.isFinite(slot.fixedUnits) || slot.fixedUnits <= 0)) throw new Error(`[nutritionCatalog] Invalid fixed units: ${template.id}`);
-      if (!foodIds.has(slot.primaryFoodItemId)) {
+      const food = foodsById.get(slot.primaryFoodItemId);
+      if (!food) {
         throw new Error(
           `[nutritionCatalog] Template ${template.id} references missing food ${slot.primaryFoodItemId}.`
         );
       }
-      const food = catalog.foods.find((item) => item.id === slot.primaryFoodItemId)!;
       if (food.role !== slot.role) {
         throw new Error(
           `[nutritionCatalog] Template ${template.id} role mismatch for ${food.id}: ${slot.role} vs ${food.role}.`

@@ -1,16 +1,47 @@
 import { defineConfig, loadEnv } from "vite";
-
 import react from "@vitejs/plugin-react";
 import { resolve } from "path";
+
+const developmentRoutes = new Map([
+  ["/", "/site.html"],
+  ["/professionals", "/site.html"],
+  ["/professionals/", "/site.html"],
+  ["/app", "/index.html"],
+]);
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
-    {name:'marketing-first-paint-development',transformIndexHtml: {order:'pre',handler(html,ctx){
-      if (!ctx.server || !html.includes('id="marketing-shell"')) return html;
-      return {html,tags:['base','pro','navigation'].map(name=>({tag:'link',attrs:{rel:'stylesheet',href:'/src/marketing/'+name+'.css'},injectTo:'head' as const}))};
-    }}},
-    {name:'clean-app-development-route',configureServer(server){server.middlewares.use((req,_res,next)=>{if(['/','/professionals','/professionals/'].includes(req.url?.split('?')[0]||''))req.url='/site.html'+(req.url?.includes('?')?'?'+req.url.split('?').slice(1).join('?'):'');else if(req.url?.split('?')[0]==='/app')req.url='/index.html'+(req.url.includes('?')?'?'+req.url.split('?').slice(1).join('?'):'');next();});}},
+    {
+      name: "marketing-first-paint-development",
+      transformIndexHtml: {
+        order: "pre",
+        handler(html, context) {
+          if (!context.server || !html.includes('id="marketing-shell"')) return html;
+          return {
+            html,
+            tags: ["base", "pro", "navigation"].map(name => ({
+              tag: "link",
+              attrs: { rel: "stylesheet", href: "/src/marketing/" + name + ".css" },
+              injectTo: "head" as const,
+            })),
+          };
+        },
+      },
+    },
+    {
+      name: "clean-app-development-route",
+      configureServer(server) {
+        server.middlewares.use((req, _res, next) => {
+          const url = req.url ?? "";
+          const queryIndex = url.indexOf("?");
+          const path = queryIndex === -1 ? url : url.slice(0, queryIndex);
+          const destination = developmentRoutes.get(path);
+          if (destination) req.url = destination + (queryIndex === -1 ? "" : url.slice(queryIndex));
+          next();
+        });
+      },
+    },
     {
       name: "member-local-api",
       async configureServer(server) {

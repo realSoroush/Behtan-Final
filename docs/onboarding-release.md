@@ -1,5 +1,7 @@
 # پچ تکمیلی آنبوردینگ به‌تن
 
+> سابقهٔ بستهٔ اولیه. برای نصب و انتشار نسخهٔ فعلی از [README مخزن](../README.md) استفاده کنید.
+
 این پچ برای به‌روزرسانی همان PR شمارهٔ ۲۱ ساخته شده است. نسخهٔ مبنا، commit `a3409805b0202be870cd032ee320dcc20bc45aa7` در شاخهٔ `feature/member-app-final` است. این بسته فقط تغییرات تکمیلی آنبوردینگ را دارد؛ پچ بازطراحی قبلی را دوباره اجرا نکن.
 
 ## تغییرات
@@ -67,18 +69,6 @@ npm run dev
 npx playwright install chromium
 npm run test:public:browser
 ```
-
-## ۳. همان PR را به‌روزرسانی کن
-
-```powershell
-git diff --check
-git add --pathspec-from-file=ONBOARDING_CHANGED_FILES.txt
-git diff --cached --stat
-git commit -m "Unify onboarding with the member experience"
-git push origin feature/member-app-final
-```
-
-با push روی همین شاخه، PR شمارهٔ ۲۱ خودکار به‌روزرسانی می‌شود. بعد از موفقیت CI و بررسی پیش‌نمایش می‌توانی همان PR را ادغام و منتشر کنی.
 
 ## دیتابیس و پیش‌نمایش
 
