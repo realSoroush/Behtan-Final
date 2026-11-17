@@ -215,7 +215,7 @@ test("photo upload strips metadata and retries the same request after connection
   await expect(
     page.getByAltText("نمای انتخاب‌شده روبه‌رو", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("checkbox").check();
+  await page.getByRole("checkbox", { name: /مراجع بزرگسال است و رضایت آگاهانه/ }).check();
   await page
     .getByRole("button", { name: "تحلیل و ساخت گزارش", exact: true })
     .click();
