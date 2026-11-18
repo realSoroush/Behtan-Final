@@ -134,3 +134,37 @@ test('Persian subscription date editing preserves the independently entered time
  await expect(page.getByLabel('ساعت پایان اشتراک',{exact:true})).toHaveValue('14:35');
  expect(await page.locator('input[type=date],input[type=datetime-local]').count()).toBe(0);
 });
+
+test('admin turns optional program delivery on and off for one specialist', async ({ page }) => {
+  await adminSetup(page);
+  const colleague = '20000000-0000-4000-8000-000000000099';
+  const writes: boolean[] = [];
+  let enabled = false;
+  await page.route('**/rest/v1/rpc/admin_pro_nutrition_delivery_access', route => {
+    expect(route.request().postDataJSON()).toEqual({ p_org: org });
+    return route.fulfill({ json: [
+      { user_id: user, phone: '989000000001', enabled },
+      { user_id: colleague, phone: '989000000002', enabled: false },
+    ] });
+  });
+  await page.route('**/rest/v1/rpc/admin_pro_set_nutrition_delivery', route => {
+    const request = route.request().postDataJSON();
+    expect(request).toEqual({ p_org: org, p_user: user, p_enabled: !enabled });
+    enabled = request.p_enabled;
+    writes.push(enabled);
+    return route.fulfill({ json: enabled });
+  });
+  await page.getByRole('button', { name: 'مدیریت Pro', exact: true }).click();
+  await page.getByRole('button', { name: 'مدیریت فضای کاری', exact: true }).click();
+  await page.getByText('دسترسی ارسال برنامه به مراجع', { exact: true }).click();
+
+  const selected = page.getByRole('switch', { name: 'ارسال برنامه برای 989000000001' });
+  const other = page.getByRole('switch', { name: 'ارسال برنامه برای 989000000002' });
+  await expect(selected).not.toBeChecked();
+  await selected.click();
+  await expect(selected).toBeChecked();
+  await expect(other).not.toBeChecked();
+  await selected.click();
+  await expect(selected).not.toBeChecked();
+  expect(writes).toEqual([true, false]);
+});
