@@ -8,7 +8,7 @@ function profileInputs(profile: UserProfile) {
     activity_level: profile.activity_level, activity: profile.activity_profile_json, goal: profile.goal,
     workout_days: profile.workout_days, workout_weekdays: profile.workout_weekdays,
     diet: profile.dietary_preferences_json, medical: profile.medical_conditions_json,
-    protein: profile.protein_budget_preference,
+    protein: profile.protein_budget_preference, meal_settings: profile.meal_settings ?? null,
     measured_fat: profile.body_fat_source === 'measured' ? profile.body_fat_pct : null,
   };
 }

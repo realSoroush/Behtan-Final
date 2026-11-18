@@ -28,6 +28,8 @@ jobs:
         run: npm run lint
       - name: Type-check browser tests and fixtures
         run: npm run typecheck:tests
+      - name: Verify patched build dependency and bounded exploit regressions
+        run: npm run test:build-dependencies
       - name: Audit runtime dependencies
         run: npm audit --omit=dev --audit-level=moderate
       - name: Audit all dependencies, including build tools

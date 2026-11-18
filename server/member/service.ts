@@ -1,3 +1,5 @@
+import { processWeightReview } from './weightReview.ts';
+import { mealStructureFor } from '../../src/utils/mealSettings.ts';
 import { intakeDependencies, processMemberIntake } from './mealIntake.ts';
 import { mealScheduleDependencies, processMemberMealSchedule } from "./mealSchedule.ts";
 import { createClient } from "@supabase/supabase-js";
@@ -70,6 +72,7 @@ export function memberService() {
     if (error || !data.user?.phone_confirmed_at || !data.user.phone)
       throw Error("AUTH_REQUIRED");
     const user = data.user.id;
+    if (action === "weight_review") return processWeightReview(admin, user, input);
     if (action === "meal_intake") return processMemberIntake(user, input, intakeDependencies(admin));
     if (action === "meal_schedule") return processMemberMealSchedule(user, input, mealScheduleDependencies(admin, url));
     const profileResult = await admin
@@ -102,7 +105,8 @@ export function memberService() {
         const trainingInput = 'trainingInput' in input ? input.trainingInput : null;
         trainingPlan = buildTrainingPlan(trainingProfile(profile), trainingInput, 1);
       }
-      const { catalog, policy, revision } = await readNutritionContext(admin, AbortSignal.timeout(12000));
+      const nutrition = await readNutritionContext(admin, AbortSignal.timeout(12000));
+      const { catalog, policy, revision } = nutrition;
       const engine = createMealPlanEngine(catalog, revision);
       const plans = [false, true].map((workout) =>
         engine.generateDailyMealPlan(
@@ -114,6 +118,7 @@ export function memberService() {
           {
             proteinBudgetPreference:
               profile.protein_budget_preference ?? "performance",
+            mealStructure: mealStructureFor(profile.meal_settings), proteinPrices: nutrition.proteinPrices,
           },
         ),
       );

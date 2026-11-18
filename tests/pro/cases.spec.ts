@@ -353,3 +353,28 @@ test('a one-menu generation failure stays visible without suggesting an unrelate
  expect(sent).toHaveLength(1);expect(sent[0].count).toBe(1);
  await expect(page.getByRole('button',{name:'تولید و پیش‌نمایش برنامه',exact:true})).toBeEnabled();
 });
+
+
+test('selected meal structure reaches the generated, saved and printed Pro plan', async ({ page }) => {
+ const state=await setup(page); await page.goto('/'); await fillNew(page);
+ await page.getByRole('button',{name:'ذخیره اطلاعات پرونده',exact:true}).click();
+ await expect(page.getByText('اطلاعات پرونده ذخیره شد.',{exact:true})).toBeVisible();
+ const count=page.getByRole('combobox',{name:'تعداد وعده‌های عادی'});
+ await count.click();
+ await page.getByRole('option',{name:'۳',exact:true}).click();
+ await page.getByRole('combobox',{name:'تعداد منو',exact:true}).click();
+ await page.getByRole('option',{name:'۱',exact:true}).click();
+ await page.getByRole('checkbox',{name:'وعدهٔ جداگانه پس از تمرین'}).uncheck();
+ const sent=page.waitForRequest(request=>request.url().endsWith('/api/pro-plan') && request.method()==='POST' && request.postDataJSON().action==='generate');
+ await page.getByRole('button',{name:'تولید و پیش‌نمایش برنامه',exact:true}).click();
+ expect((await sent).postDataJSON().mealSettings).toEqual({regularMeals:3,includePostWorkout:false});
+ await expect(page.locator('.pro-plan-preview')).toBeVisible();
+ await page.getByRole('button',{name:'ذخیره این برنامه',exact:true}).click();
+ await expect.poll(()=>state.plans.length).toBe(1);
+ for(const day of state.plans[0].plan.days)expect(day.slots.map(s=>s.slot)).toEqual(['breakfast','lunch','dinner']);
+ const popupEvent=page.waitForEvent('popup');
+ await page.getByRole('button',{name:'خروجی PDF / چاپ',exact:true}).click();
+ const popup=await popupEvent;
+ await expect(popup.locator('.meal-table')).toHaveCount(state.plans[0].plan.days.length*3);
+ await popup.close();
+});

@@ -47,10 +47,10 @@ export function memberHandler(factory = memberService) {
         !body ||
         typeof body !== "object" ||
         Object.keys(body).some((k) => !["action", "input"].includes(k)) ||
-        !["preflight", "training", "training_history", "meal_schedule", "meal_intake"].includes(body.action)
+        !["preflight", "training", "training_history", "meal_schedule", "meal_intake", "weight_review"].includes(body.action)
       )
         throw Error("INVALID_REQUEST");
-      mealSchedule = ["meal_schedule", "meal_intake"].includes(body.action);
+      mealSchedule = ["meal_schedule", "meal_intake", "weight_review"].includes(body.action);
       if (bytes > (body.action === "meal_intake" ? 65536 : 12000)) throw Error("TOO_LARGE");
       const result = await factory()(token, body.action, body.input);
       res.statusCode = 200;
@@ -61,7 +61,7 @@ export function memberHandler(factory = memberService) {
         AUTH_REQUIRED: 401, TOO_LARGE: 413, TRAINING_LOCKED: 403,
         ACCESS_DENIED: 403, INTAKE_NOT_FOUND: 409, INTAKE_LIMIT: 422, STALE_CONTEXT: 409, STALE_INTAKE: 409,
         STALE_PLAN: 409, REQUEST_CONFLICT: 409, MEAL_NOT_EDITABLE: 409,
-        NO_FEASIBLE_PLAN: 422, MEAL_SEARCH_LIMIT: 422, MEAL_ALTERNATIVE_UNAVAILABLE: 422,
+        WEEKLY_MEAL_LIMIT: 409, NO_FEASIBLE_PLAN: 422, MEAL_SEARCH_LIMIT: 422, MEAL_ALTERNATIVE_UNAVAILABLE: 422,
         MEDICAL_REVIEW_REQUIRED: 422, INVALID_INTAKE: 422,
         RATE_LIMITED: 429, MEAL_SCHEDULE_MIGRATION_REQUIRED: 503, TIMEOUT: 504,
       };

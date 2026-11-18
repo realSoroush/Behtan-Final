@@ -10,6 +10,7 @@ import { useMemberMealSchedule, type MealIntent } from '@/hooks/useMemberMealSch
 import { MemberRequestError } from '@/member/api';
 import { isMealSnapshot } from '@/utils/mealValidation';
 import { memberProfileContext, memberScheduleContext } from '@/utils/memberScheduleContext';
+import { MemberMealSettings } from './MemberMealSettings';
 import { addPlanDays, swapBaselineComponent } from '@/utils/mealPresentation';
 import { MemberHomeShell, type MemberSection } from './MemberHomeShell';
 import { MemberEnergyPolicyNote, MemberEnergySkeleton, MemberMealSkeleton, MemberScanEntry, memberTodayClass } from './MemberHomeSkeleton';
@@ -239,7 +240,7 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
     [mealPlan, consumedMealSnapshots],
   );
   const targets = mealPlan?.targets ?? null;
-  const selectedDate = viewDate && viewDate >= todayKey && viewDate <= addPlanDays(todayKey, 2) ? viewDate : todayKey;
+  const selectedDate = viewDate && viewDate >= todayKey && viewDate <= addPlanDays(todayKey, 6) ? viewDate : todayKey;
   const viewingToday = selectedDate === todayKey;
   const viewedPlan = viewingToday ? activePlan : nutritionResult && !schedule.contextStale ? schedule.plans[selectedDate] ?? null : null;
   const extraFoods = useMemo(() => schedule.day?.extras.map((meal_snapshot, index) => ({
@@ -576,7 +577,8 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
         id="today-panel"
         className={memberTodayClass}
       >
-        <MemberCompanion loading={dataLoading} name={profile?.display_name} message={companionMessage} reactionKey={currentCompanionEvent?.nonce ?? todayKey} onAction={showMeals} days={[todayKey,addPlanDays(todayKey,1),addPlanDays(todayKey,2)]} selectedDate={selectedDate} onSelectDay={dataLoading ? undefined : date=>void selectDay(date)} />
+        <MemberCompanion loading={dataLoading} name={profile?.display_name} message={companionMessage} reactionKey={currentCompanionEvent?.nonce ?? todayKey} onAction={showMeals} days={Array.from({length:7},(_,i)=>addPlanDays(todayKey,i))} selectedDate={selectedDate} onSelectDay={dataLoading ? undefined : date=>void selectDay(date)} />
+        {profile && <MemberMealSettings key={profileContext} profile={profile} disabled={!intakeReady} />}
         {(viewedPlan || loadingPlan) && <MemberEnergyPolicyNote />}
         {viewedPlan&&consumed&&<MacroSummary title={energyTitle} targets={viewedPlan.targets} consumed={viewingToday?consumed:computeConsumedMacros(viewedPlan)} planned={viewingToday?planned:computeConsumedMacros(viewedPlan,false)} isWorkoutDay={viewedPlan.isWorkoutDay} workoutControl={<MemberWorkoutToggle value={viewedPlan.isWorkoutDay} disabled={!intakeReady||Boolean(viewingToday&&consumedMealSnapshots.post_workout)} onChange={workout=>void submitDay(selectedDate,{kind:'generate',workout,regenerate:false})}/>}/>}
         {loadingPlan && <MemberEnergySkeleton title={energyTitle} />}

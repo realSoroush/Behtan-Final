@@ -1,3 +1,5 @@
+import { mealStructureFor } from '../../src/utils/mealSettings';
+import { createMealPlanEngine } from '../../src/utils/mealPlanEngine';
 import {CORRECTIVE_SEED} from '../../src/professional/training/corrective/seed';
 import { generatePrintedPlan, type PrintedPlan, type RealIntake } from '../../src/professional/menuPlan.ts';
 import type { RealCase, RealRevision, SavedRealPlan } from '../../src/professional/realCaseApi';
@@ -330,7 +332,7 @@ export async function setup(
     if (b.action === 'generate') {
       if (!draftMap.has(b.key)) {
         installTestNutritionCatalog();
-        try{draftMap.set(b.key, {draft_id:crypto.randomUUID(),plan:generatePrintedPlan(cases[0].answers,cases[0].revision,b.count,DEFAULT_PROTEIN_ENGINE_POLICY,b.date,b.notes)});}catch(e){return route.fulfill({status:422,json:{error:(e as Error).message}});}
+        try{const plan=generatePrintedPlan(cases[0].answers,cases[0].revision,b.count,DEFAULT_PROTEIN_ENGINE_POLICY,b.date,b.notes,createMealPlanEngine({foods:fixture.FOOD_ITEMS,substitutes:fixture.FOOD_SUBSTITUTES,mealTemplates:fixture.MEAL_TEMPLATES,portionRules:fixture.PORTION_RULES}),{mealStructure:mealStructureFor(b.mealSettings)});if(b.mealSettings)plan.meal_settings=b.mealSettings;draftMap.set(b.key,{draft_id:crypto.randomUUID(),plan});}catch(e){return route.fulfill({status:422,json:{error:(e as Error).message}});}
       }
       if (failGeneration) { failGeneration=false; await route.abort('failed'); return; }
       await route.fulfill({json:draftMap.get(b.key)});

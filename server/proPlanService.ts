@@ -1,6 +1,8 @@
+import { parseMealSettings, mealStructureFor, type MealSettings } from '../src/utils/mealSettings.ts';
 import type { PrintedPlan, RealIntake } from '../src/professional/menuPlan.ts';
 import { generatePrintedPlan, ProMenuCountError } from '../src/professional/menuPlan.ts';
 import { createMealPlanEngine, MealPlanFeasibilityError, MealPlanGenerationError } from '../src/utils/mealPlanEngine.ts';
+import type { ProteinPriceSnapshot } from '../src/utils/mealExperience.ts';
 import type { NutritionCatalog, ProteinEnginePolicy } from '../src/types/index.ts';
 import { proNutritionDraftAllowed } from '../src/professional/intake.ts';
 
@@ -9,7 +11,7 @@ export class ProServerError extends Error {
   status: number;
   constructor(code: string, status = 400) { super(code); this.code = code; this.status = status; }
 }
-export interface DraftRequest { date: string; count: number; notes: string }
+export interface DraftRequest { date: string; count: number; notes: string; mealSettings?: MealSettings }
 export interface ServerDraft { draft_id: string; plan: PrintedPlan }
 type CurrentCase = { revision: number; answers: RealIntake };
 type GenerationRequest = { org: string; record: string; revision: number; actor: string; key: string; request: DraftRequest };
@@ -21,7 +23,7 @@ export interface PlanDependencies {
   verifyToken(token: string): Promise<string>;
   readCase(token: string, org: string, record: string): Promise<CurrentCase>;
   prepareGeneration?(input: GenerationRequest, token: string): Promise<GenerationCase>;
-  loadNutrition(token: string): Promise<{ catalog: NutritionCatalog; policy: ProteinEnginePolicy; revision?: string; cacheHit?: boolean }>;
+  loadNutrition(token: string): Promise<{ catalog: NutritionCatalog; policy: ProteinEnginePolicy; revision?: string; cacheHit?: boolean; proteinPrices?: ProteinPriceSnapshot }>;
   stage(input: { org: string; record: string; revision: number; actor: string; key: string; request: DraftRequest; plan: PrintedPlan }): Promise<ServerDraft>;
   publish(input: { org: string; record: string; revision: number; actor: string; draft: string; key: string }): Promise<string>;
 }
@@ -45,7 +47,7 @@ export async function processPlanRequest(
   if (!token || token.length > 8192) throw new ProServerError('PRO_AUTH_REQUIRED', 401);
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new ProServerError('PRO_INVALID_REQUEST');
   const b = body as Record<string, unknown>;
-  const keys = b.action === 'generate' ? ['action','org','record','revision','key','date','count','notes']
+  const keys = b.action === 'generate' ? ['action','org','record','revision','key','date','count','notes', ...(b.mealSettings === undefined ? [] : ['mealSettings'])]
     : b.action === 'catalog' ? ['action','org','record','revision','key'] : b.action === 'save' ? ['action','org','record','revision','key','draft'] : [];
   if (!keys.length || Object.keys(b).some(k => !keys.includes(k)) || keys.some(k => !(k in b))
       || !uuid(b.org) || !uuid(b.record) || !uuid(b.key) || !Number.isSafeInteger(b.revision) || Number(b.revision) < 1)
@@ -59,6 +61,9 @@ export async function processPlanRequest(
         || typeof b.notes !== 'string' || b.notes.length > 2000)
       throw new ProServerError('PRO_INVALID_REQUEST');
   }
+  if (b.mealSettings !== undefined) {
+    try { parseMealSettings(b.mealSettings); } catch { throw new ProServerError('PRO_INVALID_REQUEST'); }
+  }
   const actor = await measure('auth', () => deps.verifyToken(token));
   const identity = { org: b.org, record: b.record, revision: Number(b.revision), actor, key: b.key };
   if (b.action === 'save') {
@@ -71,7 +76,7 @@ export async function processPlanRequest(
     const { catalog } = await measure('catalog', () => deps.loadNutrition(token));
     return { foods: catalog.foods };
   }
-  const request: DraftRequest = { date:b.date as string, count:b.count as number, notes:(b.notes as string).trim() };
+  const request: DraftRequest = { date:b.date as string, count:b.count as number, notes:(b.notes as string).trim(), ...(b.mealSettings === undefined ? {} : { mealSettings: parseMealSettings(b.mealSettings) }) };
   const input = { ...identity, request };
   const current = await measure('case', () => deps.prepareGeneration
     ? deps.prepareGeneration(input, token)
@@ -82,11 +87,12 @@ export async function processPlanRequest(
   if (!proNutritionDraftAllowed(current.answers, new Date())
       || !proNutritionDraftAllowed(current.answers, new Date(request.date + 'T12:00:00Z')))
     throw new ProServerError('PRO_MEDICAL_STOP', 422);
-  const { catalog, policy, revision } = await measure('catalog', () => deps.loadNutrition(token));
+  const { catalog, policy, revision, proteinPrices } = await measure('catalog', () => deps.loadNutrition(token));
   const plan = await measure('solve', () => {
     try {
       const engine = createMealPlanEngine(catalog, revision);
-      const result = generatePrintedPlan(current.answers, current.revision, request.count, policy, request.date, request.notes, engine);
+      const result = generatePrintedPlan(current.answers, current.revision, request.count, policy, request.date, request.notes, engine, { mealStructure: mealStructureFor(request.mealSettings), proteinPrices });
+      if (request.mealSettings) result.meal_settings = request.mealSettings;
       if (revision) result.catalog_revision = revision;
       return result;
     } catch (error) {

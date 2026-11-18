@@ -1,3 +1,5 @@
+import { weeklyScheduleContext, type ScheduledMeals } from '../../src/utils/weeklyScheduleContext.ts';
+import { mealStructureFor } from '../../src/utils/mealSettings.ts';
 import { createHash } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { DailyMealPlan, Meal, MealSlot, UserProfile } from '../../src/types/index.ts';
@@ -39,6 +41,7 @@ export interface MemberDayState {
 export interface MealScheduleDependencies {
   read(user: string, day: string, requestId: string | null): Promise<MemberDayState>;
   loadContext(): Promise<NutritionContext>;
+  readWeek?(user: string, day: string, context: string): Promise<ScheduledMeals[]>;
   reserve(user: string): Promise<boolean>;
   commit(input: Record<string, unknown>): Promise<unknown>;
 }
@@ -93,7 +96,7 @@ function serverContextKey(profile: UserProfile, revision: string) {
 
 export function memberMealSearchCode(error: unknown) {
   if (error instanceof MealPlanGenerationError)
-    return error.reason === 'no-eligible-options' ? 'NO_FEASIBLE_PLAN' : 'MEAL_SEARCH_LIMIT';
+    return error.reason === 'no-eligible-options' ? 'NO_FEASIBLE_PLAN' : error.reason === 'weekly-limit' ? 'WEEKLY_MEAL_LIMIT' : 'MEAL_SEARCH_LIMIT';
   if (error instanceof MealPlanFeasibilityError) return 'MEAL_SEARCH_LIMIT';
   return undefined;
 }
@@ -125,7 +128,7 @@ export async function processMemberMealSchedule(user: string, input: unknown, de
   if ((state.schedule?.updated_at ?? null) !== request.expectedUpdatedAt) throw Error('STALE_PLAN');
   if (!await deps.reserve(user)) throw Error('RATE_LIMITED');
   const nutritionContext = await deps.loadContext();
-  const { revision, catalog, policy } = nutritionContext;
+  const { revision, catalog, policy, proteinPrices } = nutritionContext;
   if (revision !== request.catalogRevision) throw Error('STALE_CONTEXT');
   const { profile } = state;
   const preferences = profile.dietary_preferences_json;
@@ -141,6 +144,7 @@ export async function processMemberMealSchedule(user: string, input: unknown, de
   // edits to a separate strong key derived only from the server's inputs.
   const serverContext = serverContextKey(profile, revision);
 
+  const weekContext = weeklyScheduleContext(request.date, deps.readWeek ? await deps.readWeek(user, request.date, context) : []);
   let plan: DailyMealPlan;
   try {
     if (request.kind === 'generate') {
@@ -152,8 +156,9 @@ export async function processMemberMealSchedule(user: string, input: unknown, de
       const avoidMeals = request.regenerate && isPrescriptionPlan(state.schedule?.plan) ? historyOfMeals(state.schedule.plan.meals) : [];
       plan = generateMemberPrescription(targets, profile.weight, preferences, request.workout,
         request.date + (request.regenerate ? '-v' + request.requestId : '-v0'), {
-          previousDay, avoidMeals, lockedMeals: Object.values(checkins),
+          ...weekContext, previousDay, avoidMeals, lockedMeals: Object.values(checkins),
           proteinBudgetPreference: profile.protein_budget_preference ?? 'performance',
+          mealStructure: mealStructureFor(profile.meal_settings), proteinPrices,
         }, engine);
     } else {
       const base = state.schedule?.plan;
@@ -204,6 +209,7 @@ export function mealScheduleDependencies(db: SupabaseClient, source: string): Me
   };
   return {
     read: (p_user, p_day, p_request_id) => call('member_read_meal_day', { p_user, p_day, p_request_id }),
+    readWeek: (p_user, p_day, p_context) => call('member_meal_week_context', { p_user, p_day, p_context }),
     loadContext: async () => {
       const cached = catalogCache?.source === source ? catalogCache.context : undefined;
       const context = await readNutritionContext(db, AbortSignal.timeout(12000), cached);

@@ -2691,3 +2691,6 @@
   color: var(--member-strong);
   text-decoration: underline;
 }
+
+/* Seven day selector stays readable on narrow member screens. */
+.companion-days{display:flex;overflow-x:auto;justify-content:flex-start;gap:8px;scrollbar-width:thin}.companion-days>button{flex:0 0 calc((100% - 16px)/3);min-width:90px}

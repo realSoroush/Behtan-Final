@@ -7,8 +7,9 @@ import tsPlugin from '@typescript-eslint/eslint-plugin';
 
 export default [
   {
+    // Pinned third-party code has separate source/integrity regressions.
     // Build output and the generated local Supabase copy are not source.
-    ignores: ['dist', 'dist-admin', 'dist-pro', '.cache', '.local-supabase', 'vite.config.js', 'vite.config.d.ts', '*.tsbuildinfo'],
+    ignores: ['vendor/picomatch/**', 'dist', 'dist-admin', 'dist-pro', '.cache', '.local-supabase', 'vite.config.js', 'vite.config.d.ts', '*.tsbuildinfo'],
   },
   {
     files: ['**/*.{ts,tsx}'],

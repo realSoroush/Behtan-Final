@@ -98,6 +98,7 @@ export interface BodyScanConsentJson {
 export type BodyFatSource = 'ai_visual' | 'measured';
 
 export interface UserProfile {
+  meal_settings?: import("../utils/mealSettings.ts").MealSettings | null;
   workout_weekdays?: number[];
   display_name?: string | null;
   id: string;

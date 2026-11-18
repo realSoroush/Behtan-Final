@@ -1,8 +1,11 @@
+import { parseProteinPrices } from './proteinPrices.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { buildNutritionCatalog, type FoodItemRow, type FoodSubstituteRow, type MealTemplateRow, type MealTemplateSlotRow } from './nutritionCatalog.ts';
 import { buildProteinEnginePolicy, type ProteinEnginePolicyRow } from './proteinPolicy.ts';
 
-export type NutritionContext = ReturnType<typeof parseNutritionContext>;
+export type NutritionContext = Omit<ReturnType<typeof parseNutritionContext>, 'proteinPrices'> & {
+  proteinPrices?: import('./mealExperience.ts').ProteinPriceSnapshot;
+};
 
 function parseNutritionContext(value: unknown) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('NUTRITION_CONTEXT_INVALID');
@@ -15,6 +18,7 @@ function parseNutritionContext(value: unknown) {
   }
   return {
     revision: row.revision,
+    proteinPrices: parseProteinPrices(row.protein_prices),
     catalog: buildNutritionCatalog({
       foodRows: row.food_rows as FoodItemRow[],
       substituteRows: row.substitute_rows as FoodSubstituteRow[],

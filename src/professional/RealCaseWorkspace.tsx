@@ -1,3 +1,5 @@
+import { MealSettingsFields } from '../components/ui/MealSettingsFields';
+import { DEFAULT_MEAL_SETTINGS } from '../utils/mealSettings';
 import { JalaliDateInput } from '@/components/ui/JalaliDateInput';
 import {normalizeCaseSearch} from './caseSearch';
 import { AppLoading } from '@/components/ui/AppLoading';
@@ -188,6 +190,7 @@ function RealCaseDetail({
     [planId, setPlanId] = useState(""),
     [draftId, setDraftId] = useState(""),
     [connectionWarning, setConnectionWarning] = useState(false),
+    [mealSettings, setMealSettings] = useState(DEFAULT_MEAL_SETTINGS),
     [count, setCount] = useState(4),
     [date, setDate] = useState(today),
     [notes, setNotes] = useState(""),
@@ -407,7 +410,7 @@ function RealCaseDetail({
     await run(async () => {
       if (dirty || !id || stale || connectionWarning || !access?.can_write || !access?.modules?.nutrition)
         throw new Error('ابتدا اطلاعات پرونده را ذخیره و اتصال را بررسی کنید.');
-      const result = await realCaseApi.generatePlan(org, id, revision, count, date, notes, generationKey.current);
+      const result = await realCaseApi.generatePlan(org, id, revision, count, date, notes, generationKey.current, mealSettings);
       if (!mounted.current) return;
       setPlan(result.plan);setPreviewOpen(true);
       setDraftId(result.draft_id);
@@ -458,9 +461,9 @@ function RealCaseDetail({
       </div>}
       {id&&authoredOpen&&<PanelModal title="تدوین اختصاصی برنامه غذایی" busy={authoredBusy} onClose={()=>{if(!authoredDirty||window.confirm("تغییرات ثبت‌نشده برنامه غذایی کنار گذاشته شوند؟"))setAuthoredOpen(false);}}><Suspense fallback={<AppLoading label="در حال بازکردن ابزار پرونده…" />}><AuthoredPlanEditor org={org} record={id} revision={revision} kind="nutrition" name={form.display_name} canWrite={Boolean(access?.can_write&&access?.modules?.nutrition)&&!archived&&!dirty&&!stale&&!connectionWarning} onBusy={setAuthoredBusy} onDirty={setAuthoredDirty} onSaved={()=>setAuthoredArchiveVersion(v=>v+1)} intake={form} seed={authoredSeed} onGenerate={async(requestedCount=1)=>{
         if(!id||dirty||stale||connectionWarning||archived||!access?.can_write||!access?.modules?.nutrition)throw new Error('PRO_STALE_REVISION');
-        const signature=JSON.stringify([org,id,revision,requestedCount,date,notes]);
+        const signature=JSON.stringify([org,id,revision,requestedCount,date,notes,mealSettings]);
         if(studioGeneration.current?.signature!==signature)studioGeneration.current={signature,key:crypto.randomUUID()};
-        const result=await realCaseApi.generatePlan(org,id,revision,requestedCount,date,notes,studioGeneration.current.key);
+        const result=await realCaseApi.generatePlan(org,id,revision,requestedCount,date,notes,studioGeneration.current.key,mealSettings);
         studioGeneration.current=null;return fromPrintedPlan(result.plan);
       }}/></Suspense></PanelModal>}
       {id&&!locked&&trainingOpen&&<PanelModal title="برنامه تمرینی مراجع" busy={trainingBusy} onClose={()=>{if(!trainingDirty||window.confirm("تغییرات ثبت‌نشده برنامه تمرینی کنار گذاشته شوند؟"))setTrainingOpen(false);}}><Suspense fallback={<AppLoading label="در حال بازکردن ابزار پرونده…" />}><TrainingPanel org={org} record={id} revision={revision} name={form.display_name} canWrite={Boolean(access?.can_write&&access?.modules?.training)&&!archived&&!dirty&&!stale&&!connectionWarning} onBusy={setTrainingBusy} onDirty={setTrainingDirty} onSaved={()=>setAuthoredArchiveVersion(v=>v+1)}/></Suspense></PanelModal>}
@@ -631,6 +634,7 @@ function RealCaseDetail({
                   </label>
                   <JalaliDateInput label="تاریخ برنامه" value={date} disabled={busy} onChange={value => { setDate(value); invalidatePreview(); }} />
                 </div>
+                <MealSettingsFields value={mealSettings} disabled={busy} onChange={value => { setMealSettings(value); invalidatePreview(); }} />
                 <p className="pro-muted">هر منو یک انتخاب جایگزین برای همان وعده است. برنامه با تعداد انتخاب‌شده در همهٔ وعده‌ها ساخته می‌شود.</p>
                 <label>
                   توضیحات برای مراجع

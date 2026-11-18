@@ -470,8 +470,8 @@ test("swapping previews a selection before applying it to the plate",async({page
  await expect(page.locator('#today-panel .food-piece[data-food-id="'+selectedId+'"]')).toHaveCount(1);
 });
 
-test("three-day selection never records a future meal",async({page})=>{
- await expect(page.locator('.companion-days button')).toHaveCount(3);
+test("seven-day selection never records a future meal",async({page})=>{
+ await expect(page.locator('.companion-days button')).toHaveCount(7);
  await page.locator('.companion-days button').nth(1).click();
  await expect(page.locator('#today-panel .member-meal-card')).toHaveCount(1);
  await expect(page.getByRole('heading',{name:'انرژی این روز'})).toBeVisible();
@@ -704,7 +704,8 @@ test('returning to progress reads updated evidence without reloading the app', a
   await page.route('**/rest/v1/member_weekly_review_acknowledgements?*', route => route.fulfill({ json: [] }));
   await page.getByRole('link', { name: 'روند من', exact: true }).click();
   const review = page.getByRole('region', { name: 'بازبینی هفتگی هدف' });
-  await expect(review).toContainText('حداقل سه ثبت وزن');
+  await expect(review).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'ثبت وزن امروز', exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'برنامهٔ امروز', exact: true }).click();
   enoughEntries = true;
   await page.getByRole('link', { name: 'روند من', exact: true }).click();
@@ -827,3 +828,65 @@ test('allergy change keeps consumed history but undo and reopening expose only s
   await expect(page.locator('#today-panel .member-meal-card')).toBeVisible();
   for (const id of forbidden) await expect(page.locator(`#today-panel [data-food-id="${id}"]`)).toHaveCount(0);
 });
+
+for (const outcome of ['confirm', 'dismiss', 'retry', 'stale'] as const) {
+  test(`one weight without weekly answers previews immediately: ${outcome}`, async ({ page }) => {
+    let entry: Record<string, unknown> | null = null;
+    let previews = 0, applies = 0;
+    await page.route('**/rest/v1/user_progress_entries?*', route => {
+      if (route.request().method() === 'POST') {
+        entry = route.request().postDataJSON();
+        expect(entry!.weight_kg).toBe(84);
+        expect(entry!.adherence).toBeNull();
+        expect(entry!.hunger).toBeNull();
+        return route.fulfill({ json: entry });
+      }
+      return route.fulfill({ json: entry ? [entry] : [] });
+    });
+    await page.route(apiRoute, route => {
+      const body = route.request().postDataJSON();
+      if (body.action !== 'weight_review') return route.fallback();
+      if (body.input.kind === 'apply') {
+        applies++;
+        expect(body.input.reviewKey).toBe('a'.repeat(64));
+        return outcome === 'stale'
+          ? route.fulfill({ status: 409, json: { error: 'STALE_CONTEXT' } })
+          : route.fulfill({ json: { applied: true } });
+      }
+      previews++;
+      if (outcome === 'retry' && previews === 1) return route.fulfill({ status: 503, json: { error: 'TIMEOUT' } });
+      return route.fulfill({ json: { proposal: {
+        reviewKey: 'a'.repeat(64), weight: 84,
+        measurement: { version: 'latest-confirmed-reference-v2', entryDate: '2026-11-04', weight: 84 },
+        before: { targetCalories: 2100, proteinGrams: 150, carbGrams: 240, fatGrams: 60 },
+        after: { targetCalories: 2080, proteinGrams: 148, carbGrams: 237, fatGrams: 60 },
+      } } });
+    });
+    await page.getByRole('link', { name: 'روند من', exact: true }).click();
+    await page.getByRole('button', { name: 'ثبت وزن امروز', exact: true }).click();
+    await page.getByRole('textbox', { name: 'وزن امروز', exact: true }).fill('84');
+    await page.getByRole('button', { name: 'ذخیرهٔ امروز', exact: true }).click();
+    if (outcome === 'retry') {
+      await expect(page.getByText('پاسخ سرویس برنامهٔ غذایی به‌موقع نرسید. دوباره تلاش کن.')).toBeVisible();
+      expect(entry).not.toBeNull();
+      await page.getByRole('button', { name: 'مشاهدهٔ تغییرات برنامه', exact: true }).click();
+    }
+    const dialog = page.getByRole('dialog', { name: 'به‌روزرسانی برنامه با وزن جدید' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('table')).toContainText('۲٬۰۸۰');
+    expect(applies).toBe(0);
+    if (outcome === 'dismiss') {
+      await dialog.getByRole('button', { name: 'فعلاً حفظ برنامه' }).click();
+      await expect(dialog).toHaveCount(0);
+      expect(applies).toBe(0);
+      expect(entry).not.toBeNull();
+    } else {
+      await dialog.getByRole('button', { name: 'تأیید و به‌روزرسانی برنامه' }).click();
+      await expect(dialog).toHaveCount(0);
+      await expect(page.getByText(outcome === 'stale'
+        ? 'اطلاعات مبنای برنامه تغییر کرده است. نسخهٔ تازه را باز کن.'
+        : 'وزن مبنا با تأیید تو به‌روز شد. ثبت‌های مصرف حفظ شده‌اند.')).toBeVisible();
+      expect(applies).toBe(1);
+    }
+  });
+}
