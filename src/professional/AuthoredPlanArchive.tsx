@@ -72,6 +72,7 @@ function NutritionDelivery({ org, record, plan, phone, canDeliver }: {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+  const [delivered, setDelivered] = useState(false);
   const [audit, setAudit] = useState<{ before: AuthoredContent; reason: string } | null | undefined>();
   const ids = { p_org: org, p_record: record, p_plan: plan };
 
@@ -83,6 +84,7 @@ function NutritionDelivery({ org, record, plan, phone, canDeliver }: {
     setNotice('');
     try {
       await rpc('pro_deliver_nutrition', { ...ids, p_phone: phone, p_deliver: active });
+      setDelivered(active);
       setNotice(active ? 'این نسخه در حساب مراجع در دسترس است.' : 'دسترسی مراجع به این نسخه برداشته شد.');
     } catch (err) {
       const code = err instanceof Error ? err.message : '';
@@ -109,6 +111,7 @@ function NutritionDelivery({ org, record, plan, phone, canDeliver }: {
       {audit === undefined && <button type="button" disabled={busy} onClick={() => void loadAudit()}>سابقهٔ تغییر متخصص</button>}
     </div>
     {notice && <p role="status">{notice}</p>}
+    {delivered && <p>لینک ورود مراجع <a className="underline" href="https://behtan.fit/app?prescription=1" target="_blank" rel="noreferrer">behtan.fit/app?prescription=1</a></p>}
     {error && <p role="alert">{error}</p>}
     {audit === null && <p>برای این نسخه سابقهٔ تغییر ثبت نشده است.</p>}
     {audit && <details><summary>دلیل تغییر و نسخهٔ قبل</summary><p>{audit.reason}</p><AuthoredNutritionPreview content={audit.before} /></details>}

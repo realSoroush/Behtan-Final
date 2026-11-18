@@ -915,4 +915,10 @@ test('the member can open the specialist snapshot with its original portions and
   await expect(prescriptions.getByText(/۱۲۵ گرم · پخته/)).toBeVisible();
   await expect(prescriptions.getByText(/جمع منوهای اول · ۲۰۰ کالری · پروتئین ۳۰/)).toBeVisible();
   await expect(prescriptions.getByText('یادداشت برای مراجع')).toBeVisible();
+  await page.route('**/functions/v1/payments*', route => route.abort());
+  await page.goto('/index.html?prescription=1');
+  await prescriptions.getByRole('button', { name: 'دریافت برنامه‌ها', exact: true }).click();
+  await prescriptions.getByRole('button', { name: /نسخه ارسال‌شده/ }).click();
+  await expect(prescriptions.getByText(/۱۲۵ گرم · پخته/)).toBeVisible();
+
 });

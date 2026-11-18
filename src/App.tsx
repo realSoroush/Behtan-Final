@@ -12,6 +12,7 @@ const DashboardPage = lazy(() => loadDashboard().then(m => ({default: m.Dashboar
 import { SafetyReviewPage } from '@/components/safety/SafetyReviewPage';
 import { MedicalSafetyBlockedPage } from '@/components/safety/MedicalSafetyBlockedPage';
 import { evaluateProfileMedicalEligibility } from '@/utils/medicalEligibility';
+const PrescribedNutrition = lazy(() => import('@/components/dashboard/PrescribedNutrition').then(m => ({default:m.PrescribedNutrition})));
 const BillingAccess=lazy(()=>import('@/components/billing/BillingAccess').then(m=>({default:m.BillingAccess})));
 
 function isAuthRequested() {
@@ -29,9 +30,10 @@ function isAuthRequested() {
  */
 function AppContent() {
   const { user, loading: authLoading, error: authError, signOut } = useAuth();
+  const prescriptionRequested = new URLSearchParams(window.location.search).get('prescription') === '1';
   const authenticatedUserId = user?.id;
   useEffect(()=>{if(authenticatedUserId)track('app_open');},[authenticatedUserId]);
-  const profileState = useUserProfile(user?.id, true);
+  const profileState = useUserProfile(prescriptionRequested ? undefined : user?.id, true);
   const {
     profile,
     loading: profileLoading,
@@ -68,6 +70,16 @@ function AppContent() {
   }, [profile, authenticatedUserId]);
 
   if (window.location.pathname.replace(/\/$/, '') === '/professionals') return <MarketingEntry professional />;
+  if (prescriptionRequested && !authError && !authLoading) {
+    if (!user) return <PhoneAuth onBack={closeAuth} />;
+    return <main dir="rtl" className="mx-auto min-h-screen max-w-xl p-4">
+      <nav className="flex items-center justify-between gap-3" aria-label="حساب به‌تن">
+        <a href="/app" className="px-3 py-2">بازگشت به به‌تن</a>
+        <button type="button" className="px-3 py-2" onClick={() => void signOut()}>خروج</button>
+      </nav>
+      <PrescribedNutrition key={user.id} />
+    </main>;
+  }
   if (authError || (user && profileError && !profileLoading)) return <main dir="rtl" className="min-h-screen flex flex-col items-center justify-center gap-4 p-6"><p role="alert">{authError || profileError}</p><button className="rounded-xl bg-primary-600 text-white px-5 py-3" onClick={() => authError ? location.reload() : void refetchProfile()}>تلاش دوباره</button></main>;
   if (authLoading || (user && profileLoading)) {
     return <AppLoading variant="page" label={authLoading ? "در حال بررسی ورود…" : "در حال دریافت حساب…"} />;
