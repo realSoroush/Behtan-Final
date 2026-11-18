@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ProgressEntry } from '../../src/utils/progressJournal.ts';
 import type { UserProfile } from '../../src/types/index.ts';
-import { smoothedWeightReview } from '../../src/utils/weightReview.ts';
+import { latestWeightReview } from '../../src/utils/weightReview.ts';
 import { memberNutrition } from '../../src/member/nutrition.ts';
 import { readNutritionContext } from '../../src/utils/nutritionContext.ts';
 export async function processWeightReview(db: SupabaseClient, user: string, input: unknown) {
@@ -18,23 +18,23 @@ export async function processWeightReview(db: SupabaseClient, user: string, inpu
   if (b.kind === 'apply' && await call('member_weight_review_receipt', { p_user: user, p_key: b.reviewKey })) return { applied: true };
   const state = await call('member_weight_review_state', { p_user: user }) as { today: string; profile: UserProfile; entries: ProgressEntry[] };
   if (!state?.profile) throw Error('ACCESS_DENIED');
-  const trend = smoothedWeightReview(state.entries, state.today);
-  if (!trend || !trend.ready || trend.latest.median === state.profile.weight) {
+  const measurement = latestWeightReview(state.entries, state.today);
+  if (!measurement || measurement.weight === state.profile.weight) {
     if (b.kind === 'apply') {
       if (await call('member_weight_review_receipt', { p_user: user, p_key: b.reviewKey })) return { applied: true };
       throw Error('STALE_CONTEXT');
     }
-    return { proposal: null, trend };
+    return { proposal: null, measurement };
   }
   const { policy, revision } = await readNutritionContext(db, AbortSignal.timeout(12000));
   let before, after;
   try {
     before = memberNutrition(state.profile, policy, false).targets;
-    after = memberNutrition({ ...state.profile, weight: trend.latest.median }, policy, false).targets;
+    after = memberNutrition({ ...state.profile, weight: measurement.weight }, policy, false).targets;
   } catch { throw Error('MEDICAL_REVIEW_REQUIRED'); }
-  const reviewKey = createHash('sha256').update(JSON.stringify({ state, trend, revision })).digest('hex');
-  const proposal = { reviewKey, weight: trend.latest.median, before, after, trend };
-  if (b.kind === 'preview') return { proposal, trend };
+  const reviewKey = createHash('sha256').update(JSON.stringify({ state, measurement, revision })).digest('hex');
+  const proposal = { reviewKey, weight: measurement.weight, before, after, measurement };
+  if (b.kind === 'preview') return { proposal, measurement };
   if (b.reviewKey !== reviewKey) {
     if (await call('member_weight_review_receipt', { p_user: user, p_key: b.reviewKey })) return { applied: true };
     throw Error('STALE_CONTEXT');

@@ -11,6 +11,7 @@ export async function testMealSettingsAndWeightReview(db) {
  // The older shared test bootstrap predates the budget-policy migration.
  await db.exec(await readFile(new URL('../supabase/migrations/20260905_010_protein_budget_preference.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../supabase/migrations/20261117210000_060_meal_settings_weight_review.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../supabase/migrations/20261118120000_061_single_weight_review.sql',import.meta.url),'utf8'));
  const user=randomUUID(),other=randomUUID();
  for (const id of [user,other]){
   await db.query("insert into auth.users(id,phone,phone_confirmed_at)values($1,'989111111111',now())",[id]);
@@ -89,19 +90,24 @@ export async function testMealSettingsAndWeightReview(db) {
  await db.query(`update user_profiles set weight=85,gender='male',birth_date='1990-05-15',activity_level='moderate',goal='weight_loss',
  weight_loss_speed='standard',protein_budget_preference='balanced',medical_conditions_json=$2 where id=$1`,[user,
  {conditions:[],injuries:'',medications:'',pregnancyStatus:'not_applicable',eatingDisorderStatus:'none',safetyAnswersConfirmed:true,safetyScreeningVersion:1}]);
- for(let i=0;i<14;i++) await db.query(`insert into user_progress_entries(user_id,entry_date,weight_kg,adherence,hunger,difficulty)
- values($1,$2::date-$3::integer,80,'mostly','comfortable','none') on conflict(user_id,entry_date) do update set weight_kg=80,adherence='mostly',hunger='comfortable',difficulty='none'`,[user,day,i]);
+ await db.query('delete from user_progress_entries where user_id=$1',[user]);
+ await db.query(`insert into user_progress_entries(user_id,entry_date,weight_kg) values($1,$2,80)`,[user,day]);
  const adapter={rpc(name,args){return{abortSignal(){return this;},retry(){return this;},then(resolve,reject){
   return rpc(name,Object.values(args)).then(data=>resolve({data,error:null}),reject);
  }}}};
  const preview=await processWeightReview(adapter,user,{kind:'preview'});
  assert.equal(preview.proposal.weight,80);
+ assert.equal(Number((await db.query('select weight from user_profiles where id=$1',[user])).rows[0].weight),85,'Preview never applies');
  await db.query('update user_progress_entries set weight_kg=81 where user_id=$1 and entry_date=$2',[user,day]);
  await assert.rejects(()=>processWeightReview(adapter,user,{kind:'apply',reviewKey:preview.proposal.reviewKey}),/STALE_CONTEXT/);
+ await db.query("update user_progress_entries set adherence='little',hunger='often',difficulty='cost' where user_id=$1",[user]);
  const fresh=await processWeightReview(adapter,user,{kind:'preview'});
  assert.deepEqual(await processWeightReview(adapter,user,{kind:'apply',reviewKey:fresh.proposal.reviewKey}),{applied:true});
  assert.deepEqual(await processWeightReview(adapter,user,{kind:'apply',reviewKey:fresh.proposal.reviewKey}),{applied:true},'Lost-response retry returns original receipt without applying again');
  assert.equal((await processWeightReview(adapter,user,{kind:'preview'})).proposal,null);
+ await db.query('update user_profiles set weight=85 where id=$1',[user]);
+ await db.query('update user_progress_entries set entry_date=$2::date-40 where user_id=$1',[user,day]);
+ assert.equal((await processWeightReview(adapter,user,{kind:'preview'})).proposal.weight,81,'Latest recorded weight has no hidden age gate');
  await db.query('delete from nutrition_protein_prices');
  console.log('PASS migration 060: settings CAS/shape, measurement isolation, stale-evidence rejection, apply audit/receipt ownership, price RLS/revision/snapshot, all Pro layout SQL contracts, rolling weekly cap');
 }
