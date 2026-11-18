@@ -5,7 +5,7 @@ import {fileURLToPath} from 'node:url';
 
 const root=fileURLToPath(new URL('..',import.meta.url));
 const compiled=await build({
-  stdin:{contents:`export {AuthoredPlanArchive} from './src/professional/AuthoredPlanArchive';export {AuthoredNutritionPreview} from './src/professional/NutritionStudio';export {authoredHtml} from './src/professional/authoredPlan';export {CorrectiveBank} from './src/professional/training/corrective/CorrectiveBank';export {CORRECTIVE_SEED} from './src/professional/training/corrective/seed';export {createElement} from 'react';export {act,create} from 'react-test-renderer';`,resolveDir:root},
+  stdin:{contents:`export {AuthoredPlanArchive} from './src/professional/AuthoredPlanArchive';export {AuthoredNutritionPreview} from './src/professional/AuthoredNutritionPreview';export {authoredHtml} from './src/professional/authoredPlan';export {CorrectiveBank} from './src/professional/training/corrective/CorrectiveBank';export {CORRECTIVE_SEED} from './src/professional/training/corrective/seed';export {createElement} from 'react';export {act,create} from 'react-test-renderer';`,resolveDir:root},
   tsconfig:root+'/tsconfig.json',bundle:true,platform:'node',format:'cjs',write:false,
   external:['react','react/jsx-runtime','react-test-renderer'],
   plugins:[{name:'synthetic-pro-transports',setup(b){
