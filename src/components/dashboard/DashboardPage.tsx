@@ -64,6 +64,7 @@ const FoodScanPanel = lazy(() => import('./FoodScanPanel').then(module => ({ def
 const ProgressJournal = lazy(() => import('./ProgressJournal').then(module => ({ default: module.ProgressJournal })));
 const MemberAnalytics = lazy(() => import('./MemberAnalytics').then(module => ({ default: module.MemberAnalytics })));
 const WeekPlanner = lazy(() => import('./WeekPlanner').then(module => ({ default: module.WeekPlanner })));
+const PrescribedNutrition = lazy(() => import('./PrescribedNutrition').then(module => ({ default: module.PrescribedNutrition })));
 const MemberProfile = lazy(() => import('./MemberProfile').then(module => ({ default: module.MemberProfile })));
 
 // ============================================================================
@@ -712,6 +713,7 @@ function Dashboard({ user, signOut, profileState }: DashboardSession) {
             profile={profile}
             today={todayKey}
           /></Suspense>
+          {section === 'profile' && <Suspense fallback={<AppLoading label="در حال بازکردن برنامه‌های متخصص…" />}><PrescribedNutrition key={profile.id} /></Suspense>}
         </div>
       )}
       {pendingMeal&&<MemberMealConfirmation meal={pendingMeal.meal} action={pendingMeal.action} onConfirm={confirmPendingMeal} onCancel={()=>setPendingMeal(null)}/> }

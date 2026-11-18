@@ -5,9 +5,11 @@ import { FileDown, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { printAuthored, type AuthoredSnapshot } from './authoredPlan';
 import { lineDescription } from './studioModel';
-import { AuthoredNutritionPreview } from './NutritionStudio';
+import { AuthoredNutritionPreview } from './AuthoredNutritionPreview';
+import { rpc } from './api';
+import type { AuthoredContent } from './authoredPlan';
 
-export function AuthoredPlanArchive({ org, record, name }: { org: string; record: string; name: string }) {
+export function AuthoredPlanArchive({ org, record, name, phone, canDeliver }: { org: string; record: string; name: string; phone: string; canDeliver: boolean }) {
   const [rows, setRows] = useState<AuthoredSnapshot[]>([]);
   const [page, setPage] = useState(0), [reload, setReload] = useState(0), [hasNext, setHasNext] = useState(false);
   const [busy, setBusy] = useState(true), [error, setError] = useState(''), [printError, setPrintError] = useState('');
@@ -53,6 +55,7 @@ export function AuthoredPlanArchive({ org, record, name }: { org: string; record
     {viewing && <section className="studio-snapshot" aria-label="مشاهده برنامه اختصاصی ذخیره‌شده">
       <div className="studio-row"><h4>{viewing.content.title}</h4><button type="button" onClick={() => setViewing(null)}>بستن مشاهده برنامه اختصاصی</button></div>
       {viewing.kind==='training'&&viewing.content.startDate&&<p>تاریخ شروع: {trainingStartLabel(viewing.content.startDate)}</p>}{viewing.kind === 'nutrition' ? <AuthoredNutritionPreview content={viewing.content} showTitle={false} /> : viewing.content.sections.map((s, i) => <section key={i}><h4>{s.title}</h4>{s.lines.map((l, j) => <p key={j}><strong>{l.name}</strong><span>{lineDescription(l)}</span></p>)}</section>)}
+      {viewing.kind === 'nutrition' && <NutritionDelivery key={viewing.id} org={org} record={record} plan={viewing.id} phone={phone} canDeliver={canDeliver} />}
       {viewing.kind === 'training' && <p>{viewing.content.notes}</p>}
     </section>}
     <div className="pro-actions">
@@ -61,4 +64,53 @@ export function AuthoredPlanArchive({ org, record, name }: { org: string; record
       <button type="button" disabled={busy || !hasNext || Boolean(error)} onClick={() => setPage(p => p + 1)}>اختصاصی‌های قدیمی‌تر</button>
     </div>
   </section>;
+}
+
+function NutritionDelivery({ org, record, plan, phone, canDeliver }: {
+  org: string; record: string; plan: string; phone: string; canDeliver: boolean;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
+  const [audit, setAudit] = useState<{ before: AuthoredContent; reason: string } | null | undefined>();
+  const ids = { p_org: org, p_record: record, p_plan: plan };
+
+  async function deliver(active: boolean) {
+    if (busy || (active && !canDeliver)) return;
+    if (active && !window.confirm(`همین نسخه در حساب به‌تن با شمارهٔ ${phone} نمایش داده شود؟`)) return;
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      await rpc('pro_deliver_nutrition', { ...ids, p_phone: phone, p_deliver: active });
+      setNotice(active ? 'این نسخه در حساب مراجع در دسترس است.' : 'دسترسی مراجع به این نسخه برداشته شد.');
+    } catch (err) {
+      const code = err instanceof Error ? err.message : '';
+      setError(code.includes('PRO_DELIVERY_MEMBER_NOT_FOUND')
+        ? 'مراجع باید ابتدا با همین شماره وارد به‌تن شود و شماره را تأیید کند.'
+        : code.includes('PRO_DELIVERY_PHONE_CHANGED')
+          ? 'شمارهٔ پرونده معتبر نیست یا تغییر کرده است. پرونده را دوباره باز کنید.'
+          : 'وضعیت ارسال تغییر نکرد. دوباره تلاش کنید.');
+    } finally { setBusy(false); }
+  }
+
+  async function loadAudit() {
+    setBusy(true);
+    setError('');
+    try { setAudit(await rpc<{ before: AuthoredContent; reason: string } | null>('pro_nutrition_override', ids)); }
+    catch { setError('دریافت سابقهٔ تغییر انجام نشد.'); }
+    finally { setBusy(false); }
+  }
+
+  return <div className="space-y-3">
+    <div className="pro-actions">
+      <button type="button" disabled={busy || !canDeliver || !phone} onClick={() => void deliver(true)}>ارسال به حساب مراجع</button>
+      <button type="button" disabled={busy} onClick={() => void deliver(false)}>برداشتن دسترسی مراجع</button>
+      {audit === undefined && <button type="button" disabled={busy} onClick={() => void loadAudit()}>سابقهٔ تغییر متخصص</button>}
+    </div>
+    {notice && <p role="status">{notice}</p>}
+    {error && <p role="alert">{error}</p>}
+    {audit === null && <p>برای این نسخه سابقهٔ تغییر ثبت نشده است.</p>}
+    {audit && <details><summary>دلیل تغییر و نسخهٔ قبل</summary><p>{audit.reason}</p><AuthoredNutritionPreview content={audit.before} /></details>}
+  </div>;
 }
