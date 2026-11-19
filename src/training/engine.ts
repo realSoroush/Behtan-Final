@@ -59,9 +59,9 @@ export function parseTrainingInput(value: unknown, professional = false): Traini
   ]);
   if (
     b.version !== 1 ||
-    !["home", "gym"].includes(String(b.location)) ||
-    !["beginner", "returning", "regular"].includes(String(b.experience)) ||
-    !["general", "muscle"].includes(String(b.goal)) ||
+    (b.location !== "home" && b.location !== "gym") ||
+    (b.experience !== "beginner" && b.experience !== "returning" && b.experience !== "regular") ||
+    (b.goal !== "general" && b.goal !== "muscle") ||
     (professional ? (!Number.isInteger(b.minutes) || Number(b.minutes)<15 || Number(b.minutes)>180) : ![45, 60].includes(Number(b.minutes))) ||
     typeof b.minutes !== "number"
   )
@@ -220,6 +220,12 @@ export function trainingEligibility(
     )
   )
     fail("TRAINING_PULL_EQUIPMENT");
+  if (
+    requiresSupportedPush(a) &&
+    !input.equipment.includes("stable_platform") &&
+    !input.equipment.includes("chest_press")
+  )
+    fail("TRAINING_SUPPORTED_PUSH");
 }
 function select(
   pattern: Pattern,
@@ -259,9 +265,57 @@ function select(
     .map((id) => EXERCISES.find((e) => e.id === id)!)
     .filter((e) => e.equipment.every((x) => input.equipment.includes(x)));
   if (!available.length) return fail("TRAINING_EQUIPMENT");
-  // Alternate only between equivalent pulls; repeat fundamentals to support learning.
+  // Rotate between the available pulls and repeat the other patterns to support learning.
   return available[pattern === "pull" ? variant % available.length : 0];
 }
+/** Whether the engine uses the supported, lower-load starting template. */
+export function usesConservativeTraining(a: TrainingProfile, input: TrainingInput) {
+  return input.experience !== "regular" || requiresSupportedPush(a);
+}
+
+function requiresSupportedPush(a: TrainingProfile) {
+  return a.weight_kg / (a.height_cm / 100) ** 2 >= 35;
+}
+
+function sessionSeconds(lines: TrainingLine[]) {
+  return 8 * 60 + lines.reduce((seconds, line) => {
+    const repSeconds = line.reps[1] * (line.per_side ? 2 : 1) * 3;
+    return seconds + line.sets * repSeconds + (line.sets - 1) * line.rest_seconds + 60;
+  }, 0);
+}
+
+/** Start with every required pattern, then add sets in a fixed priority order. */
+function fitSession(required: TrainingLine[], optional: TrainingLine[], minutes: number, targetSets: number) {
+  const budget = minutes * 60;
+  const lines = [...required];
+  if (sessionSeconds(lines) > budget) fail("TRAINING_TIME_BUDGET");
+
+  for (let sets = 2; sets <= targetSets; sets++) {
+    for (const line of lines) {
+      if (line.exercise.pattern === "core" && sets > 2) continue;
+      line.sets = sets;
+      if (sessionSeconds(lines) > budget) {
+        line.sets--;
+        return lines;
+      }
+    }
+  }
+
+  // Accessories may use remaining time, without replacing the required work.
+  for (const accessory of optional) {
+    if (sessionSeconds([...lines, accessory]) > budget) break;
+    lines.push(accessory);
+    for (let sets = 2; sets <= targetSets; sets++) {
+      accessory.sets = sets;
+      if (sessionSeconds(lines) > budget) {
+        accessory.sets--;
+        return lines;
+      }
+    }
+  }
+  return lines;
+}
+
 export function buildTrainingPlan(
   a: TrainingProfile,
   raw: unknown,
@@ -278,79 +332,49 @@ export function buildTrainingPlan(
     a.display_name.length > 80
   )
     fail("TRAINING_INVALID_INPUT");
-  const conservative =
-    input.experience !== "regular" ||
-    a.weight_kg / (a.height_cm / 100) ** 2 >= 35;
-  // High-body-mass novice push-ups are regressed onto a stable elevated surface or machine.
-  if (
-    conservative &&
-    a.weight_kg / (a.height_cm / 100) ** 2 >= 35 &&
-    !input.equipment.includes("stable_platform") &&
-    !input.equipment.includes("chest_press")
-  )
-    fail("TRAINING_SUPPORTED_PUSH");
-  const patterns: Pattern[] = [
-    "squat",
-    "push",
-    "hinge",
-    "pull",
-    "core",
-    "calf",
-  ];
-  if (
-    input.minutes === 60 &&
-    input.goal === "muscle" &&
-    input.equipment.some((x) => ["dumbbells", "long_band"].includes(x))
-  )
-    patterns.push("shoulder");
+  const conservative = usesConservativeTraining(a, input);
+  const upper: Pattern[] = ["push", "pull"];
+  const lower: Pattern[] = ["squat", "hinge", "calf", "core"];
+  const fullBody: Pattern[] = ["squat", "push", "hinge", "pull", "core", "calf"];
+  const split = professional && input.days.some(day => input.days.includes((day + 1) % 7));
   const start = new Date(input.start_date + "T12:00:00Z");
   const startDay = (start.getUTCDay() + 1) % 7;
   const scheduledDays = [...input.days].sort(
     (a, b) => ((a - startDay + 7) % 7) - ((b - startDay + 7) % 7),
   );
+  const weekBoundaryGap = (scheduledDays[0] - scheduledDays[scheduledDays.length - 1] + 7) % 7;
+  // Keep weekdays stable unless an odd split would repeat the same muscle group across adjacent weeks.
+  const alternateWeeks = split && scheduledDays.length % 2 === 1 && weekBoundaryGap === 1;
+  let upperSessionIndex = 0;
   const weeks = [1, 2, 3, 4].map((week) => ({
     week,
     sessions: scheduledDays.map((day, index) => {
-      // Consecutive Pro days use a rotating split, never repeat full-body daily.
-      const split = professional && (scheduledDays.length>3 || input.days.some((d)=>input.days.includes((d+1)%7)));
-      const cycle=((week-1)*scheduledDays.length+index)%3;
-      const selectedPatterns:Pattern[] = split ? ([['push','shoulder'],['pull','arms'],['squat','hinge','calf','core']] as Pattern[][])[cycle] : patterns;
-      const sessionPatterns = professional ? selectedPatterns.filter(pattern=>!["shoulder","arms"].includes(pattern)||EXERCISES.some(e=>e.pattern===pattern&&e.equipment.every(x=>input.equipment.includes(x)))) : selectedPatterns;
-      const lines: TrainingLine[] = sessionPatterns.map((pattern) => {
-        const exercise = select(pattern, input, index, conservative);
-        const sets = professional && input.minutes<45 ? 1 : conservative
-          ? week === 1
-            ? 1
-            : 2
-          : 2 + (week >= 3 && input.minutes === 60 ? 1 : 0);
-        return {
-          exercise: structuredClone(exercise),
-          sets: pattern === "core" ? Math.min(sets, 2) : sets,
-          reps:
-            pattern === "core"
-              ? [6, 10]
-              : pattern === "calf"
-                ? [10, 15]
-                : [8, 12],
-          per_side: pattern === "core",
-          rest_seconds: ["core", "calf", "arms", "shoulder"].includes(pattern)
-            ? 60
-            : 120,
-          rir: week === 1 ? 4 : 3,
-        };
+      // Alternating upper/lower covers both in every split week, including two-day weeks.
+      const upperDay = (index + (alternateWeeks ? week - 1 : 0)) % 2 === 0;
+      // Calendar parity can repeat every upper day. Rotate by actual upper sessions instead.
+      const pullVariant = split && upperDay ? upperSessionIndex++ : index;
+      const patterns = split ? (upperDay ? upper : lower) : fullBody;
+      const accessories: Pattern[] = [];
+      if (split && upperDay) accessories.push("shoulder", "arms");
+      if (!split && input.minutes >= 60 && input.goal === "muscle") accessories.push("shoulder");
+
+      const createLine = (pattern: Pattern): TrainingLine => ({
+        exercise: structuredClone(select(pattern, input, pullVariant, conservative)),
+        sets: 1,
+        reps: pattern === "core" ? [6, 10] : pattern === "calf" ? [10, 15] : [8, 12],
+        per_side: pattern === "core",
+        rest_seconds: ["core", "calf", "arms", "shoulder"].includes(pattern) ? 60 : 120,
+        rir: week === 1 ? 4 : 3,
       });
-      const seconds =
-        8 * 60 +
-        lines.reduce(
-          (s, l) =>
-            s +
-            l.sets * (l.per_side ? l.reps[1] * 2 * 3 : l.reps[1] * 3) +
-            (l.sets - 1) * l.rest_seconds +
-            60,
-          0,
-        );
-      const estimated_minutes = Math.ceil(seconds / 60);
-      if (estimated_minutes > input.minutes) fail("TRAINING_TIME_BUDGET");
+      const availableAccessories = accessories.filter(pattern => EXERCISES.some(
+        exercise => exercise.pattern === pattern && exercise.equipment.every(e => input.equipment.includes(e)),
+      ));
+      // Keep the existing starter dose for short sessions and progressively add sets in longer blocks.
+      let targetSets = 2;
+      if ((professional && input.minutes < 45) || (conservative && week === 1)) targetSets = 1;
+      else if (!conservative && week >= 3 && input.minutes >= 60) targetSets = 3;
+      const lines = fitSession(patterns.map(createLine), availableAccessories.map(createLine), input.minutes, targetSets);
+      const estimated_minutes = Math.ceil(sessionSeconds(lines) / 60);
       const sessionDate = new Date(start);
       sessionDate.setUTCDate(
         start.getUTCDate() + ((day - startDay + 7) % 7) + (week - 1) * 7,
@@ -358,7 +382,7 @@ export function buildTrainingPlan(
       return {
         day,
         date: sessionDate.toISOString().slice(0, 10),
-        title: (split ? ["فشار بالاتنه","کشش بالاتنه","پایین‌تنه و میان‌تنه"][cycle] : "تمرین تمام‌بدن " + String.fromCharCode(65 + index)),
+        title: split ? (upperDay ? "تمرین بالاتنه" : "پایین‌تنه و میان‌تنه") : "تمرین تمام‌بدن " + String.fromCharCode(65 + index),
         estimated_minutes,
         lines,
       };
@@ -367,6 +391,7 @@ export function buildTrainingPlan(
   return {
     version: 1,
     engine: "behtan-training-1.0",
+    planning_revision: "weekly-coverage-v2",
     catalog: "basics-22-v1",
     created_at: now.toISOString(),
     display_name: a.display_name.trim(),

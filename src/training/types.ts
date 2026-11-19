@@ -17,10 +17,10 @@ export interface TrainingProfile {
   medical_conditions: MedicalCondition[];
   medications_present: boolean;
   injuries_present: boolean;
-  pregnancy_status: PregnancyStatus;
-  eating_disorder_status: EatingDisorderStatus;
+  pregnancy_status: PregnancyStatus | null;
+  eating_disorder_status: EatingDisorderStatus | null;
   safety_confirmed: boolean;
-  screening_version: 1;
+  screening_version: number | null;
 }
 export type Equipment =
   | "dumbbells"
@@ -90,6 +90,7 @@ export interface TrainingWeek {
 export interface TrainingPlan {
   version: 1;
   engine: "behtan-training-1.0";
+  planning_revision?: "weekly-coverage-v2";
   catalog: "basics-22-v1";
   created_at: string;
   display_name: string;
