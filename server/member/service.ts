@@ -13,33 +13,8 @@ import {
 } from "../../src/member/nutrition.ts";
 import type { UserProfile } from "../../src/types/index.ts";
 import { buildTrainingPlan } from "../../src/training/engine.ts";
-import type { TrainingProfile } from "../../src/training/types.ts";
-function canonical(value: unknown): string {
- if(Array.isArray(value))return '['+value.map(canonical).join(',')+']';
- if(value&&typeof value==='object')return '{'+Object.entries(value).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>JSON.stringify(k)+':'+canonical(v)).join(',')+'}';
- return JSON.stringify(value);
-}
-function trainingProfile(profile: UserProfile): TrainingProfile {
-  const medical = profile.medical_conditions_json;
-  const p: TrainingProfile = {
-        display_name: profile.display_name || "عضو به‌تن",
-        gender: profile.gender!,
-        birth_date: profile.birth_date!,
-        height_cm: profile.height!,
-        weight_kg: profile.weight!,
-        goal: profile.goal!,
-        workout_days: profile.workout_days ?? 0,
-        medical_conditions: medical?.conditions ?? [],
-        medications_present: Boolean(medical?.medications?.trim()),
-        injuries_present: Boolean(medical?.injuries?.trim()),
-        pregnancy_status: medical?.pregnancyStatus ?? "not_applicable",
-        eating_disorder_status: medical?.eatingDisorderStatus ?? "none",
-        safety_confirmed: medical?.safetyAnswersConfirmed === true,
-        screening_version: 1,
-      };
-
-  return p;
-}
+import type { TrainingPlan } from "../../src/training/types.ts";
+import { canReuseMemberTraining, trainingProfile } from "./trainingProfile.ts";
 export function memberService() {
   const url = process.env.VITE_SUPABASE_URL,
     key = process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -155,8 +130,11 @@ export function memberService() {
         .maybeSingle();
       if (r.error) throw Error("دریافت تمرین انجام نشد.");
       const stored = r.data;
-      if(stored && canonical(JSON.parse(stored.profile_hash))!==canonical(Object.fromEntries(Object.entries(profile).filter(([key])=>key!=='updated_at')))) return {plan:null,outdated:true};
-      if(stored) return stored;
+      if (stored) {
+        const plan = stored.plan as TrainingPlan;
+        if (!canReuseMemberTraining(plan, stored.profile_hash, profile)) return { plan: null, outdated: true };
+        return { plan, created_at: stored.created_at };
+      }
       // A paid order carries the exact plan approved before checkout. Recover it after redirects as well.
       const approved = await rpc('member_activate_training',{p_user:user});
       return approved ? {plan:approved} : {plan:null,needsPreparation:true};

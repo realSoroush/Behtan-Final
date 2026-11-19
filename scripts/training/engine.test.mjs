@@ -5,6 +5,7 @@ import {
   parseTrainingInput,
   progressionAdvice,
 } from "../../src/training/engine.ts";
+import { canReuseMemberTraining, trainingProfile } from "../../server/member/trainingProfile.ts";
 import { EXERCISES } from "../../src/training/catalog.ts";
 import { trainingHtml } from "../../src/training/print.ts";
 import { emptyRealIntake } from "../../src/professional/menuPlan.ts";
@@ -240,6 +241,90 @@ const manifest = JSON.parse(
   ),
 );
 eq(manifest.length, 44);
+// Every Pro weekday combination, rotating the start date through the week.
+for (let mask = 1; mask < 128; mask++) {
+  const days = Array.from({ length: 7 }, (_, day) => day).filter(day => mask & (1 << day));
+  const split = days.some(day => days.includes((day + 1) % 7));
+  for (let offset = 0; offset < 7; offset++) {
+    const start_date = `2026-10-${24 + offset}`;
+    const plan = buildTrainingPlan(answers, { ...input, days, start_date }, 1, now, true);
+    for (const week of plan.weeks) {
+      assert.equal(week.sessions.length, days.length);
+      const patterns = new Set(week.sessions.flatMap(session => session.lines.map(line => line.exercise.pattern)));
+      for (const pattern of ["push", "pull", "squat", "hinge", "calf", "core"]) {
+        assert(patterns.has(pattern), `Week ${week.week} with weekdays ${days} lost ${pattern}`);
+      }
+    }
+    const sessions = plan.weeks.flatMap(week => week.sessions);
+    for (let index = 1; index < sessions.length; index++) {
+      const previous = sessions[index - 1];
+      const current = sessions[index];
+      if (Date.parse(current.date) - Date.parse(previous.date) === 86400000) {
+        assert(split);
+        assert.notEqual(previous.title, current.title, "Adjacent Pro sessions must alternate, even across weeks");
+      }
+    }
+  }
+}
+
+// More time never removes previously assigned work, including around 45 and 60 minutes.
+for (const days of [[0, 3], [0, 1], [0, 1, 3, 4, 6]]) {
+  for (const experience of ["beginner", "regular"]) {
+    const equipment = ["dumbbells", "stable_platform"];
+    let previous;
+    for (let minutes = 19; minutes <= 180; minutes++) {
+      const plan = buildTrainingPlan(answers, { ...input, days, minutes, experience, goal: "muscle", equipment }, 1, now, true);
+      const sessions = plan.weeks.flatMap(week => week.sessions);
+      sessions.forEach((session, index) => {
+        assert(session.estimated_minutes <= minutes);
+        const lines = new Map(session.lines.map(line => [line.exercise.id, line.sets]));
+        for (const line of previous?.[index].lines ?? []) {
+          assert(lines.get(line.exercise.id) >= line.sets, `${minutes} minutes removed work`);
+        }
+      });
+      previous = sessions;
+    }
+  }
+}
+rejects(() => buildTrainingPlan(answers, { ...input, minutes: 15 }, 1, now, true), "TRAINING_TIME_BUDGET");
+
+const member = {
+  display_name: "Synthetic",
+  gender: "male",
+  birth_date: "1992-04-23",
+  height: 165,
+  weight: 75,
+  goal: "maintenance",
+  workout_days: input.days.length,
+  workout_weekdays: input.days,
+  medical_conditions_json: {
+    conditions: [],
+    medications: "",
+    injuries: "",
+    pregnancyStatus: "not_applicable",
+    eatingDisorderStatus: "none",
+    safetyAnswersConfirmed: true,
+    safetyScreeningVersion: 1,
+  },
+};
+const legacySnapshot = JSON.stringify({ ...member, meal_settings: null });
+const regularInput = { ...input, experience: "regular" };
+const storedPlan = buildTrainingPlan(trainingProfile(member), regularInput, 1, now);
+delete storedPlan.planning_revision; // Old on-disk plans remain readable as-is.
+const canReuse = (patch = {}, snapshot = legacySnapshot, plan = storedPlan) =>
+  canReuseMemberTraining(plan, snapshot, { ...member, ...patch }, now);
+assert(canReuse({ weight: 76, meal_settings: { regularMeals: 4, includePostWorkout: false }, protein_budget_preference: "economic" }));
+assert(canReuse({ workout_weekdays: [3, 0], display_name: "نام جدید" }));
+assert(!canReuse({ weight: 100 }), "Crossing the conservative template boundary requires rebuilding");
+assert(!canReuse({ workout_weekdays: [1, 4] }));
+assert(!canReuse({ workout_days: 3 }));
+assert(!canReuse({ medical_conditions_json: { ...member.medical_conditions_json, injuries: "Reported" } }));
+assert(!canReuse({ medical_conditions_json: { ...member.medical_conditions_json, safetyAnswersConfirmed: false } }));
+assert(!canReuse({}, "invalid snapshot"));
+const unsupported = buildTrainingPlan(trainingProfile(member), { ...input, equipment: ["dumbbells"] }, 1, now);
+assert(!canReuse({ weight: 100 }, legacySnapshot, unsupported), "A newly required supported push invalidates the old plan");
+console.log("PASS weekly coverage across every Pro schedule, monotonic set budgets, and compatible legacy member plans");
+
 console.log(
   `PASS training engine: ${plans} valid programme combinations; ${checks} assertions; equipment, recovery, scope, deterministic plans, escaping, media`,
 );
