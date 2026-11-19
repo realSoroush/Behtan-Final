@@ -1,3 +1,4 @@
+import { AuthoredNutritionPreview } from './AuthoredNutritionPreview';
 import {StudioNavigation} from './StudioNavigation';
 import { AppLoading } from '@/components/ui/AppLoading';
 import { useEffect, useRef, useState } from 'react';
@@ -91,7 +92,4 @@ export function NutritionStudio({ content, mutate, intake, org, record, revision
 
 export function NutritionMenuRows({section,active,onSelect}:{section:AuthoredContent['sections'][number];active?:string;onSelect?:(id:string)=>void}) {
  return <table className="studio-menu-table"><thead><tr><th>منو</th><th>مواد و مقدار مصرف</th></tr></thead><tbody>{sectionMenus(section).map((menu,i)=>{return <tr key={menu.id} className={active===menu.id?'is-selected':''}><td>{onSelect?<button type="button" aria-pressed={active===menu.id} onClick={()=>onSelect(menu.id)}>{menu.title}</button>:menu.title||'منو '+fa(i+1)}</td><td><p>{menu.lines.filter(l=>l.name.trim()).map(l=>l.food?`${l.name} ${fa(l.food.grams)} گرم (${l.food.basis})`:l.name+' '+l.details).join(' + ')||'مواد این منو را اضافه کنید.'}</p><small>{nutritionMenuSummary(menu.lines)}</small>{menu.lines.some(l=>l.details)&&<small>{menu.lines.filter(l=>l.details).map(l=>l.name+': '+l.details).join('؛ ')}</small>}</td></tr>})}</tbody></table>;
-}
-export function AuthoredNutritionPreview({content,showTitle=true}:{content:AuthoredContent;showTitle?:boolean}){
- return <aside className="authored-live-preview" aria-label="پیش‌نمایش زنده تغذیه"><small>از هر وعده فقط یک منو انتخاب شود.</small>{showTitle&&<h3>{content.title}</h3>}{content.sections.map((s,i)=><section key={i}><h4>{dayLabel(s.nutritionDay||'daily')} · {s.title}</h4><NutritionMenuRows section={s}/></section>)}<p>{content.notes}</p></aside>;
 }

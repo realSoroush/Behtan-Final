@@ -2,7 +2,8 @@ import {trainingStartLabel} from './training/trainingDate';
 import {PanelSelect} from '@/components/ui/PanelSelect';
 import { AppLoading } from '@/components/ui/AppLoading';
 import { ManualTrainingBuilder } from './training/ManualTrainingBuilder';
-import { NutritionStudio, AuthoredNutritionPreview } from './NutritionStudio';
+import { NutritionStudio } from './NutritionStudio';
+import { AuthoredNutritionPreview } from './AuthoredNutritionPreview';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FileDown, Copy, Save, Sparkles, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
@@ -39,11 +40,17 @@ export function AuthoredPlanEditor({ org, record, revision, kind, name, canWrite
   onGenerate?: (menuCount?:number) => Promise<AuthoredContent>; intake?: RealIntake; onSaved?: () => void;
 }) {
   const [content, setContent] = useState<AuthoredContent>(() => prepareContent(seed ? { ...seed, reviewed: false } : empty(kind), kind));
+  const [source, setSource] = useState<{content: AuthoredContent; id?: string} | null>(
+    () => kind === 'nutrition' && seed ? { content: structuredClone(seed) } : null,
+  );
+  const [reason, setReason] = useState('');
+  const changedPrescription = source !== null && JSON.stringify([source.content.sections, source.content.nutritionTargets])
+    !== JSON.stringify([content.sections, content.nutritionTargets]);
   const [generatedCount,setGeneratedCount]=useState(1);
   const [rows, setRows] = useState<AuthoredSnapshot[]>([]), [page, setPage] = useState(0), [hasNext, setHasNext] = useState(false);
   const [busy, setBusy] = useState(false), [historyBusy, setHistoryBusy] = useState(false), [error, setError] = useState(''), [historyError, setHistoryError] = useState(''), [notice, setNotice] = useState('');
   const [saved, setSaved] = useState<AuthoredSnapshot | null>(null), [viewing, setViewing] = useState<AuthoredSnapshot | null>(null), [loaded, setLoaded] = useState(false);
-  const request = useRef<{ key: string; content: AuthoredContent } | null>(null), pending = useRef(false), alive = useRef(true), seq = useRef(0);
+  const request = useRef<{ key: string; content: AuthoredContent; override?: { p_source: string | null; p_before: AuthoredContent | null; p_reason: string } } | null>(null), pending = useRef(false), alive = useRef(true), seq = useRef(0);
   const notify = useRef(onBusy), dirtyNotify = useRef(onDirty), baseline = useRef(seed ? '' : JSON.stringify(content));
   notify.current = onBusy; dirtyNotify.current = onDirty;
   const dirty = JSON.stringify(content) !== baseline.current;
@@ -74,14 +81,25 @@ export function AuthoredPlanEditor({ org, record, revision, kind, name, canWrite
     if (pending.current || !canWrite) return;
     const validation = validateAuthored(request.current?.content || content, kind);
     if (validation || !content.reviewed) { setError(validation || 'بازبینی برنامه را تأیید کنید.'); return; }
+    if (changedPrescription && !reason.trim()) { setError('دلیل تغییر برنامه را وارد کنید.'); return; }
     pending.current = true; setBusy(true); notify.current(true); setError('');
     try {
-      const req = request.current ?? { key: crypto.randomUUID(), content: structuredClone(content) }; request.current = req;
-      const id = await rpc<string>('pro_save_authored_plan', { p_org: org, p_record: record, p_revision: revision, p_kind: kind, p_content: req.content, p_key: req.key });
+      const req = request.current ?? {
+        key: crypto.randomUUID(), content: structuredClone(content),
+        override: changedPrescription && source ? {
+          p_source: source.id ?? null, p_before: source.id ? null : source.content, p_reason: reason.trim(),
+        } : undefined,
+      };
+      request.current = req;
+      const base = { p_org: org, p_record: record, p_revision: revision, p_content: req.content, p_key: req.key };
+      const id = req.override
+        ? await rpc<string>('pro_save_nutrition_override', { ...base, ...req.override })
+        : await rpc<string>('pro_save_authored_plan', { ...base, p_kind: kind });
       if (!alive.current) return;
       const snapshot = { id, kind, content: req.content, display_name: name, intake_revision: revision, recorded_at: new Date().toISOString() };
       baseline.current = JSON.stringify(req.content); setSaved(snapshot); setContent(req.content); request.current = null; dirtyNotify.current?.(false);
       setNotice('نسخهٔ تأییدشده ذخیره شد؛ برای تغییر، نسخهٔ جدید بسازید.');
+      if (kind === 'nutrition') { setSource({ id, content: req.content }); setReason(''); }
       onSaved?.();
       if (page === 0) await load(0); else setPage(0);
     } catch (e) {
@@ -94,7 +112,7 @@ export function AuthoredPlanEditor({ org, record, revision, kind, name, canWrite
     if (pending.current || !canWrite || !onGenerate || request.current) return;
     if (dirty && !window.confirm('پیش‌نویس فعلی با خروجی موتور جایگزین شود؟ نسخه‌های ثبت‌شده حفظ می‌شوند.')) return;
     pending.current = true; setBusy(true); notify.current(true); setError('');
-    try { const next = await onGenerate(generatedCount); if (alive.current) { setContent(prepareContent(next, kind)); setSaved(null); setNotice('پیش‌نویس موتور بر اساس پرونده آماده شد. مقدارها را بازبینی کنید؛ هنوز ثبت نشده است.'); } }
+    try { const next = await onGenerate(generatedCount); if (alive.current) { setContent(prepareContent(next, kind)); setSource({ content: next }); setReason(''); setSaved(null); setNotice('پیش‌نویس موتور بر اساس پرونده آماده شد. مقدارها را بازبینی کنید؛ هنوز ثبت نشده است.'); } }
     catch (e) { if (alive.current) setError(message(e)); }
     finally { pending.current = false; if (alive.current) { setBusy(false); notify.current(false); } }
   }
@@ -107,17 +125,18 @@ export function AuthoredPlanEditor({ org, record, revision, kind, name, canWrite
       <fieldset disabled={busy || Boolean(request.current)}><div className="studio-title-row"><label>عنوان برنامه<input aria-label="عنوان برنامه اختصاصی" value={content.title} maxLength={160} onChange={e => mutate(d => { d.title = e.target.value; })} /></label>{onGenerate&&kind==='nutrition'&&<label>تعداد منوی ساخت خودکار<PanelSelect aria-label="تعداد منوی ساخت در استودیو" value={generatedCount}onChange={e=>setGeneratedCount(Number(e.target.value))}>{[1,2,3,4,5].map(n=><option key={n}value={n}>{n.toLocaleString('fa-IR')}</option>)}</PanelSelect></label>}{onGenerate && <button type="button" onClick={() => void generate()}><Sparkles size={17} />ساخت برنامه توسط به‌تن</button>}</div>
         {kind === 'training' ? <ManualTrainingBuilder org={org} content={content} mutate={mutate} /> : <NutritionStudio org={org} record={record} revision={revision} content={content} mutate={mutate} intake={intake} />}
         <label className="pro-authored-notes">یادداشت متخصص<textarea aria-label="یادداشت متخصص" value={content.notes} maxLength={4000} rows={3} onChange={e => mutate(d => { d.notes = e.target.value; })} /></label>
+        {changedPrescription && <label className="pro-authored-notes">دلیل تغییر برنامه<textarea value={reason} onChange={e => setReason(e.target.value)} maxLength={1000} rows={2} /></label>}
         <label className="pro-authored-review"><input type="checkbox" aria-label="تأیید برنامه اختصاصی متخصص" checked={content.reviewed} onChange={e => setContent({ ...content, reviewed: e.target.checked })} />این نسخه و تناسب آن با شرایط مراجع را بازبینی و تأیید کردم.</label>
       </fieldset>
       {validation && <p className="studio-help">{validation}</p>}
-      <div className="studio-save-bar"><span>{saved ? 'نسخه تأییدشده ثبت شده' : dirty ? 'تغییرات ثبت نشده' : 'آماده تدوین برنامه'}</span><div className="pro-actions"><button className="pro-primary" disabled={busy || Boolean(validation) || !content.reviewed || Boolean(saved)} onClick={() => void save()}><Save size={17} />{request.current ? 'تلاش مجدد ثبت نسخه' : 'ثبت نسخهٔ تأییدشده'}</button>{saved && <button disabled={busy} onClick={() => void printAuthored(saved, name, org).catch(e => setError(message(e)))}><FileDown size={17} />PDF نسخه ثبت‌شده</button>}</div></div>
+      <div className="studio-save-bar"><span>{saved ? 'نسخه تأییدشده ثبت شده' : dirty ? 'تغییرات ثبت نشده' : 'آماده تدوین برنامه'}</span><div className="pro-actions"><button className="pro-primary" disabled={busy || Boolean(validation) || !content.reviewed || (changedPrescription && !reason.trim()) || Boolean(saved)} onClick={() => void save()}><Save size={17} />{request.current ? 'تلاش مجدد ثبت نسخه' : 'ثبت نسخهٔ تأییدشده'}</button>{saved && <button disabled={busy} onClick={() => void printAuthored(saved, name, org).catch(e => setError(message(e)))}><FileDown size={17} />PDF نسخه ثبت‌شده</button>}</div></div>
     </>}
     <section className="studio-history"><div className="studio-row"><h3>سوابق برنامه‌های اختصاصی</h3><button type="button" disabled={historyBusy} onClick={() => void load(page)}><RefreshCw size={16} />دریافت سوابق</button></div>
       {historyBusy && <AppLoading label="در حال دریافت سوابق…" />}{historyError && <p role="alert" className="pro-error">{historyError}</p>}
       {loaded && !historyBusy && !historyError && !rows.length && <p className="pro-muted">هنوز برنامهٔ اختصاصی ثبت نشده است.</p>}
       {rows.map(p => <article className="pro-authored-snapshot" key={p.id}><div><strong>{p.content.title}</strong><small>{new Date(p.recorded_at).toLocaleString('fa-IR')} · نسخه پرونده {p.intake_revision.toLocaleString('fa-IR')}</small></div><div className="pro-actions">
         <button disabled={busy} onClick={() => setViewing(viewing?.id === p.id ? null : p)}>مشاهده نسخه</button>
-        {canWrite && <button disabled={busy || Boolean(request.current)} onClick={() => { if (dirty && !window.confirm('تغییرات ثبت‌نشده کنار گذاشته شوند؟')) return; setContent(prepareContent({ ...p.content, reviewed: false }, kind)); setSaved(null); setNotice('نسخهٔ جدید برای ویرایش آماده است؛ نسخهٔ قبلی تغییر نمی‌کند.'); }}><Copy size={16} />ساخت نسخه جدید</button>}
+        {canWrite && <button disabled={busy || Boolean(request.current)} onClick={() => { if (dirty && !window.confirm('تغییرات ثبت‌نشده کنار گذاشته شوند؟')) return; setContent(prepareContent({ ...p.content, reviewed: false }, kind)); setSource(kind === 'nutrition' ? { id: p.id, content: p.content } : null); setReason(''); setSaved(null); setNotice('نسخهٔ جدید برای ویرایش آماده است؛ نسخهٔ قبلی تغییر نمی‌کند.'); }}><Copy size={16} />ساخت نسخه جدید</button>}
         <button onClick={() => void printAuthored(p, name, org).catch(e => setError(message(e)))}><FileDown size={16} />PDF</button>
       </div></article>)}
       {viewing && <section className="studio-snapshot" aria-label="نسخه ذخیره‌شده"><div className="studio-row"><h4>{viewing.content.title}</h4><button onClick={() => setViewing(null)}>بستن مشاهده نسخه</button></div>{kind==='training'&&viewing.content.startDate&&<p>تاریخ شروع: {trainingStartLabel(viewing.content.startDate)}</p>}{kind==='nutrition'?<AuthoredNutritionPreview content={viewing.content} showTitle={false}/>:viewing.content.sections.map((s, i) => <section key={i}><h4>{s.title}</h4>{s.lines.map((l, j) => <p key={j}><strong>{l.name}</strong><span>{lineDescription(l)}</span></p>)}</section>)}{kind==='training'&&<p>{viewing.content.notes}</p>}</section>}

@@ -53,6 +53,16 @@ export function nutritionMenuSummary(lines: AuthoredLine[]): string {
   const partial = lines.some(line => !line.food && line.name.trim());
   return `${fa(t.kcal)} کالری · پروتئین ${fa(t.protein)} · کربوهیدرات ${fa(t.carbs)} · چربی ${fa(t.fat)} گرم${partial ? ' · فقط مواد دارای مقادیر ثبت‌شده؛ سطرهای متنی در جمع محاسبه نشده‌اند.' : ''}`;
 }
+export function authoredNutritionDays(content: AuthoredContent) {
+  const keys = [...new Set(content.sections.map(section => section.nutritionDay || 'daily'))];
+  return keys.map(key => {
+    const sections = content.sections.filter(section => (section.nutritionDay || 'daily') === key);
+    return {
+      key, label: dayLabel(key), sections,
+      primarySummary: nutritionMenuSummary(sections.flatMap(section => section.lines)),
+    };
+  });
+}
 export function foodLine(food: FoodItem, grams = 100): AuthoredLine {
   return { name: food.name, details: '', food: {
     id: food.id, grams, gramsPerUnit: food.gramsPerUnit,

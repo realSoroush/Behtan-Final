@@ -5,7 +5,7 @@ import {fileURLToPath} from 'node:url';
 
 const root=fileURLToPath(new URL('..',import.meta.url));
 const compiled=await build({
-  stdin:{contents:`export {AuthoredPlanArchive} from './src/professional/AuthoredPlanArchive';export {AuthoredNutritionPreview} from './src/professional/NutritionStudio';export {authoredHtml} from './src/professional/authoredPlan';export {CorrectiveBank} from './src/professional/training/corrective/CorrectiveBank';export {CORRECTIVE_SEED} from './src/professional/training/corrective/seed';export {createElement} from 'react';export {act,create} from 'react-test-renderer';`,resolveDir:root},
+  stdin:{contents:`export {AuthoredPlanArchive} from './src/professional/AuthoredPlanArchive';export {AuthoredNutritionPreview} from './src/professional/AuthoredNutritionPreview';export {authoredHtml} from './src/professional/authoredPlan';export {CorrectiveBank} from './src/professional/training/corrective/CorrectiveBank';export {CORRECTIVE_SEED} from './src/professional/training/corrective/seed';export {createElement} from 'react';export {act,create} from 'react-test-renderer';`,resolveDir:root},
   tsconfig:root+'/tsconfig.json',bundle:true,platform:'node',format:'cjs',write:false,
   external:['react','react/jsx-runtime','react-test-renderer'],
   plugins:[{name:'synthetic-pro-transports',setup(b){
@@ -36,12 +36,16 @@ try{
    {id:'training',kind:'training',intake_revision:1,recorded_at:'2026-11-08T12:00:00Z',content:{version:1,title:'تمرین قدیمی',notes:'',reviewed:true,sections:[{title:'جلسه',lines:[{name:'حرکت قدیمی',details:'دستور قدیمی'}]}]}});
   const before=JSON.stringify(rows);let tree;
   try{
-   await act(async()=>{tree=create(createElement(AuthoredPlanArchive,{org,record:'synthetic-record',name:'مراجع مصنوعی'}));});
+   await act(async()=>{tree=create(createElement(AuthoredPlanArchive,{org,record:'synthetic-record',name:'مراجع مصنوعی',deliveryEnabled:false}));});
    await act(async()=>button(tree,'مشاهده برنامه اختصاصی').props.onClick());
    const view=tree.root.findByProps({'aria-label':'مشاهده برنامه اختصاصی ذخیره‌شده'});
    assert(text(view).includes('ماده جایگزین'),'Saved alternatives must also appear in the case archive');
    assert.equal(text(view).split('یادداشت نسخه مصنوعی').length-1,1,'Show historical notes exactly once');assert.equal(view.findAllByType('h3').length,0,'The archive already supplies the document heading');
    assert(text(view).includes('۱۵۰ گرم'));assert.equal(view.findAllByType('tbody')[0].findAllByType('tr').length,2);
+   const deliveryButton=()=>tree.root.findAllByType('button').find(b=>text(b)==='ارسال به حساب مراجع');
+   assert.equal(deliveryButton(),undefined,'Archived nutrition can be viewed while delivery is off');
+   await act(async()=>tree.update(createElement(AuthoredPlanArchive,{org,record:'synthetic-record',name:'مراجع مصنوعی',phone:'09100123452',deliveryEnabled:true,canDeliver:true})));
+   assert.equal(deliveryButton().props.disabled,false,'Only an opted-in specialist can see the optional action');
    await act(async()=>tree.root.findAllByType('button').filter(b=>text(b)==='مشاهده برنامه اختصاصی')[1].props.onClick());
    assert(text(tree.root.findByProps({'aria-label':'مشاهده برنامه اختصاصی ذخیره‌شده'})).includes('دستور قدیمی'));
    assert.equal(JSON.stringify(rows),before,'Viewing must not rewrite historical records');

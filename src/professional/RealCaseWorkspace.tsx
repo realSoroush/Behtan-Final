@@ -731,7 +731,7 @@ function RealCaseDetail({
                   ))}
                 </ul>
                 <div className="pro-actions"><button disabled={busy||plansPage===0} onClick={()=>void run(async()=>{const r=await realCaseApi.plans(org,id,plansPage-1);setPlans(r.rows);setPlansPage(p=>p-1);})}>برنامه‌های جدیدتر</button><span>صفحه {(plansPage+1).toLocaleString('fa-IR')} · {plansTotal.toLocaleString('fa-IR')} برنامه</span><button disabled={busy||(plansPage+1)*10>=plansTotal} onClick={()=>void run(async()=>{const r=await realCaseApi.plans(org,id,plansPage+1);setPlans(r.rows);setPlansPage(p=>p+1);})}>برنامه‌های قدیمی‌تر</button></div>
-                <Suspense fallback={<AppLoading label="در حال بازکردن ابزار پرونده…" />}><AuthoredPlanArchive key={`${org}:${id}:${authoredArchiveVersion}`} org={org} record={id} name={form.display_name} /></Suspense>
+                <Suspense fallback={<AppLoading label="در حال بازکردن ابزار پرونده…" />}><AuthoredPlanArchive key={`${org}:${id}:${authoredArchiveVersion}`} org={org} record={id} name={form.display_name} phone={form.phone} deliveryEnabled={access?.nutrition_delivery === true} canDeliver={Boolean(access?.can_write&&access?.modules?.nutrition)&&!archived&&!dirty&&!stale&&!connectionWarning} /></Suspense>
               </section>
             </>
           )}

@@ -890,3 +890,35 @@ for (const outcome of ['confirm', 'dismiss', 'retry', 'stale'] as const) {
     }
   });
 }
+
+test('the member can open the specialist snapshot with its original portions and macros', async ({ page }) => {
+  await page.route('**/rest/v1/rpc/member_prescribed_nutrition', route => route.fulfill({ json: [{
+    id: '11111111-1111-4111-8111-111111111199',
+    recorded_at: '2026-11-04T10:00:00Z',
+    delivered_at: '2026-11-04T11:00:00Z',
+    content: {
+      version: 1, title: 'نسخه ارسال‌شده', notes: 'یادداشت برای مراجع', reviewed: true,
+      sections: [{
+        title: 'ناهار', nutritionDay: 'rest',
+        lines: [{ name: 'مرغ پرونده', details: '', food: {
+          id: 'synthetic-chicken', grams: 125, gramsPerUnit: 100, basis: 'پخته',
+          kcal: 160, protein: 24, carbs: 0, fat: 7,
+        } }],
+      }],
+    },
+  }] }));
+  await page.getByRole('link', { name: 'حساب من', exact: true }).click();
+  const prescriptions = page.getByRole('region', { name: 'برنامه‌های متخصص', exact: true });
+  await prescriptions.getByRole('button', { name: 'دریافت برنامه‌ها', exact: true }).click();
+  await prescriptions.getByRole('button', { name: /نسخه ارسال‌شده/ }).click();
+  await expect(prescriptions.getByText('مرغ پرونده')).toBeVisible();
+  await expect(prescriptions.getByText(/۱۲۵ گرم · پخته/)).toBeVisible();
+  await expect(prescriptions.getByText(/جمع منوهای اول · ۲۰۰ کالری · پروتئین ۳۰/)).toBeVisible();
+  await expect(prescriptions.getByText('یادداشت برای مراجع')).toBeVisible();
+  await page.route('**/functions/v1/payments*', route => route.abort());
+  await page.goto('/index.html?prescription=1');
+  await prescriptions.getByRole('button', { name: 'دریافت برنامه‌ها', exact: true }).click();
+  await prescriptions.getByRole('button', { name: /نسخه ارسال‌شده/ }).click();
+  await expect(prescriptions.getByText(/۱۲۵ گرم · پخته/)).toBeVisible();
+
+});
