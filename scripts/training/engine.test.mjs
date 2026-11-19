@@ -5,7 +5,7 @@ import {
   parseTrainingInput,
   progressionAdvice,
 } from "../../src/training/engine.ts";
-import { canReuseMemberTraining, trainingProfile } from "../../server/member/trainingProfile.ts";
+import { canReuseMemberTraining, eligibleMemberTrainingInput, trainingProfile } from "../../server/member/trainingProfile.ts";
 import { EXERCISES } from "../../src/training/catalog.ts";
 import { trainingHtml } from "../../src/training/print.ts";
 import { emptyRealIntake } from "../../src/professional/menuPlan.ts";
@@ -142,6 +142,9 @@ for (const patch of [
   rejects(() => parseTrainingInput({ ...input, ...patch }), "TRAINING_");
 for (const patch of [
   { minutes: "45" },
+  { location: ["home"] },
+  { experience: ["regular"] },
+  { goal: ["muscle"] },
   { minutes: NaN },
   { equipment: ["machine"] },
   { equipment: ["dumbbells", "dumbbells"] },
@@ -267,6 +270,19 @@ for (let mask = 1; mask < 128; mask++) {
   }
 }
 
+const stableSplit = buildTrainingPlan(answers, { ...input, days: [0, 1, 3] }, 1, now, true);
+const titles = stableSplit.weeks[0].sessions.map(session => session.title);
+for (const week of stableSplit.weeks) assert.deepEqual(week.sessions.map(session => session.title), titles);
+
+const machineInput = {
+  ...input, location: "gym", days: [0, 1, 2, 3],
+  equipment: ["seated_row", "lat_pulldown"],
+};
+const machineSplit = buildTrainingPlan(answers, machineInput, 1, now, true);
+const machinePulls = machineSplit.weeks.map(week => week.sessions.flatMap(session =>
+  session.lines.filter(line => line.exercise.pattern === "pull").map(line => line.exercise.id)));
+for (const pulls of machinePulls) assert.deepEqual(pulls, ["0180", "0818"]);
+
 // More time never removes previously assigned work, including around 45 and 60 minutes.
 for (const days of [[0, 3], [0, 1], [0, 1, 3, 4, 6]]) {
   for (const experience of ["beginner", "regular"]) {
@@ -287,6 +303,13 @@ for (const days of [[0, 3], [0, 1], [0, 1, 3, 4, 6]]) {
   }
 }
 rejects(() => buildTrainingPlan(answers, { ...input, minutes: 15 }, 1, now, true), "TRAINING_TIME_BUDGET");
+
+// The earlier default starter prescriptions must not gain sets just because the budget can fit them.
+const starter = { ...input, experience: "regular" };
+for (const [minutes, expectedSets] of [[30, 6], [45, 12], [60, 17], [75, 17]]) {
+  const plan = buildTrainingPlan(answers, { ...starter, minutes }, 1, now, true);
+  assert.equal(plan.weeks[3].sessions[0].lines.reduce((sum, line) => sum + line.sets, 0), expectedSets);
+}
 
 const member = {
   display_name: "Synthetic",
@@ -320,7 +343,21 @@ assert(!canReuse({ workout_weekdays: [1, 4] }));
 assert(!canReuse({ workout_days: 3 }));
 assert(!canReuse({ medical_conditions_json: { ...member.medical_conditions_json, injuries: "Reported" } }));
 assert(!canReuse({ medical_conditions_json: { ...member.medical_conditions_json, safetyAnswersConfirmed: false } }));
+for (const incomplete of [
+  { safetyScreeningVersion: undefined },
+  { safetyScreeningVersion: 2 },
+  { pregnancyStatus: undefined },
+  { eatingDisorderStatus: undefined },
+]) {
+  const profile = { ...member, medical_conditions_json: { ...member.medical_conditions_json, ...incomplete } };
+  assert(!canReuseMemberTraining(storedPlan, legacySnapshot, profile, now));
+  rejects(() => buildTrainingPlan(trainingProfile(profile), regularInput, 1, now), "TRAINING_REVIEW_REQUIRED");
+}
 assert(!canReuse({}, "invalid snapshot"));
+assert(!canReuse({ gender: null }));
+assert.equal(eligibleMemberTrainingInput(storedPlan, member, new Date("2060-01-01T12:00Z")), null,
+  "A plan recovered after checkout still needs to pass current age eligibility");
+assert(eligibleMemberTrainingInput(storedPlan, member, now));
 const unsupported = buildTrainingPlan(trainingProfile(member), { ...input, equipment: ["dumbbells"] }, 1, now);
 assert(!canReuse({ weight: 100 }, legacySnapshot, unsupported), "A newly required supported push invalidates the old plan");
 console.log("PASS weekly coverage across every Pro schedule, monotonic set budgets, and compatible legacy member plans");

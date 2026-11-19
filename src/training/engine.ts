@@ -59,9 +59,9 @@ export function parseTrainingInput(value: unknown, professional = false): Traini
   ]);
   if (
     b.version !== 1 ||
-    !["home", "gym"].includes(String(b.location)) ||
-    !["beginner", "returning", "regular"].includes(String(b.experience)) ||
-    !["general", "muscle"].includes(String(b.goal)) ||
+    (b.location !== "home" && b.location !== "gym") ||
+    (b.experience !== "beginner" && b.experience !== "returning" && b.experience !== "regular") ||
+    (b.goal !== "general" && b.goal !== "muscle") ||
     (professional ? (!Number.isInteger(b.minutes) || Number(b.minutes)<15 || Number(b.minutes)>180) : ![45, 60].includes(Number(b.minutes))) ||
     typeof b.minutes !== "number"
   )
@@ -265,7 +265,7 @@ function select(
     .map((id) => EXERCISES.find((e) => e.id === id)!)
     .filter((e) => e.equipment.every((x) => input.equipment.includes(x)));
   if (!available.length) return fail("TRAINING_EQUIPMENT");
-  // Alternate only between equivalent pulls; repeat fundamentals to support learning.
+  // Rotate between the available pulls and repeat the other patterns to support learning.
   return available[pattern === "pull" ? variant % available.length : 0];
 }
 /** Whether the engine uses the supported, lower-load starting template. */
@@ -342,19 +342,24 @@ export function buildTrainingPlan(
   const scheduledDays = [...input.days].sort(
     (a, b) => ((a - startDay + 7) % 7) - ((b - startDay + 7) % 7),
   );
+  const weekBoundaryGap = (scheduledDays[0] - scheduledDays[scheduledDays.length - 1] + 7) % 7;
+  // Keep weekdays stable unless an odd split would repeat the same muscle group across adjacent weeks.
+  const alternateWeeks = split && scheduledDays.length % 2 === 1 && weekBoundaryGap === 1;
+  let upperSessionIndex = 0;
   const weeks = [1, 2, 3, 4].map((week) => ({
     week,
     sessions: scheduledDays.map((day, index) => {
       // Alternating upper/lower covers both in every split week, including two-day weeks.
-      // Carry the alternation across weeks so consecutive sessions never share a split.
-      const upperDay = ((week - 1) * scheduledDays.length + index) % 2 === 0;
+      const upperDay = (index + (alternateWeeks ? week - 1 : 0)) % 2 === 0;
+      // Calendar parity can repeat every upper day. Rotate by actual upper sessions instead.
+      const pullVariant = split && upperDay ? upperSessionIndex++ : index;
       const patterns = split ? (upperDay ? upper : lower) : fullBody;
       const accessories: Pattern[] = [];
       if (split && upperDay) accessories.push("shoulder", "arms");
       if (!split && input.minutes >= 60 && input.goal === "muscle") accessories.push("shoulder");
 
       const createLine = (pattern: Pattern): TrainingLine => ({
-        exercise: structuredClone(select(pattern, input, index, conservative)),
+        exercise: structuredClone(select(pattern, input, pullVariant, conservative)),
         sets: 1,
         reps: pattern === "core" ? [6, 10] : pattern === "calf" ? [10, 15] : [8, 12],
         per_side: pattern === "core",
@@ -364,7 +369,10 @@ export function buildTrainingPlan(
       const availableAccessories = accessories.filter(pattern => EXERCISES.some(
         exercise => exercise.pattern === pattern && exercise.equipment.every(e => input.equipment.includes(e)),
       ));
-      const targetSets = conservative ? (week === 1 ? 1 : 2) : (week < 3 ? 2 : 3);
+      // Keep the existing starter dose for short sessions and progressively add sets in longer blocks.
+      let targetSets = 2;
+      if ((professional && input.minutes < 45) || (conservative && week === 1)) targetSets = 1;
+      else if (!conservative && week >= 3 && input.minutes >= 60) targetSets = 3;
       const lines = fitSession(patterns.map(createLine), availableAccessories.map(createLine), input.minutes, targetSets);
       const estimated_minutes = Math.ceil(sessionSeconds(lines) / 60);
       const sessionDate = new Date(start);

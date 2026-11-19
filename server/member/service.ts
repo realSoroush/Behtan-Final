@@ -14,7 +14,7 @@ import {
 import type { UserProfile } from "../../src/types/index.ts";
 import { buildTrainingPlan } from "../../src/training/engine.ts";
 import type { TrainingPlan } from "../../src/training/types.ts";
-import { canReuseMemberTraining, trainingProfile } from "./trainingProfile.ts";
+import { canReuseMemberTraining, eligibleMemberTrainingInput, trainingProfile } from "./trainingProfile.ts";
 export function memberService() {
   const url = process.env.VITE_SUPABASE_URL,
     key = process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -136,8 +136,10 @@ export function memberService() {
         return { plan, created_at: stored.created_at };
       }
       // A paid order carries the exact plan approved before checkout. Recover it after redirects as well.
-      const approved = await rpc('member_activate_training',{p_user:user});
-      return approved ? {plan:approved} : {plan:null,needsPreparation:true};
+      const approved = await rpc("member_activate_training", { p_user: user }) as TrainingPlan | null;
+      if (!approved) return { plan: null, needsPreparation: true };
+      if (!eligibleMemberTrainingInput(approved, profile)) return { plan: null, outdated: true };
+      return { plan: approved };
     }
     throw Error("INVALID_REQUEST");
   };
