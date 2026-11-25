@@ -1,3 +1,4 @@
+import { proPlanAccessToken } from './planSession';
 import { parsePilotServerTiming, recordPilotTiming } from '../utils/pilotTimings';
 import { supabase } from "@/lib/supabaseClient";
 import { rpc } from "./api";
@@ -83,28 +84,31 @@ async function planRequest<T>(body: Record<string, unknown>): Promise<T> {
       ...(response ? { phases_ms: parsePilotServerTiming(response.headers.get('Server-Timing')) } : {}),
     });
   };
-  const { data, error } = await supabase.auth.getSession();
-  if (error || !data.session) throw new Error('PRO_AUTH_REQUIRED');
-  const signal = AbortSignal.timeout(60_000);
+  const signal = AbortSignal.timeout(65_000);
   let response: Response;
   try {
+    const token = await proPlanAccessToken(AbortSignal.any([signal, AbortSignal.timeout(8_000)]));
     response = await fetch('/api/pro-plan', {
-      method:'POST', headers:{'Content-Type':'application/json',Authorization:`Bearer ${data.session.access_token}`},
+      method:'POST', headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},
       body:JSON.stringify(body), signal,
     });
-  } catch {
+  } catch (error) {
     reportGeneration();
-    throw new Error(signal.aborted ? 'PRO_REQUEST_TIMEOUT' : 'PRO_CONNECTION_ERROR');
+    if (error instanceof Error && error.message === 'PRO_AUTH_REQUIRED') throw error;
+    const timedOut = signal.aborted || (error instanceof Error && error.name === 'TimeoutError');
+    throw new Error(timedOut ? 'PRO_REQUEST_TIMEOUT' : 'PRO_CONNECTION_ERROR');
   }
-  let value: {error?: string};
+  const id = response.headers.get('X-Request-Id');
+  const fail = (code: string) => new Error(code + (id ? ' [' + id + ']' : ''));
+  let value: {error?: string} | null;
   try { value = await response.json(); } catch {
     reportGeneration(response);
-    throw new Error(response.status === 404 || response.ok ? 'PRO_API_NOT_DEPLOYED' : 'PRO_API_UNAVAILABLE');
+    if (signal.aborted || response.status === 504) throw fail('PRO_REQUEST_TIMEOUT');
+    throw fail(response.status === 404 || response.ok ? 'PRO_API_NOT_DEPLOYED' : 'PRO_API_UNAVAILABLE');
   }
   reportGeneration(response);
   if (!response.ok) {
-    const id=response.headers.get('X-Request-Id');
-    throw new Error((value.error || 'PRO_CONNECTION_ERROR') + (id ? ' ['+id+']' : ''));
+    throw fail(value?.error || (response.status === 504 ? 'PRO_REQUEST_TIMEOUT' : 'PRO_CONNECTION_ERROR'));
   }
   return value as T;
 }

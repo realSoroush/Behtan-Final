@@ -31,14 +31,17 @@ const uuid = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{8}
 export async function processPlanRequest(
   body: unknown, token: string, deps: PlanDependencies,
   observe?: (phase: PlanPhase, milliseconds: number, details?: { cacheHit?: boolean }) => void,
+  checkDeadline?: () => void,
 ) {
   async function measure<T>(phase: PlanPhase, work: () => T | Promise<T>): Promise<T> {
+    checkDeadline?.();
     const start = performance.now();
     let details: { cacheHit?: boolean } | undefined;
     try {
       const result = await work();
       if (phase === 'catalog' && result && typeof result === 'object' && 'cacheHit' in result)
         details = { cacheHit: result.cacheHit === true };
+      checkDeadline?.();
       return result;
     } finally {
       observe?.(phase, Math.round(performance.now() - start), details);
@@ -91,11 +94,12 @@ export async function processPlanRequest(
   const plan = await measure('solve', () => {
     try {
       const engine = createMealPlanEngine(catalog, revision);
-      const result = generatePrintedPlan(current.answers, current.revision, request.count, policy, request.date, request.notes, engine, { mealStructure: mealStructureFor(request.mealSettings), proteinPrices });
+      const result = generatePrintedPlan(current.answers, current.revision, request.count, policy, request.date, request.notes, engine, { mealStructure: mealStructureFor(request.mealSettings), proteinPrices }, checkDeadline);
       if (request.mealSettings) result.meal_settings = request.mealSettings;
       if (revision) result.catalog_revision = revision;
       return result;
     } catch (error) {
+      if (error instanceof ProServerError) throw error;
       if (error instanceof ProMenuCountError)
         throw new ProServerError(error.reason === 'search-limit' ? 'PRO_MENU_SEARCH_LIMIT' : 'PRO_MENU_COUNT_UNAVAILABLE', 422);
       if (error instanceof MealPlanGenerationError)
