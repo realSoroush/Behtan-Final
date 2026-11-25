@@ -39,6 +39,15 @@ deny=true;await reject(()=>processPlanRequest(body,'valid-token',deps),'PRO_ACCE
 answers={...answers,medical_conditions:['kidney_disease']};
 await reject(()=>processPlanRequest(body,'valid-token',deps),'PRO_MEDICAL_STOP');
 equal(stageCalls,0);answers={...answers,medical_conditions:[]};
+// Interrupt actual menu search before it can stage a partial or late draft.
+let solving=false, checkpoints=0;
+await reject(() => processPlanRequest({...body,key:randomUUID()},'valid-token',{
+ ...deps,
+ async loadNutrition(){ return {catalog:TEST_NUTRITION_CATALOG,policy:DEFAULT_PROTEIN_ENGINE_POLICY}; },
+}, phase => { if(phase==='catalog') solving=true; }, () => {
+ if(solving && ++checkpoints===5) throw new ProServerError('PRO_REQUEST_TIMEOUT',504);
+}), 'PRO_REQUEST_TIMEOUT');
+equal(stageCalls,0);
 const generated=await processPlanRequest(body,'valid-token',deps);
 equal(generated.plan.display_name,answers.display_name);
 equal(generated.plan.intake_revision,1);
@@ -103,6 +112,10 @@ try{
  Object.assign(process.env,{VITE_SUPABASE_URL:'https://health-test.supabase.co',VITE_SUPABASE_ANON_KEY:'public-test',SUPABASE_SERVICE_ROLE_KEY:'private-test-never-expose',PRO_SERVER_PLANS_ENABLED:'true'});
  globalThis.fetch=async(input,init)=>{
   const path=new URL(String(input)).pathname;
+  if(path.endsWith('/auth/v1/user') && healthMode==='auth-stalled'){
+   assert.ok(init.signal);
+   return new Promise((_,reject)=>init.signal.addEventListener('abort',()=>reject(init.signal.reason),{once:true}));
+  }
   if(path.endsWith('/auth/v1/user'))return new Response(JSON.stringify(healthMode==='auth-denied'?{message:'denied'}:{id:actor,phone:'989000000000',phone_confirmed_at:'2026-01-01T00:00:00Z',aud:'authenticated',app_metadata:{},user_metadata:{},created_at:'2026-01-01T00:00:00Z'}),{status:healthMode==='auth-denied'?401:200,headers:{'Content-Type':'application/json'}});
   if(path.endsWith('/pro_pilot_status'))return new Response(JSON.stringify(healthMode!=='access-denied'),{headers:{'Content-Type':'application/json'}});
   if(path.endsWith('/pro_prepare_server_plan')){
@@ -120,6 +133,15 @@ try{
   return new Response(JSON.stringify('operations-v2'),{headers:{'Content-Type':'application/json'}});
  };
  const healthy=await proHealth('valid-token');equal(healthy.ready,true);equal(healthy.scope,'server-and-migration');equal(healthy.generationAccess,'057');equal(JSON.stringify(healthy).includes('private-test-never-expose'),false);
+ healthMode='auth-stalled';
+ const abort=new AbortController();
+ const health=proHealth('valid-token',abort.signal);
+ const generation=supabasePlanDependencies(abort.signal).verifyToken('valid-token');
+ setImmediate(()=>abort.abort(new DOMException('Timed out','TimeoutError')));
+ await Promise.all([
+  reject(()=>health,'PRO_REQUEST_TIMEOUT'),
+  reject(()=>generation,'PRO_REQUEST_TIMEOUT'),
+ ]);
  healthMode='legacy-057';equal((await proHealth('valid-token')).generationAccess,'legacy');
  healthMode='unchecked-057';await reject(()=>proHealth('valid-token'),'PRO_CONNECTION_ERROR');
  healthMode='ready';

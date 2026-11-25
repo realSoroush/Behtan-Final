@@ -3,6 +3,8 @@ import { readNutritionContext, NutritionContextError, type NutritionContext } fr
 import type { RealIntake } from '../src/professional/menuPlan.ts';
 import { ProServerError, type PlanDependencies, type ServerDraft } from './proPlanService.ts';
 
+import { PRO_PLAN_TIMEOUT, proDeadlineFetch } from './proPlanDeadline.ts';
+
 let catalogCache: { source: string; context: NutritionContext } | undefined;
 
 function databaseError(error: { message: string; code?: string }, status = 0): never {
@@ -16,17 +18,20 @@ function databaseError(error: { message: string; code?: string }, status = 0): n
   if (status === 403 || error.code === '42501' || error.code === 'PGRST116') throw new ProServerError('PRO_ACCESS_DENIED', 403);
   throw new ProServerError('PRO_CONNECTION_ERROR', 503);
 }
-export function supabasePlanDependencies(): PlanDependencies {
+export function supabasePlanDependencies(deadline = AbortSignal.timeout(50_000)): PlanDependencies {
   const url = process.env.VITE_SUPABASE_URL;
   const anon = process.env.VITE_SUPABASE_ANON_KEY;
   const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (process.env.PRO_SERVER_PLANS_ENABLED !== 'true' || !url || !anon || !secret)
     throw new ProServerError('PRO_SERVER_NOT_CONFIGURED', 503);
-  const options = { auth: { persistSession:false, autoRefreshToken:false, detectSessionInUrl:false } };
+  const ensureResponse = () => { if (deadline.aborted) throw new ProServerError(PRO_PLAN_TIMEOUT, 504); };
+  const signalFor = (ms: number) => AbortSignal.any([deadline, AbortSignal.timeout(ms)]);
+  const options = { auth: { persistSession:false, autoRefreshToken:false, detectSessionInUrl:false }, global: { fetch: proDeadlineFetch(deadline, 12_000) } };
   const admin = createClient(url, secret, options);
-  const userClient = (token: string) => createClient(url, anon, { ...options, global: { headers: { Authorization: `Bearer ${token}` } } });
+  const userClient = (token: string) => createClient(url, anon, { ...options, global: { fetch: proDeadlineFetch(deadline, 5_000), headers: { Authorization: `Bearer ${token}` } } });
   const call = async <T>(name: string, args: Record<string,unknown>): Promise<T> => {
-    const { data, error, status } = await admin.rpc(name, args).abortSignal(AbortSignal.timeout(12000)).retry(false);
+    const { data, error, status } = await admin.rpc(name, args).abortSignal(signalFor(12_000)).retry(false);
+    ensureResponse();
     if (error) {
       if(status===401 || ((status===403 || error.code==='42501') && !error.message.includes('PRO_')))throw new ProServerError('PRO_SERVER_CREDENTIAL_INVALID',503);
       databaseError(error,status);
@@ -34,9 +39,10 @@ export function supabasePlanDependencies(): PlanDependencies {
     return data as T;
   };
   return {
-    async reportFailure(x) { await admin.rpc('pro_report_failure',{p_id:x.id,p_actor:x.actor,p_org:x.org,p_operation:x.operation,p_code:x.code}).abortSignal(AbortSignal.timeout(2000)); },
+    async reportFailure(x) { await admin.rpc('pro_report_failure',{p_id:x.id,p_actor:x.actor,p_org:x.org,p_operation:x.operation,p_code:x.code}).abortSignal(signalFor(2000)).retry(false); },
     async verifyToken(token) {
       const { data, error } = await userClient(token).auth.getUser(token);
+      ensureResponse();
       if (error) {
         if ('status' in error && Number(error.status) >= 500) throw new ProServerError('PRO_CONNECTION_ERROR',503);
         if (error.name === 'AuthRetryableFetchError') throw new ProServerError('PRO_CONNECTION_ERROR',503);
@@ -47,12 +53,13 @@ export function supabasePlanDependencies(): PlanDependencies {
     },
     async readCase(token, org, record) {
       const db = userClient(token);
-      const signal = AbortSignal.timeout(12000);
+      const signal = signalFor(12_000);
       const [{ data, error, status }, access] = await Promise.all([
         db.from('pro_real_cases').select('answers,revision,archived_at')
           .eq('organization_id', org).eq('id', record).abortSignal(signal).retry(false).single(),
         db.rpc('pro_workspace_status', { p_org: org }).abortSignal(signal).retry(false),
       ]);
+      ensureResponse();
       if (error) databaseError(error,status);
       if (!data) throw new ProServerError('PRO_ACCESS_DENIED',403);
       if(data.archived_at)throw new ProServerError('PRO_CASE_ARCHIVED',409);
@@ -80,10 +87,12 @@ export function supabasePlanDependencies(): PlanDependencies {
       void token;
       try {
         const cached = catalogCache?.source === url ? catalogCache.context : undefined;
-        const context = await readNutritionContext(admin, AbortSignal.timeout(12000), cached);
+        const context = await readNutritionContext(admin, signalFor(12_000), cached);
+        ensureResponse();
         catalogCache = { source: url, context };
         return { ...context, cacheHit: context === cached };
       } catch (error) {
+        ensureResponse();
         if (error instanceof NutritionContextError) {
           if (error.status === 401 || error.status === 403) throw new ProServerError('PRO_SERVER_CREDENTIAL_INVALID', 503);
           if (error.code === 'PGRST202') throw new ProServerError('PRO_MIGRATION_REQUIRED', 503);

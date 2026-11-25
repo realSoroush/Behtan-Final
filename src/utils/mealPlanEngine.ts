@@ -1656,7 +1656,7 @@ function fitProfessionalMeal(engine:EngineCatalog, meal:Meal, reference:Meal, da
 
 /** Adjust complete Pro alternatives together against the worst-case daily
  * envelope. A valid result covers all combinations, not just paired menu rows. */
-function rebalanceProfessionalMenusWithCatalog(engine:EngineCatalog,source:ProfessionalMenuSlot[],targets:MacroTargets,reference:Meal[],pools:ProfessionalMenuSlot[]=source):ProfessionalMenuSlot[]|null {
+function rebalanceProfessionalMenusWithCatalog(engine:EngineCatalog,source:ProfessionalMenuSlot[],targets:MacroTargets,reference:Meal[],pools:ProfessionalMenuSlot[]=source,checkDeadline?:()=>void):ProfessionalMenuSlot[]|null {
   const slots=structuredClone(source),scale=menuTargetVector(targets);
   const anchors=new Map(reference.map(m=>[m.slot,m]));
   const dayCalories=reference.reduce((n,m)=>n+m.totalKcal,0);
@@ -1665,9 +1665,11 @@ function rebalanceProfessionalMenusWithCatalog(engine:EngineCatalog,source:Profe
     return sum+s.options.reduce((n,m)=>n+menuNutrients.reduce((v,k,i)=>v+Math.pow((m[k]-base[k])/Math.max(1,scale[i]),2),0),0)/s.options.length;
   },0);
   for(let pass=0;pass<10;pass++) {
+    checkDeadline?.();
     if(professionalMenusFeasible(slots,targets))return slots;
     let changed=false;
     for(const slot of slots)for(let option=0;option<slot.options.length;option++) {
+      checkDeadline?.();
       const template=engine.templatesById.get(slot.options[option].templateId.split('~')[0]);
       for(let index=0;index<slot.options[option].components.length;index++) {
         const original=slot.options[option],component=original.components[index];
@@ -1694,6 +1696,7 @@ function rebalanceProfessionalMenusWithCatalog(engine:EngineCatalog,source:Profe
       if(score()<before-1e-12)changed=true;else slot.options=previous;
     }
     if(!changed || pass===1)for(let index=0;index<slots.length;index++) {
+      checkDeadline?.();
       const slot=slots[index],count=slot.options.length,other=professionalMenuBounds(slots.filter((_,i)=>i!==index));
       const limits={min:scale.map((t,k)=>t*(k===0?.95:.9)-other[k].min),max:scale.map((t,k)=>t*(k===0?1.03:1.1)-other[k].max)};
       const anchor=anchors.get(slot.slot)!,identity=professionalMenuIdentity;

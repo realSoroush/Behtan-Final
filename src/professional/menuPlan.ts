@@ -82,11 +82,12 @@ export class ProMenuCountError extends Error {
 }
 /** Select whole option groups together. Greedy per-slot appends can exhaust
  * the day's tolerance before later slots receive their requested options. */
-export function selectProfessionalMenus(pools:MenuDay['slots'],targets:MacroTargets,count:number, repair?:(slots:MenuDay['slots'])=>MenuDay['slots']|null):MenuDay['slots']|null {
+export function selectProfessionalMenus(pools:MenuDay['slots'],targets:MacroTargets,count:number, repair?:(slots:MenuDay['slots'])=>MenuDay['slots']|null, checkDeadline?:()=>void):MenuDay['slots']|null {
   const daily=[targets.targetCalories,targets.proteinGrams,targets.carbGrams,targets.fatGrams];
   const vector=(meal:Meal)=>fields.map(f=>meal[f]);
   const bounds=(meals:Meal[])=>({min:fields.map(f=>Math.min(...meals.map(m=>m[f]))),max:fields.map(f=>Math.max(...meals.map(m=>m[f])))});
   const groups=pools.map(pool=>{
+    checkDeadline?.();
     const byRecipe = new Map<string, Meal>();
     for (const meal of pool.options) {
       const identity = menuIdentity(meal);
@@ -104,6 +105,7 @@ export function selectProfessionalMenus(pools:MenuDay['slots'],targets:MacroTarg
       if (!found.has(key)) found.set(key, { meals, ...bounds(meals), variety: variety(meals) });
     };
     for(const anchor of choices.slice(0,80)) {
+      checkDeadline?.();
       const meals=[anchor];
       while(meals.length<count) {
         let best:Meal|undefined,score=Infinity;
@@ -143,6 +145,7 @@ export function selectProfessionalMenus(pools:MenuDay['slots'],targets:MacroTarg
   // Retain bounds only for candidates that enter the beam.
   const min=[0,0,0,0],max=[0,0,0,0];
   for(let slot=0;slot<groups.length;slot++) {
+    checkDeadline?.();
     const rest=pools.slice(slot+1).map(p=>vector(p.options[0]));
     const reference=fields.map((_,i)=>rest.reduce((s,v)=>s+v[i],0));
     const next:State[]=[];
@@ -179,7 +182,8 @@ export function selectProfessionalMenus(pools:MenuDay['slots'],targets:MacroTarg
   }
   const repairStates=beam.slice(0,3),seen=new Set<string>();
   for(const state of beam){const key=[state.chosen[0],state.chosen[state.chosen.length-1],...pools.flatMap((p,i)=>p.slot==='post_workout'?[state.chosen[i]]:[])].join(':');if(!seen.has(key)){seen.add(key);repairStates.push(state);}if(repairStates.length>=30)break;}
-  if(repair)for(const state of repairStates){
+  if(repair)for(const state of new Set(repairStates)){
+    checkDeadline?.();
     const fixed=repair(pools.map((p,i)=>({...p,options:groups[i][state.chosen[i]].meals})));
     if(fixed&&hasExactMenus(fixed,pools,count)&&menuCombinationsFeasible(fixed,targets))return fixed;
   }
@@ -235,6 +239,7 @@ export function generatePrintedPlan(
   notes = "",
   engine: Pick<MealPlanEngine, 'generateDailyMealPlan' | 'getProfessionalMealOptions'> & Partial<Pick<MealPlanEngine, 'rebalanceProfessionalMenus' | 'canUseProfessionalMeal'>> = { generateDailyMealPlan, getProfessionalMealOptions, rebalanceProfessionalMenus, canUseProfessionalMeal },
   context: Pick<MealExperienceContext, 'mealStructure' | 'proteinPrices'> = {},
+  checkDeadline?: () => void,
 ): PrintedPlan {
   if (!Number.isInteger(count) || count < 1 || count > 5)
     throw new Error("تعداد منو باید بین ۱ تا ۵ باشد.");
@@ -251,6 +256,7 @@ export function generatePrintedPlan(
   };
   const days: MenuDay[] = [];
   for (const workout of a.workout_days > 0 ? [false, true] : [false]) {
+    checkDeadline?.();
     const { targets, trace } = calculateFullNutritionPlanWithTrace({
       weightKg: a.weight_kg,
       heightCm: a.height_cm,
@@ -284,15 +290,19 @@ export function generatePrintedPlan(
     const eligible = (meal: Meal) =>
       (engine.canUseProfessionalMeal?.(meal, workout) ?? true) &&
       professionalRecipeAllowed(meal.components.map(c => c.foodItem));
-    const pools = base.meals.map(meal => ({
-      slot: meal.slot, label: meal.label,
-      options: (count === 1 && eligible(meal)
-        ? [meal] : [meal, ...engine.getProfessionalMealOptions(meal, preferences, workout, targets, referenceCalories)])
-        .filter(eligible),
-    }));
+    const pools = base.meals.map(meal => {
+      checkDeadline?.();
+      return {
+        slot: meal.slot, label: meal.label,
+        options: (count === 1 && eligible(meal)
+          ? [meal] : [meal, ...engine.getProfessionalMealOptions(meal, preferences, workout, targets, referenceCalories)])
+          .filter(eligible),
+      };
+    });
     let slots = count === 1 && pools.every(pool => pool.options.length === 1) ? pools
-      : selectProfessionalMenus(pools,targets,count,engine.rebalanceProfessionalMenus?slots=>engine.rebalanceProfessionalMenus!(slots,targets,base.meals,pools):undefined);
+      : selectProfessionalMenus(pools,targets,count,engine.rebalanceProfessionalMenus?slots=>engine.rebalanceProfessionalMenus!(slots,targets,base.meals,pools,checkDeadline):undefined,checkDeadline);
     if(!slots || !hasExactMenus(slots,pools,count) || slots.some(slot => slot.options.some(meal => !eligible(meal))) || !menuCombinationsFeasible(slots,targets)) {
+      checkDeadline?.();
       const exact = exhaustiveMenuSearch(pools, targets, count);
       if (exact.kind !== 'found') {
         throw new ProMenuCountError(count,pools.map(slot=>({slot:slot.slot,label:slot.label,available:new Set(slot.options.map(menuIdentity)).size})),exact.kind);
